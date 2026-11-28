@@ -3,7 +3,11 @@ import { mount, type VueWrapper } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { defineComponent, h } from 'vue'
 
-import { assetHref, useAssetRoute } from '../../src/neon/sections/investment/asset-route'
+import {
+  assetHref,
+  instrumentHref,
+  useAssetRoute,
+} from '../../src/neon/sections/investment/asset-route'
 
 /**
  * The route of an asset's detail (#439, #440) against the browser's history:
@@ -137,6 +141,85 @@ describe('useAssetRoute', () => {
     route.reset()
     expect(route.selected.value).toBeNull()
     expect(route.movements.value).toBe(false)
+  })
+})
+
+describe('useAssetRoute: detalle de instrumento', () => {
+  it('abrirlo desde una cuenta deja su dirección y atrás vuelve al detalle de la cuenta', async () => {
+    const route = mountRoute('/inversion')
+    route.open('crypto')
+    route.openInstrument('i-eth')
+    expect(address()).toBe('/inversion?instrumento=i-eth')
+    expect(route.instrument.value).toBe('i-eth')
+    expect(route.selected.value).toBeNull()
+
+    await navigate(() => route.closeInstrument())
+    expect(address()).toBe('/inversion?activo=crypto')
+    expect(route.instrument.value).toBeNull()
+    expect(route.selected.value).toBe('crypto')
+  })
+
+  it('abrirlo desde la portada y volver deja la portada', async () => {
+    const route = mountRoute('/inversion')
+    route.openInstrument('i-eth')
+
+    await navigate(() => route.closeInstrument())
+    expect(address()).toBe('/inversion')
+    expect(route.instrument.value).toBeNull()
+  })
+
+  it('un enlace cargado al instrumento funciona al recargar y se cierra reescribiendo la dirección', () => {
+    const route = mountRoute('/inversion?instrumento=i-eth')
+    expect(route.instrument.value).toBe('i-eth')
+    expect(route.selected.value).toBeNull()
+
+    route.closeInstrument()
+    expect(address()).toBe('/inversion')
+    expect(route.instrument.value).toBeNull()
+  })
+
+  it('el botón atrás del navegador sale del instrumento', async () => {
+    const route = mountRoute('/inversion')
+    route.open('crypto')
+    route.openInstrument('i-eth')
+
+    await navigate(() => window.history.back())
+    expect(route.instrument.value).toBeNull()
+    expect(route.selected.value).toBe('crypto')
+  })
+
+  it('el enlace de la sección en la navegación vuelve a la portada desde el instrumento', async () => {
+    const route = mountRoute('/inversion')
+    route.open('crypto')
+    route.openInstrument('i-eth')
+    const nav = document.createElement('a')
+    nav.dataset.navItem = ''
+    nav.dataset.section = 'investment'
+    document.body.append(nav)
+
+    await navigate(() => nav.click())
+    expect(route.instrument.value).toBeNull()
+    expect(route.selected.value).toBeNull()
+    expect(address()).toBe('/inversion')
+    nav.remove()
+  })
+
+  it('abrir una cuenta deja el instrumento y al salir de la sección el detalle se va con ella', () => {
+    const route = mountRoute('/inversion?instrumento=i-eth')
+    route.open('crypto')
+    expect(route.instrument.value).toBeNull()
+    expect(address()).toBe('/inversion?activo=crypto')
+
+    route.openInstrument('i-btc')
+    route.reset()
+    expect(route.instrument.value).toBeNull()
+  })
+})
+
+describe('instrumentHref', () => {
+  it('da la dirección del detalle de un instrumento', () => {
+    expect(instrumentHref('i-eth')).toBe('/inversion?instrumento=i-eth')
+    expect(instrumentHref('a b&c')).toBe('/inversion?instrumento=a+b%26c')
   })
 })
 

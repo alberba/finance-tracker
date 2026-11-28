@@ -191,8 +191,13 @@ const round1 = (value: number) => Math.round(value * 10) / 10
 const round2 = (value: number) => Math.round(value * 100) / 100
 const share = (value: number, total: number) => Math.round((value / total) * 10000) / 100
 
-function isOperation(tx: Transaction): boolean {
+export function isOperation(tx: Transaction): boolean {
   return !!tx.side && Number(tx.units) > 0
+}
+
+/** Newest first: by date, then by time. */
+export function newestFirst(a: Transaction, b: Transaction): number {
+  return b.date.localeCompare(a.date) || String(b.time ?? '').localeCompare(String(a.time ?? ''))
 }
 
 /** The asset's movements, newest first. */
@@ -205,10 +210,7 @@ function assetMovements(state: State, position: InvestmentAccount): Transaction[
         tx.type === 'investment' &&
         movementBelongsToInvestmentAsset(tx, asset, state.investmentAssets, state.instruments),
     )
-    .sort(
-      (a, b) =>
-        b.date.localeCompare(a.date) || String(b.time ?? '').localeCompare(String(a.time ?? '')),
-    )
+    .sort(newestFirst)
 }
 
 function movementRow(tx: Transaction): AssetMovementRow {
@@ -250,7 +252,7 @@ function yearSum(movements: readonly Transaction[]): string {
     .join(' · ')
 }
 
-function groupByYear(movements: readonly Transaction[]): AssetYear[] {
+export function groupByYear(movements: readonly Transaction[]): AssetYear[] {
   const years: Array<{ year: string; movements: Transaction[] }> = []
   for (const tx of movements) {
     const year = tx.date.slice(0, 4)

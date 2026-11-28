@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test'
 import { test, expect } from './fixtures'
+import { holdVwceInFondos } from './seed-sync-v2'
 
 /**
  * The cover of Inversión in the mobile frame (#438), and an
@@ -57,6 +58,35 @@ test('abre un activo desde la portada, entra en sus movimientos y vuelve con atr
   await bar.getByRole('link', { name: /^Volver a / }).click()
   await expect(section(page).getByRole('heading', { name: 'Tu posición' })).toBeVisible()
   await page.goBack()
+  await expect(page).toHaveURL(/\/inversion$/)
+  await expect(section(page).getByRole('heading', { name: 'Inversión', level: 1 })).toBeVisible()
+})
+
+test('abre un instrumento desde las posiciones de su cuenta y vuelve con la flecha y con atrás', async ({
+  page,
+  tracker,
+}) => {
+  await holdVwceInFondos(page)
+  await tracker.openInvestment()
+  const bar = page.locator('[data-mobile-app-bar]')
+
+  await section(page).getByRole('button', { name: 'Ver Fondos Indexados' }).click()
+  await section(page).getByRole('link', { name: 'VWCE' }).click()
+  await expect(page).toHaveURL(/\/inversion\?instrumento=[^&]+$/)
+  await expect(bar.getByRole('heading', { level: 1 })).toHaveText('VWCE')
+  await expect(section(page).locator('[data-instrument-total]')).toContainText('15 títulos')
+  await expect(section(page).getByRole('heading', { name: 'Movimientos' })).toBeVisible()
+
+  await tracker.reload()
+  await expect(bar.getByRole('heading', { level: 1 })).toHaveText('VWCE')
+  await expect(section(page).locator('[data-instrument-total]')).toContainText('15 títulos')
+
+  // The reload kept the history entry: the arrow still goes back to the account it came from.
+  await bar.getByRole('link', { name: 'Volver a Inversión' }).click()
+  await expect(page).toHaveURL(/\/inversion\?activo=[^&]+$/)
+  await expect(section(page).getByRole('heading', { name: 'Posiciones' })).toBeVisible()
+
+  await bar.getByRole('link', { name: 'Volver a Inversión' }).click()
   await expect(page).toHaveURL(/\/inversion$/)
   await expect(section(page).getByRole('heading', { name: 'Inversión', level: 1 })).toBeVisible()
 })

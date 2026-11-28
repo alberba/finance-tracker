@@ -9,17 +9,30 @@ import { onBeforeUnmount, onMounted, ref } from 'vue'
 // of the section that touches `location`, `history` and the document: it also
 // scrolls to the top and moves focus when the page changes, and sends the
 // section's own nav item back to the cover.
+//
+// An instrument has its own detail, a route apart from the account's:
+// `/inversion?instrumento=<id>` (#561, `instrumentHref`). It is an entry of its
+// own as well, pushed from wherever it was opened (an account's positions, or
+// the cover grouped by instrument), so back returns there; a loaded link has
+// nothing under it and goes to the cover.
 
 const PARAM = 'activo'
+const INSTRUMENT = 'instrumento'
 const VIEW = 'vista'
 const MOVEMENTS = 'movimientos'
 /** The history state holds how many entries the detail pushed on top of the cover. */
 const MARK = 'neon-investment-asset'
 
-function readUrl(): { selected: string | null; movements: boolean } {
+function readUrl(): { selected: string | null; movements: boolean; instrument: string | null } {
   const params = new URLSearchParams(window.location.search)
-  const selected = params.get(PARAM) || null
-  return { selected, movements: selected !== null && params.get(VIEW) === MOVEMENTS }
+  // The instrument's detail wins over an account's: they are never both open.
+  const instrument = params.get(INSTRUMENT) || null
+  const selected = instrument ? null : params.get(PARAM) || null
+  return {
+    selected,
+    movements: selected !== null && params.get(VIEW) === MOVEMENTS,
+    instrument,
+  }
 }
 
 function depth(): number {
@@ -38,8 +51,14 @@ export function assetHref(id: string): string {
   return `/inversion?${new URLSearchParams({ [PARAM]: id })}`
 }
 
+/** The address of an instrument's detail. */
+export function instrumentHref(id: string): string {
+  return `/inversion?${new URLSearchParams({ [INSTRUMENT]: id })}`
+}
+
 export function useAssetRoute() {
   const selected = ref<string | null>(null)
+  const instrument = ref<string | null>(null)
   const movements = ref(false)
   // Going back to the cover from an entry that was loaded, not pushed: once
   // history lands there, the URL is rewritten.
@@ -49,13 +68,14 @@ export function useAssetRoute() {
     const url = readUrl()
     if (leaving) {
       leaving = false
-      if (url.selected !== null) {
+      if (url.selected !== null || url.instrument !== null) {
         rewriteToCover()
         return
       }
     }
     selected.value = url.selected
     movements.value = url.movements
+    instrument.value = url.instrument
   }
 
   function rewriteToCover(): void {
@@ -65,25 +85,52 @@ export function useAssetRoute() {
       urlWith((params) => {
         params.delete(PARAM)
         params.delete(VIEW)
+        params.delete(INSTRUMENT)
       }),
     )
     selected.value = null
     movements.value = false
+    instrument.value = null
   }
 
   function open(id: string): void {
     const url = urlWith((params) => {
       params.set(PARAM, id)
       params.delete(VIEW)
+      params.delete(INSTRUMENT)
     })
     window.history.pushState({ [MARK]: depth() + 1 }, '', url)
     selected.value = id
     movements.value = false
+    instrument.value = null
+  }
+
+  /** The detail of an instrument, from an account or from the cover. */
+  function openInstrument(id: string): void {
+    const url = urlWith((params) => {
+      params.delete(PARAM)
+      params.delete(VIEW)
+      params.set(INSTRUMENT, id)
+    })
+    window.history.pushState({ [MARK]: depth() + 1 }, '', url)
+    selected.value = null
+    movements.value = false
+    instrument.value = id
+  }
+
+  /** Back from the instrument to where it was opened, or to the cover for a loaded link. */
+  function closeInstrument(): void {
+    if (instrument.value === null) return
+    if (depth() > 0) {
+      window.history.back()
+      return
+    }
+    rewriteToCover()
   }
 
   /** Back to the cover: undoes the entries the detail pushed, or rewrites the URL of a loaded link. */
   function close(): void {
-    if (selected.value === null) return
+    if (selected.value === null && instrument.value === null) return
     const pushed = depth()
     if (pushed === 0) {
       rewriteToCover()
@@ -122,6 +169,7 @@ export function useAssetRoute() {
   function reset(): void {
     selected.value = null
     movements.value = false
+    instrument.value = null
     leaving = false
   }
 
@@ -141,7 +189,18 @@ export function useAssetRoute() {
     document.removeEventListener('click', onNavClick)
   })
 
-  return { selected, movements, open, close, openMovements, closeMovements, reset }
+  return {
+    selected,
+    movements,
+    instrument,
+    open,
+    close,
+    openMovements,
+    closeMovements,
+    openInstrument,
+    closeInstrument,
+    reset,
+  }
 }
 
 /** A new page starts: back to the top and the focus on its heading, for keyboards and screen readers. */

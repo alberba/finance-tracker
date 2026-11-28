@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test'
 import { test, expect } from './fixtures'
-import { editScenarioState } from './seed-sync-v2'
+import { editScenarioState, holdVwceInFondos } from './seed-sync-v2'
 
 /**
  * The cover of Inversión (#437), desktop. The clock sits on 20 March 2026, the newest month of
@@ -178,5 +178,54 @@ test.describe('Inversión', () => {
     await page.goBack()
     await expect(page).toHaveURL(/\/inversion$/)
     await expect(section(page).getByRole('heading', { name: 'Inversión', level: 1 })).toBeVisible()
+  })
+
+  test('abre un instrumento desde las posiciones de su cuenta, vuelve a la cuenta y sobrevive a la recarga', async ({
+    page,
+    tracker,
+  }) => {
+    await serveLateQuotes(page)
+    await tracker.goto()
+    await holdVwceInFondos(page)
+    await tracker.openInvestment()
+
+    await section(page).getByRole('button', { name: 'Ver Fondos Indexados' }).click()
+    await section(page).getByRole('link', { name: 'VWCE' }).click()
+    await expect(page).toHaveURL(/\/inversion\?instrumento=[^&]+$/)
+    await expect(section(page).getByRole('heading', { level: 1 })).toHaveText('VWCE')
+    await expect(section(page).getByRole('heading', { name: 'Cotización' })).toBeVisible()
+    const positions = section(page).locator('[data-instrument-position]')
+    await expect(positions).toContainText('Fondos Indexados')
+    await expect(positions).toContainText('15')
+    await expect(section(page).locator('[data-instrument-total]')).toContainText('1.950,00')
+    await expect(section(page).locator('[data-instrument-count]')).toHaveText('2 operaciones')
+    await expect(section(page).getByText('Compra 5 VWCE')).toHaveCount(0)
+
+    await tracker.reload()
+    await expect(section(page).getByRole('heading', { level: 1 })).toHaveText('VWCE')
+    await expect(section(page).locator('[data-instrument-total]')).toContainText('1.950,00')
+
+    // The reload kept the history entry: the arrow still goes back to the account it came from.
+    await section(page).getByRole('link', { name: 'Volver a Inversión' }).click()
+    await expect(page).toHaveURL(/\/inversion\?activo=[^&]+$/)
+    await expect(section(page).getByRole('heading', { name: 'Posiciones' })).toBeVisible()
+  })
+
+  test('el atrás del navegador del instrumento vuelve al detalle de su cuenta', async ({
+    page,
+    tracker,
+  }) => {
+    await serveLateQuotes(page)
+    await tracker.goto()
+    await holdVwceInFondos(page)
+    await tracker.openInvestment()
+
+    await section(page).getByRole('button', { name: 'Ver Fondos Indexados' }).click()
+    await section(page).getByRole('link', { name: 'VWCE' }).click()
+    await expect(page).toHaveURL(/instrumento=[^&]+/)
+
+    await page.goBack()
+    await expect(page).toHaveURL(/\/inversion\?activo=[^&]+$/)
+    await expect(section(page).getByRole('heading', { name: 'Posiciones' })).toBeVisible()
   })
 })

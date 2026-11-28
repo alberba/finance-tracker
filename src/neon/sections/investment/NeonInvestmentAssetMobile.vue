@@ -27,6 +27,7 @@ const props = defineProps<{ detail: AssetDetail; movements: boolean }>()
 
 const emit = defineEmits<{
   back: []
+  openInstrument: [instrumentId: string]
   openMovements: []
   closeMovements: []
   buy: [event: MouseEvent]
@@ -155,6 +156,7 @@ const PRESS =
       :positions="detail.positions"
       :note="detail.unpricedNote"
       stacked
+      @open="emit('openInstrument', $event)"
     />
 
     <section class="grid min-w-0 gap-3" aria-labelledby="asset-position-title">

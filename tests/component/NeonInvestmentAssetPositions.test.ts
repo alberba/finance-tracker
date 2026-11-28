@@ -132,4 +132,19 @@ describe('NeonInvestmentAssetPositions', () => {
 
     expect(wrapper.find('[data-position-evolution]').exists()).toBe(false)
   })
+
+  it.each([false, true])(
+    'cada posición lleva al detalle de su instrumento (apilada: %s)',
+    async (stacked) => {
+      const { positions, unpricedNote } = cryptoDetail()
+      const wrapper = mount(NeonInvestmentAssetPositions, {
+        props: { positions, note: unpricedNote, stacked },
+      })
+
+      const link = wrapper.get('[data-asset-position-line="ETH"] a')
+      expect(link.attributes('href')).toBe('/inversion?instrumento=i-eth')
+      await link.trigger('click')
+      expect(wrapper.emitted('open')).toEqual([['i-eth']])
+    },
+  )
 })

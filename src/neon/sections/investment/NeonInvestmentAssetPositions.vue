@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { instrumentHref } from './asset-route'
 import type { PositionLine } from './asset-view-model'
 import { SPARK_HEIGHT, SPARK_WIDTH, TONE_STROKE, TONE_TEXT } from './view-model'
 
@@ -6,7 +7,10 @@ import { SPARK_HEIGHT, SPARK_WIDTH, TONE_STROKE, TONE_TEXT } from './view-model'
 // 0011) with units, average buy price, value, what went in, the result and the
 // weight inside the account. Desktop is a dense table with the value as the
 // figure of each row; the mobile frame stacks each position as a short list.
-// A position with no quote says so, quietly: its value is an estimate.
+// A position with no quote says so, quietly: its value is an estimate. The
+// symbol of each one is a link to its instrument's detail (#561): a real
+// address, so it opens in a tab and survives a reload, and it stretches over
+// the whole row so the row is the tap target.
 withDefaults(
   defineProps<{
     positions: readonly PositionLine[]
@@ -15,6 +19,18 @@ withDefaults(
   }>(),
   { stacked: false },
 )
+
+const emit = defineEmits<{ open: [instrumentId: string] }>()
+
+const LINK =
+  'text-text outline-accent min-w-0 truncate font-bold after:absolute after:inset-0 focus-visible:outline-2 focus-visible:outline-offset-[-2px]'
+
+function onOpen(event: MouseEvent, instrumentId: string): void {
+  // A modified click keeps the browser's own way of opening a link.
+  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return
+  event.preventDefault()
+  emit('open', instrumentId)
+}
 
 const COLUMNS =
   'grid-cols-[minmax(0,1.3fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.1fr)] gap-x-[clamp(0.625rem,1.5cqi,1.75rem)]'
@@ -28,10 +44,17 @@ const COLUMNS =
       <li
         v-for="line in positions"
         :key="line.instrumentId"
-        class="border-line grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 gap-y-1 border-t py-2.5"
+        class="border-line relative grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 gap-y-1 border-t py-2.5"
         :data-asset-position-line="line.symbol"
       >
-        <span class="text-row min-w-0 truncate font-bold">{{ line.symbol }}</span>
+        <a
+          :href="instrumentHref(line.instrumentId)"
+          class="text-row"
+          :class="LINK"
+          @click="onOpen($event, line.instrumentId)"
+        >
+          {{ line.symbol }}
+        </a>
         <span class="font-display text-figure-row text-end font-semibold tabular-nums">
           {{ line.value }}
         </span>
@@ -95,12 +118,19 @@ const COLUMNS =
         <li
           v-for="line in positions"
           :key="line.instrumentId"
-          class="border-line grid items-center border-t py-3.5"
+          class="border-line relative grid items-center border-t py-3.5"
           :class="COLUMNS"
           :data-asset-position-line="line.symbol"
         >
           <span class="grid min-w-0 gap-px">
-            <span class="text-row truncate font-bold">{{ line.symbol }}</span>
+            <a
+              :href="instrumentHref(line.instrumentId)"
+              class="text-row"
+              :class="LINK"
+              @click="onOpen($event, line.instrumentId)"
+            >
+              {{ line.symbol }}
+            </a>
             <span
               v-if="line.estimated"
               class="text-muted text-meta font-bold"
