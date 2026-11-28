@@ -2,7 +2,7 @@ import { Effect } from 'effect'
 
 import type { PriceHistory, PriceRange } from '../domain/investment/price-history'
 import type { SymbolCandidate } from '../domain/investment/ticker-suggestion'
-import type { Instrument, Quote } from '../scripts/types'
+import type { Instrument, InstrumentQuoteSource, Quote } from '../scripts/types'
 import { isDemoMode } from '../scripts/demo-mode'
 import { requestApiJson } from '../lib/client/api-client'
 import { ApiClientError } from '../lib/client/api-error'
@@ -22,6 +22,21 @@ export const fetchMarketQuotes = (
   }).pipe(Effect.map((body) => body.quotes || {}))
 }
 
+/** The query naming an instrument for a market lookup, plus what the lookup asks for. */
+function instrumentParams(
+  instrument: InstrumentQuoteSource,
+  extra: Record<string, string>,
+): URLSearchParams {
+  const params = new URLSearchParams({
+    symbol: instrument.symbol,
+    type: instrument.type,
+    currency: instrument.currency,
+    ...extra,
+  })
+  if (instrument.quoteSymbol) params.set('quoteSymbol', instrument.quoteSymbol)
+  return params
+}
+
 /** An index's previous December close and then each month close of `year`. */
 export const fetchBenchmarkCloses = (
   id: string,
@@ -37,18 +52,12 @@ export const fetchBenchmarkCloses = (
 
 /** An instrument's previous December close and then each month close of `year`; none in demo mode. */
 export const fetchInstrumentCloses = (
-  instrument: Pick<Instrument, 'symbol' | 'quoteSymbol' | 'type' | 'currency'>,
+  instrument: InstrumentQuoteSource,
   year: number,
 ): Effect.Effect<number[], ApiClientError, ClientHttp> => {
   if (isDemoMode()) return Effect.succeed([])
 
-  const params = new URLSearchParams({
-    symbol: instrument.symbol,
-    type: instrument.type,
-    currency: instrument.currency,
-    year: String(year),
-  })
-  if (instrument.quoteSymbol) params.set('quoteSymbol', instrument.quoteSymbol)
+  const params = instrumentParams(instrument, { year: String(year) })
   return requestApiJson<{ closes?: number[] }>(`/api/market/closes?${params.toString()}`, {
     fallbackMessage: 'No se pudo cargar el histórico',
   }).pipe(Effect.map((body) => body.closes || []))
@@ -56,18 +65,12 @@ export const fetchInstrumentCloses = (
 
 /** A symbol's closes over `range`, for its quote chart; null in demo mode. */
 export const fetchPriceHistory = (
-  instrument: Pick<Instrument, 'symbol' | 'quoteSymbol' | 'type' | 'currency'>,
+  instrument: InstrumentQuoteSource,
   range: PriceRange,
 ): Effect.Effect<PriceHistory | null, ApiClientError, ClientHttp> => {
   if (isDemoMode()) return Effect.succeed(null)
 
-  const params = new URLSearchParams({
-    symbol: instrument.symbol,
-    type: instrument.type,
-    currency: instrument.currency,
-    range,
-  })
-  if (instrument.quoteSymbol) params.set('quoteSymbol', instrument.quoteSymbol)
+  const params = instrumentParams(instrument, { range })
   return requestApiJson<{ history?: PriceHistory }>(`/api/market/history?${params.toString()}`, {
     fallbackMessage: 'No se pudo cargar la cotización',
   }).pipe(Effect.map((body) => body.history ?? null))

@@ -2,7 +2,7 @@ import { Effect } from 'effect'
 
 import type { Benchmark } from '../../domain/investment/benchmarks'
 import { yahooQuoteSymbol } from '../../domain/investment/symbol-matching'
-import type { Instrument } from '../../scripts/types'
+import type { InstrumentQuoteSource } from '../../scripts/types'
 import { MarketQuoteError } from './market-data'
 import { yahooFinance } from './yahoo-finance'
 
@@ -23,7 +23,7 @@ export function loadBenchmarkCloses(
 
 /** The same closes for an instrument's own quote, for the evolution of its position. */
 export function loadInstrumentCloses(
-  instrument: Pick<Instrument, 'symbol' | 'quoteSymbol' | 'type' | 'currency'>,
+  instrument: InstrumentQuoteSource,
   year: number,
 ): Effect.Effect<number[], MarketQuoteError> {
   return loadYahooCloses(yahooQuoteSymbol(instrument), instrument.symbol, year)

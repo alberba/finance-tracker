@@ -5,6 +5,7 @@ import { findBenchmark } from '../../../domain/investment/benchmarks'
 import { requirePrincipal, withApiErrorHandling } from '../../../lib/server/api-auth'
 import { loadBenchmarkCloses } from '../../../lib/server/benchmark-history'
 import { createJsonResponse } from '../../../lib/server/json-response'
+import { isMarketYear } from '../../../lib/server/market-params'
 
 const json = createJsonResponse('private, max-age=3600')
 
@@ -15,7 +16,7 @@ export const GET: APIRoute = async ({ url, locals }) =>
     requirePrincipal(locals)
     const benchmark = findBenchmark(url.searchParams.get('id') ?? '')
     const year = Number(url.searchParams.get('year'))
-    if (!benchmark || !Number.isInteger(year) || year < 1990 || year > 2100) {
+    if (!benchmark || !isMarketYear(year)) {
       return json({ error: 'Índice o año no válido' }, 400)
     }
     try {

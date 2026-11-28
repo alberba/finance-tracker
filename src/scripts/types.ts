@@ -14,7 +14,8 @@ export type SortDirection = 'asc' | 'desc'
 export type TransactionsSubTab = 'registry' | 'subscriptions'
 export type SnapshotKind = 'accounts' | 'investments' | 'liabilities'
 export type EntityKey = 'accounts' | 'investmentAssets' | 'liabilities'
-export type InstrumentType = 'stock' | 'etf' | 'fund' | 'crypto'
+export const INSTRUMENT_TYPES = ['stock', 'etf', 'fund', 'crypto'] as const
+export type InstrumentType = (typeof INSTRUMENT_TYPES)[number]
 export type QuoteStatus = 'fresh' | 'stale' | 'unavailable'
 
 /** Quote providers an instrument can point at. */
@@ -116,6 +117,9 @@ export interface Instrument {
   holdingsUpdatedAt?: string
   holdingsSource?: 'manual'
 }
+
+/** What a market lookup (quote, closes, history) needs to find an instrument. */
+export type InstrumentQuoteSource = Pick<Instrument, 'symbol' | 'quoteSymbol' | 'type' | 'currency'>
 
 export interface Quote {
   instrumentId: string
@@ -416,6 +420,10 @@ export function isTransactionType(value: string): value is TransactionType {
 
 export function isSubscriptionFrequency(value: string): value is SubscriptionFrequency {
   return (SUBSCRIPTION_FREQUENCIES as readonly string[]).includes(value)
+}
+
+export function isInstrumentType(value: unknown): value is InstrumentType {
+  return (INSTRUMENT_TYPES as readonly unknown[]).includes(value)
 }
 
 export function isInvestmentSide(value: string): value is InvestmentSide {
