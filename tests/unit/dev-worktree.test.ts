@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { upsertEnvVar } from '../../scripts/dev-worktree.mjs'
+import { requestedPort, upsertEnvVar } from '../../scripts/dev-worktree.mjs'
 
 describe('upsertEnvVar', () => {
   it('replaces an existing value and keeps the other lines', () => {
@@ -17,5 +17,15 @@ describe('upsertEnvVar', () => {
 
   it('does not touch variables that merely start with the same name', () => {
     expect(upsertEnvVar('K_OTHER=1\n', 'K', 'v')).toBe('K_OTHER=1\nK=v\n')
+  })
+})
+
+describe('requestedPort', () => {
+  it('accepts a valid PORT', () => {
+    expect(requestedPort('4400')).toBe(4400)
+  })
+
+  it.each([undefined, '', 'abc', '0', '-1', '1.5', '70000'])('ignores %j', (value) => {
+    expect(requestedPort(value)).toBeNull()
   })
 })
