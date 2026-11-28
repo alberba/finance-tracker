@@ -1,6 +1,7 @@
 ---
 import '../../styles/global.css'
 import NeonFontPreloads from '../layout/NeonFontPreloads.astro'
+import NeonInitialTheme from '../layout/NeonInitialTheme.astro'
 import NeonFrame from '../layout/NeonFrame.astro'
 import AppWorkspace from './AppWorkspace.vue'
 import { getSectionFromPath } from '../../scripts/app/dashboard-section-routing'
@@ -21,38 +22,7 @@ const activeSection = page === 'reports' ? null : getSectionFromPath(Astro.url.p
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
-    <script is:inline>
-      // Theme before the first paint (src/lib/client/neon-theme.ts): a stored
-      // theme name wins, otherwise «oscuro suave», or «claro melocotón» if the
-      // system asks for light. Blocked storage still honours the system.
-      ;(function () {
-        const root = document.documentElement
-        try {
-          const prefersDark =
-            window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
-          let stored = null
-          try {
-            stored = localStorage.getItem('neon-theme')
-          } catch {
-            /* Storage blocked: no stored choice. */
-          }
-          root.dataset.theme = [
-            'oscuro-suave',
-            'oscuro-fuerte',
-            'claro-hueso',
-            'claro-melocoton',
-          ].includes(stored)
-            ? stored
-            : prefersDark
-              ? 'oscuro-suave'
-              : 'claro-melocoton'
-        } catch {
-          root.dataset.theme = 'oscuro-suave'
-        }
-        const meta = document.querySelector('meta[name="color-scheme"]')
-        if (meta) meta.content = root.dataset.theme.startsWith('oscuro') ? 'dark' : 'light'
-      })()
-    </script>
+    <NeonInitialTheme />
     <script is:inline>
       // Modo demo: `?demo=1` activa (persistente), `?demo=0` desactiva. Debe
       // correr antes que los scripts de la app para fijar el namespace `demo`

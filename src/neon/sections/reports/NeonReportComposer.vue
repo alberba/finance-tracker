@@ -100,7 +100,7 @@ watch(
   () => props.resetSignal,
   () => {
     reset()
-    announcement.value = 'Aclaración publicada.'
+    announcement.value = 'Aclaración guardada.'
   },
 )
 </script>
@@ -112,7 +112,9 @@ watch(
   >
     <div class="flex flex-col gap-1">
       <h3 id="reports-composer-title" class="text-block-title font-extrabold">Nueva aclaración</h3>
-      <p class="text-muted text-note">{{ composerNote(report) }}</p>
+      <p class="text-muted text-note">
+        {{ demo ? composerNote(report) : 'La aclaración se guarda de forma privada en la app.' }}
+      </p>
     </div>
 
     <form class="flex flex-col gap-3.5" novalidate @submit.prevent="onSubmit">

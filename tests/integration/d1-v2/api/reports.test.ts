@@ -707,7 +707,12 @@ describe('/api/reports', () => {
     }
     expect(body.detail.threadIssue.number).toBe(20)
     expect(body.detail.thread.map((item) => item.id)).toEqual([1, 4])
-    expect(body.detail.thread[1]).toMatchObject({ kind: 'reporter', text: 'mía', editable: true })
+    expect(body.detail.thread[1]).toMatchObject({
+      kind: 'reporter',
+      text: 'mía',
+      editable: false,
+      deletable: true,
+    })
   })
 
   describe('descripciones del detalle', () => {
@@ -831,7 +836,7 @@ describe('/api/reports', () => {
     expect(response.status).toBe(409)
   })
 
-  it('publica una aclaración con su marcador y autor del bot', async () => {
+  it('guarda una aclaración privada y la devuelve al leer el hilo', async () => {
     await record(userA.id, 10)
     state.issues.set(10, { number: 10, title: 'Abierta', state: 'OPEN', stateReason: null })
     const { POST } = await import('../../../../src/pages/api/reports/[number]/comments/index')
@@ -839,8 +844,12 @@ describe('/api/reports', () => {
     expect(response.status).toBe(201)
     const body = (await response.json()) as { comment: { kind: string; text: string } }
     expect(body.comment).toMatchObject({ kind: 'reporter', text: 'Ocurre en móvil' })
-    const created = [...state.comments.values()][0]
-    expect(created?.body).toContain(`<!-- finance-tracker:reporter-comment user=${userA.id} -->`)
+    const { GET } = await import('../../../../src/pages/api/reports/[number]/index')
+    const detail = await GET(context(userA.id, { number: '10' }))
+    expect(await detail.json()).toMatchObject({ detail: { thread: [body.comment] } })
+    expect(state.calls.some((call) => call.startsWith('POST ') && call.endsWith('/comments'))).toBe(
+      false,
+    )
   })
 
   it('prohíbe editar un comentario sin el marcador propio', async () => {
@@ -884,7 +893,7 @@ describe('/api/reports', () => {
     expect(await response.json()).toEqual({ ok: false, error: 'Reporte no encontrado.' })
   })
 
-  it('edita y borra una aclaración publicada en la principal que se sigue', async () => {
+  it('permite borrar una aclaración histórica de la principal y evita publicar ediciones', async () => {
     await record(userA.id, 10)
     state.issues.set(10, {
       number: 10,
@@ -912,8 +921,8 @@ describe('/api/reports', () => {
         { text: 'editada', keepAttachments: [] },
       ),
     )
-    expect(patched.status).toBe(200)
-    expect(state.comments.get(50)?.body).toContain('editada')
+    expect(patched.status).toBe(403)
+    expect(state.comments.get(50)?.body).toContain('mía')
 
     const deleted = await DELETE(context(userA.id, { number: '10', commentId: '50' }))
     expect(deleted.status).toBe(204)

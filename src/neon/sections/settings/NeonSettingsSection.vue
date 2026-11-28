@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { lastReportOutcome } from '../../../lib/client/report-observations'
+import { useScreenDiagnostic } from '../../reports/use-report-diagnostic'
 import { computed, nextTick, onMounted, ref } from 'vue'
 
 import { useMediaQuery } from '../../../composables/useMediaQuery'
@@ -70,6 +72,25 @@ const parts = computed(() =>
 )
 const ids = computed(() => parts.value.map((part) => `cfg-${part.id}`))
 const current = useScrollSpy(ids)
+const diagnosticViews = {
+  cuentas: 'accounts',
+  activos: 'assets',
+  pasivos: 'liabilities',
+  categorias: 'categories',
+  recurrentes: 'recurring',
+  preferencias: 'preferences',
+  seguridad: 'security',
+  conexiones: 'connections',
+  cuenta: 'account',
+} as const
+useScreenDiagnostic('settings', () => {
+  const view = desktopFrame.value ? current.value?.replace(/^cfg-/, '') : mobileView.value
+  const subview =
+    view && Object.hasOwn(diagnosticViews, view)
+      ? diagnosticViews[view as keyof typeof diagnosticViews]
+      : 'index'
+  return { subview, checks: [lastReportOutcome('settings', subview) ?? 'insufficient'] }
+})
 
 function goTo(id: SettingsPartId): void {
   scrollToId(`cfg-${id}`)

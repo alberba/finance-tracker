@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useScreenDiagnostic } from '../reports/use-report-diagnostic'
 import { storeToRefs } from 'pinia'
 import { computed, nextTick, onBeforeUnmount, shallowRef, useTemplateRef } from 'vue'
 
@@ -40,6 +41,17 @@ import { useNeonDashboardStore } from './store'
 defineProps<{ isActive?: boolean }>()
 
 const store = useNeonDashboardStore()
+useScreenDiagnostic('dashboard', () => {
+  const vm = store.viewModel
+  const start = /^from-(\d+)-(\d+)$/.exec(vm.selectedRange)
+  return {
+    year: vm.rangeBounds.endYear,
+    month: vm.rangeBounds.endMonth,
+    ...(start ? { fromYear: Number(start[1]), fromMonth: Number(start[2]) } : {}),
+    options: [start ? 'custom' : (vm.selectedRange as '1m' | '3m' | '6m' | '1a')],
+    checks: [vm.pending.count ? 'recurring-pending' : 'recurring-clear'],
+  }
+})
 const { viewModel, range } = storeToRefs(store)
 const { needsAccount } = useAccountRequirement()
 const { openEntrySheet } = useEntrySheet()

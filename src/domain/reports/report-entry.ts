@@ -7,6 +7,8 @@
  * e hilo se muestran.
  */
 
+import type { ReportDiagnostic } from './diagnostic'
+
 export type IssueState = 'OPEN' | 'CLOSED'
 export type IssueStateReason = 'COMPLETED' | 'NOT_PLANNED' | 'DUPLICATE' | 'REOPENED' | null
 /** Tono del punto de estado; el texto siempre lleva el significado. */
@@ -69,6 +71,7 @@ export interface ThreadItem {
   text: string
   attachments: ThreadAttachment[]
   editable: boolean
+  deletable?: boolean
 }
 
 export interface ReportDetail {
@@ -80,10 +83,24 @@ export interface ReportDetail {
   canComment: boolean
   /** Lo que la persona envió al crear el reporte; `null` si no se conserva. */
   original: string | null
+  attachments?: ThreadAttachment[]
+  diagnosticExpiresAt?: string | null
   /** Cuerpo actual de la issue propia, sin contexto ni reportero; `null` si no aporta nada. */
   issueDescription: string | null
   /** ISO del servidor al empezar a leer; base de `markSeen` ([D4]). */
   fetchedAt: string
+}
+
+export interface SupportReportCase {
+  issueNumber: number
+  reference: string | null
+  title: string | null
+  original: string | null
+  submittedAt: string
+  diagnostic: ReportDiagnostic | null
+  diagnosticExpiresAt: string | null
+  attachments: ThreadAttachment[]
+  comments: ThreadItem[]
 }
 
 export interface ReportsListResponse {

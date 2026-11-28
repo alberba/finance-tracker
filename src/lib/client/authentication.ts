@@ -17,7 +17,11 @@ export function openFinanzas(): void {
 }
 
 export async function requireAuthenticationResult(result: {
-  error?: { message?: string } | null
+  error?: { message?: string; reference?: string } | null
 }): Promise<void> {
-  if (result.error) throw new Error(result.error.message ?? 'No se pudo completar el acceso.')
+  if (result.error) {
+    throw new Error(result.error.message ?? 'No se pudo completar el acceso.', {
+      cause: result.error.reference,
+    })
+  }
 }

@@ -1,17 +1,17 @@
 /** Shared API authentication, authorization and private JSON responses. */
 
-import type { AuthPrincipal } from "./auth/principal";
-import { reportApiRouteFailure } from "./error-tracking";
+import type { AuthPrincipal } from './auth/principal'
+import { reportApiRouteFailure } from './error-tracking'
 
 export function jsonResponse(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
-      "Content-Type": "application/json",
-      "Cache-Control": "no-store",
-      "X-Content-Type-Options": "nosniff",
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff',
     },
-  });
+  })
 }
 
 export class UnauthorizedError extends Error {}
@@ -19,11 +19,11 @@ export class ForbiddenError extends Error {}
 
 /** Returns the request's `AuthPrincipal`, or throws `UnauthorizedError` if absent. */
 export function requirePrincipal(locals: App.Locals): AuthPrincipal {
-  const principal = locals.principal;
+  const principal = locals.principal
   if (!principal) {
-    throw new UnauthorizedError("Se requiere autenticación (Astro.locals.principal ausente).");
+    throw new UnauthorizedError('Se requiere autenticación (Astro.locals.principal ausente).')
   }
-  return principal;
+  return principal
 }
 
 /**
@@ -36,16 +36,22 @@ export async function withApiErrorHandling(
   handler: () => Promise<Response>,
 ): Promise<Response> {
   try {
-    return await handler();
+    return await handler()
   } catch (error) {
     if (error instanceof UnauthorizedError) {
-      return jsonResponse({ error: error.message }, 401);
+      return jsonResponse({ error: error.message }, 401)
     }
     if (error instanceof ForbiddenError) {
-      return jsonResponse({ error: error.message }, 403);
+      return jsonResponse({ error: error.message }, 403)
     }
-    console.error(`[api] Unhandled route error in ${route}`, error);
-    reportApiRouteFailure(error, { route, status: 500 });
-    return jsonResponse({ error: "Error interno del servidor." }, 500);
+    const privateReportRoute = /^\/api\/(?:reports|report-files|support\/reports)(?:\/|$)/.test(
+      route,
+    )
+    const recorded = privateReportRoute
+      ? new Error('No se pudo procesar el reporte privado.')
+      : error
+    console.error(`[api] Unhandled route error in ${route}`, recorded)
+    reportApiRouteFailure(recorded, { route, status: 500 })
+    return jsonResponse({ error: 'Error interno del servidor.' }, 500)
   }
 }

@@ -15,15 +15,16 @@ function warmAuth(): void {
 warmAuth()
 export type AccessMode = 'code' | 'password' | 'register' | 'verify' | 'recover'
 export function useAuthenticationForm(
-  options: { verifyEmail?: string; initialError?: string } = {},
+  options: { verifyEmail?: string; initialError?: string; initialReference?: string } = {},
 ) {
   const mode = shallowRef<AccessMode>(options.verifyEmail ? 'verify' : 'password')
   const email = shallowRef(options.verifyEmail ?? '')
   const password = shallowRef('')
   const otp = shallowRef('')
   const sent = shallowRef(false)
-  const { busy, message, error, run } = useAuthenticationAction()
+  const { busy, message, error, reference, run } = useAuthenticationAction()
   error.value = options.initialError ?? ''
+  reference.value = options.initialReference ?? ''
   const needsCode = computed(() => ['code', 'verify', 'recover'].includes(mode.value))
   const needsPassword = computed(() => ['password', 'register', 'recover'].includes(mode.value))
   watch(
@@ -152,6 +153,7 @@ export function useAuthenticationForm(
     busy,
     message,
     error,
+    reference,
     needsCode,
     needsPassword,
     changeMode,

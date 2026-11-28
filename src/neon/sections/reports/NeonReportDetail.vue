@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { computed, nextTick, useTemplateRef, watch } from 'vue'
+import { computed, ref, nextTick, useTemplateRef, watch } from 'vue'
 
 import type { ReportDetail } from '../../../domain/reports/report-entry'
 import type { ReportThreadStatus } from '../../../composables/useReportThread'
+import { runClientHttp } from '../../../lib/client/runtime'
+import { withdrawReportDiagnostic } from '../../../services/reports-api'
 import { isDemoMode } from '../../../scripts/demo-mode'
 import type { ReportCommentInput, ReportCommentUpdateInput } from '../../../services/reports-api'
 import NeonButton from '../../ui/NeonButton.vue'
@@ -27,7 +29,7 @@ const props = defineProps<{
   composerResetSignal: number
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   back: []
   retry: []
   addComment: [input: ReportCommentInput]
@@ -35,6 +37,25 @@ defineEmits<{
   removeComment: [commentId: number]
   'update:editingCommentId': [commentId: number | null]
 }>()
+
+const withdrawn = ref<number | null>(null)
+const withdrawError = ref('')
+const withdrawing = ref(false)
+
+async function withdrawDiagnostic(): Promise<void> {
+  const number = props.issueNumber
+  withdrawing.value = true
+  withdrawError.value = ''
+  try {
+    await runClientHttp(withdrawReportDiagnostic(number))
+    withdrawn.value = number
+    emit('retry')
+  } catch {
+    withdrawError.value = 'No se pudo retirar el diagnóstico. Inténtalo de nuevo.'
+  } finally {
+    withdrawing.value = false
+  }
+}
 
 const demo = isDemoMode()
 const heading = useTemplateRef<HTMLElement>('heading')
@@ -219,16 +240,41 @@ watch(
         </p>
       </NeonReportCard>
 
-      <template v-if="available">
+      <NeonReportCard
+        v-if="shown.diagnosticExpiresAt && withdrawn !== issueNumber"
+        aria-label="Diagnóstico privado"
+      >
+        <p class="text-soft text-note">
+          Diagnóstico disponible hasta el {{ shown.diagnosticExpiresAt.slice(0, 10) }}.
+        </p>
+        <NeonButton class="self-start" :disabled="withdrawing" @click="withdrawDiagnostic">
+          Retirar diagnóstico
+        </NeonButton>
+        <p v-if="withdrawError" class="text-loss text-note" role="alert">{{ withdrawError }}</p>
+      </NeonReportCard>
+
+      <template v-if="available || shown.original || shown.attachments?.length">
         <NeonReportCard
-          v-if="shown.original"
+          v-if="shown.original || shown.attachments?.length"
           class="motion-safe:animate-rise gap-3.5 [animation-delay:105ms]"
           aria-labelledby="reports-original-title"
         >
           <h3 id="reports-original-title" class="text-block-title font-extrabold">
             Tu descripción
           </h3>
-          <NeonReportMarkdown :source="shown.original" />
+          <NeonReportMarkdown v-if="shown.original" :source="shown.original" />
+          <ul v-if="shown.attachments?.length" aria-label="Capturas privadas">
+            <li v-for="attachment in shown.attachments" :key="attachment.url">
+              <a
+                :href="attachment.url"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-accent-text text-note underline"
+              >
+                {{ attachment.name }}
+              </a>
+            </li>
+          </ul>
         </NeonReportCard>
 
         <NeonReportCard
@@ -246,6 +292,7 @@ watch(
         </NeonReportCard>
 
         <NeonReportThread
+          v-if="available"
           :report="shown.report"
           :items="shown.thread"
           :can-comment="shown.canComment"

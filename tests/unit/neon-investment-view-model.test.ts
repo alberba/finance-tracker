@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { buildInvestmentDashboardViewModel } from '../../src/domain/investment/view-model'
+import { diagnosePositions } from '../../src/neon/sections/investment/position-diagnostic'
 import type { Month } from '../../src/lib/month'
 import {
   compactChart,
@@ -76,6 +77,31 @@ function portfolio(overrides: Record<string, unknown> = {}): State {
 const simple = (state = portfolio(), month = 3 as Month) =>
   buildInvestmentDashboardViewModel(state, month, 'simple')
 
+it('distinguishes broker movements grouped into one row from an asset outside the selected period', () => {
+  const state = portfolio({
+    accounts: [
+      { id: 'broker', name: 'Broker A', openingBalance: 0 },
+      { id: 'second', name: 'Broker B', openingBalance: 0 },
+    ],
+    transactions: [
+      buy('t1', 'Fondos', '2026-01-10', 10, 100),
+      { ...buy('t2', 'Fondos', '2026-01-15', 10, 120), accountId: 'second' },
+      buy('t3', 'Oro', '2026-02-20', 4, 50),
+    ],
+  })
+  const visible = simple(state, 1).positions.map((position) => position.id)
+
+  expect(diagnosePositions(state, 1, visible, 'fondos')).toEqual([
+    'position-visible',
+    'position-category',
+    'position-grouped',
+  ])
+  expect(diagnosePositions(state, 1, visible, 'oro')).toEqual([
+    'position-empty',
+    'position-outside-period',
+  ])
+})
+
 describe('periodFigures', () => {
   it('en simple da la rentabilidad con la ganancia, lo que vale y lo que has puesto', () => {
     expect(periodFigures(simple(), 'simple', { latest: true, twr: 0 })).toEqual([
@@ -142,7 +168,6 @@ describe('portfolioChart', () => {
     expect(chart.zero).not.toBeNull()
     expect(chart.grid.some((line) => line.text === '0\u00a0%')).toBe(true)
   })
-
 })
 
 describe('compactChart', () => {

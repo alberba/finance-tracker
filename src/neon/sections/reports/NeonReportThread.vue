@@ -92,7 +92,7 @@ onBeforeUnmount(resetEditor)
 
 function removeKept(url: string): void {
   kept.value = kept.value.filter((current) => current !== url)
-  attachmentNotice.value = 'Quitar un adjunto no lo borra de GitHub.'
+  attachmentNotice.value = 'El adjunto se eliminará al guardar los cambios.'
 }
 
 function onFilesPicked(event: Event): void {
@@ -202,15 +202,25 @@ function confirmDelete(item: ThreadItem): void {
             <span class="text-[15px] font-extrabold wrap-anywhere">{{ item.author }}</span>
             <span class="text-muted text-meta">
               {{ people.get(item.id)?.role }} ·
-              <time :datetime="item.createdAt">{{ people.get(item.id)?.when }}</time
-              ><template v-if="item.editedAt"> · editado</template>
+              <time :datetime="item.createdAt">{{ people.get(item.id)?.when }}</time><template
+                v-if="item.editedAt"
+              >
+                · editado</template
+              >
             </span>
           </p>
           <div
-            v-if="item.editable && canComment && editingId !== item.id && confirmingId !== item.id"
+            v-if="
+              (item.editable || item.deletable) &&
+              canComment &&
+              editingId !== item.id &&
+              confirmingId !== item.id
+            "
             class="flex shrink-0 items-center"
           >
-            <NeonButton :disabled="pending" @click="startEdit(item)">Editar</NeonButton>
+            <NeonButton v-if="item.editable" :disabled="pending" @click="startEdit(item)"
+              >Editar</NeonButton
+            >
             <NeonButton danger data-thread-delete :disabled="pending" @click="askDelete(item)"
               >Borrar</NeonButton
             >
@@ -253,12 +263,15 @@ function confirmDelete(item: ThreadItem): void {
           <p :id="`reports-delete-${item.id}`" class="text-[16px] font-extrabold">
             ¿Borrar esta aclaración?
           </p>
-          <p class="text-soft text-note">Se eliminará de GitHub y no se puede deshacer.</p>
+          <p class="text-soft text-note">
+            {{ item.deletable ? 'Se eliminará de GitHub.' : 'Se eliminará de la app.' }} Esta acción
+            es definitiva.
+          </p>
           <div class="flex flex-wrap justify-end gap-2">
             <NeonButton ref="cancelDelete" @click="cancelDelete(item)">Cancelar</NeonButton>
-            <NeonButton danger :disabled="pending" @click="confirmDelete(item)"
-              >Borrar de GitHub</NeonButton
-            >
+            <NeonButton danger :disabled="pending" @click="confirmDelete(item)">{{
+              item.deletable ? 'Borrar de GitHub' : 'Borrar aclaración'
+            }}</NeonButton>
           </div>
         </div>
 

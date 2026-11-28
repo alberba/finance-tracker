@@ -1,9 +1,3 @@
-export interface IssueReportContext {
-  userAgent: string
-  pathname: string
-  timestamp: string
-}
-
 const REPORT_DIALOG_OPEN_EVENT = 'finance:open-report-dialog'
 
 export function requestReportDialogOpen(): void {
@@ -21,12 +15,4 @@ export function subscribeToReportDialogOpen(callback: () => void): () => void {
 
   window.addEventListener(REPORT_DIALOG_OPEN_EVENT, callback)
   return () => window.removeEventListener(REPORT_DIALOG_OPEN_EVENT, callback)
-}
-
-export function getIssueReportContext(): IssueReportContext {
-  return {
-    userAgent: navigator.userAgent,
-    pathname: window.location.pathname,
-    timestamp: new Date().toISOString(),
-  }
 }

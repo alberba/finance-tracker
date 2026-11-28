@@ -87,6 +87,7 @@ export function createAuthentication(
     baseURL: env.BETTER_AUTH_URL,
     secret: env.BETTER_AUTH_SECRET,
     trustedOrigins: [new URL(env.BETTER_AUTH_URL).origin],
+    onAPIError: { errorURL: new URL('/login', env.BETTER_AUTH_URL).href },
     advanced: {
       ipAddress: {
         ipAddressHeaders: localAuthenticationTest(env)

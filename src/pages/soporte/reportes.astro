@@ -1,0 +1,29 @@
+---
+import { getDb } from '../../db/client'
+import { readSupportCase } from '../../db/repositories/private-reports'
+import { ISSUE_NUMBER_PATTERN, parseNumericParam } from '../../lib/server/issue-reports/route'
+import { runServer } from '../../lib/server/runtime'
+import NeonSupportReportPage from '../../neon/reports/NeonSupportReportPage.astro'
+import '../../styles/global.css'
+
+Astro.response.headers.set('Cache-Control', 'private, no-store')
+Astro.response.headers.set('Referrer-Policy', 'no-referrer')
+const principal = Astro.locals.principal
+if (!principal?.isAdmin) return new Response('Caso no disponible.', { status: 404 })
+const number = Astro.url.searchParams.get('numero') ?? undefined
+const issueNumber = parseNumericParam(number, ISSUE_NUMBER_PATTERN)
+let failed = false
+const report = issueNumber
+  ? await runServer(
+      getDb(Astro.locals),
+      readSupportCase(issueNumber, principal.userId, new Date().toISOString()),
+    ).catch(() => {
+      failed = true
+      return null
+    })
+  : null
+
+if (number && !report) Astro.response.status = failed ? 500 : 404
+---
+
+<NeonSupportReportPage {number} {report} {failed} />

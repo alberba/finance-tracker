@@ -31,10 +31,10 @@ export default defineConfig({
       // mostly covered by E2E, so this is a new baseline, not a drop of the old
       // one. Keep the minimum just below the measurement; raise it with new code.
       thresholds: {
-        lines: 59.4,
-        statements: 57.5,
-        functions: 52.2,
-        branches: 48.3,
+        lines: 59.5,
+        statements: 57.6,
+        functions: 52.3,
+        branches: 48.4,
       },
     },
   },

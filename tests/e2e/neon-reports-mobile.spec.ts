@@ -46,6 +46,14 @@ test(
   },
 )
 
+test('atribuye al marco móvil el diagnóstico que se abre desde Más', async ({ tracker }) => {
+  await tracker.openReports()
+  await tracker.openGlobalReportDialog()
+  const diagnostic = await tracker.reviewDiagnostic()
+  await expect(diagnostic).toContainText('Mis reportes · list')
+  await expect(diagnostic).toContainText('Móvil')
+})
+
 test('todos los controles de Mis reportes y de «Más» miden al menos 44 px con puntero táctil', async ({
   page,
   tracker,
