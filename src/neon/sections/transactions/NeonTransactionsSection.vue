@@ -80,17 +80,6 @@ function createNew(event: MouseEvent): void {
   if (ui.txTab === 'subscriptions') subscriptions.value?.openNew()
   else openEntrySheet(event)
 }
-
-// «Apuntar un movimiento» from the setup guide lands here with the sheet open.
-watch(
-  () => uiStore.setupAction,
-  (action) => {
-    if (action !== 'movement' || needsAccount.value) return
-    uiStore.setupAction = null
-    openEntrySheet()
-  },
-  { immediate: true },
-)
 </script>
 
 <template>

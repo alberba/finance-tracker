@@ -11,18 +11,17 @@ afterEach(() => {
   window.__FINANCE_NAMESPACE__ = undefined
 })
 
-describe('demo import preserves the recipient welcome', () => {
+describe('demo import preserves the recipient setup progress', () => {
   it.each([false, true])('keeps completion %s when replacing financial data', async (completed) => {
     const store = useFinancialStateStore()
     store.commitState((draft) => {
       draft.onboardingPresented = true
       draft.onboardingDismissed = true
-      draft.onboardingAccountCompleted = true
-      draft.onboardingMovementCompleted = completed
       draft.onboardingCompleted = completed
+      draft.onboardingStep = 4
     })
     const file = new File(
-      [JSON.stringify({ currency: 'USD', onboardingCompleted: !completed })],
+      [JSON.stringify({ currency: 'USD', onboardingCompleted: !completed, onboardingStep: 1 })],
       'backup.json',
     )
     await useDataStore().importJson(file)
@@ -30,9 +29,8 @@ describe('demo import preserves the recipient welcome', () => {
     expect(store.state).toMatchObject({
       onboardingPresented: true,
       onboardingDismissed: true,
-      onboardingAccountCompleted: true,
-      onboardingMovementCompleted: completed,
       onboardingCompleted: completed,
+      onboardingStep: 4,
     })
   })
 })

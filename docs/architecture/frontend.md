@@ -11,7 +11,7 @@ Esta app combina Astro, Vue, Tailwind y TypeScript. El objetivo es que cada capa
 - Tailwind aporta las utilidades de la plantilla, con los tokens de `@theme` en `src/neon/styles/neon.css`. Lo que se repite entre ficheros se convierte en componente base (ADR 0004).
 - `src/styles/global.css` solo importa las dos partes del CSS: `common.css` (fuentes y reset, sin tokens) y `src/neon/styles/neon.css` (los tokens de DESIGN.md con sus cuatro temas). No hay otra hoja de estilos: `tests/unit/styles-guards.test.ts` lo vigila.
 - La interfaz vive en `src/neon/`; el código compartido (`domain`, `lib`, `stores`, `config`) no importa de ella (`scripts/lib/eslint-design-boundary.ts`).
-- Las secciones son componentes Vue de `src/neon/`; `src/neon/app/AppWorkspace.vue` monta la de la ruta activa (el dashboard en el arranque, el resto en diferido y precargado al quedar el navegador libre), la bienvenida (`src/neon/onboarding/NeonWelcome.vue`) y el lanzador de reportes.
+- Las secciones son componentes Vue de `src/neon/`; `src/neon/app/AppWorkspace.vue` monta la de la ruta activa (el dashboard en el arranque, el resto en diferido y precargado al quedar el navegador libre), la puesta en marcha (`src/neon/onboarding/NeonSetup.vue`, con su lógica en `src/composables/useSetup.ts`) y el lanzador de reportes.
 
 ## Puntos de entrada por responsabilidad
 

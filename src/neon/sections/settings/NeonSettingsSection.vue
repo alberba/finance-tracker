@@ -75,30 +75,20 @@ function goTo(id: SettingsPartId): void {
   scrollToId(`cfg-${id}`)
 }
 
-// Onboarding sends the user to an apartado through the old tab names.
+// Presupuesto sends the user to an apartado through the old tab names.
 const FROM_TAB: Record<string, SettingsPartId> = {
   categories: 'categorias',
-  connections: 'conexiones',
 }
 
 onMounted(async () => {
   // The watchlists feed the Stock Events lists the accounts and assets show.
   await stockEventsStore.initializeCredential()
   if (stockEventsStore.credentialConfigured) await stockEventsStore.loadWatchlists()
-  // «Crear cuenta» in the welcome lands on the accounts, in the new account's name.
-  const creatingAccount = uiStore.setupAction === 'account'
-  if (creatingAccount) uiStore.setupAction = null
-  const target = creatingAccount ? 'cuentas' : FROM_TAB[uiStore.settingsTab]
+  const target = FROM_TAB[uiStore.settingsTab]
   if (target && !desktopFrame.value) mobileView.value = target
   else if (target) {
     await nextTick()
     goTo(target)
-  }
-  if (creatingAccount) {
-    await nextTick()
-    document
-      .querySelector<HTMLInputElement>('#settings input[aria-label="Nombre de la nueva cuenta"]')
-      ?.focus({ preventScroll: desktopFrame.value })
   }
 })
 

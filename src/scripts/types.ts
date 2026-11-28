@@ -245,9 +245,11 @@ export interface State {
   dashboardLayout: DashboardLayoutPreference | null
   onboardingPresented: boolean
   onboardingDismissed: boolean
-  onboardingAccountCompleted: boolean
-  onboardingMovementCompleted: boolean
   onboardingCompleted: boolean
+  /** The setup wizard's step to resume at (0 «Cómo empiezas» … 7 «Listo»). */
+  onboardingStep: number
+  /** The theme chosen by the user, shared by their devices; `null` lets each device decide. */
+  theme: string | null
 
   meta: StateMeta
   year: number

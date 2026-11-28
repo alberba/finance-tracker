@@ -317,9 +317,8 @@ export async function syncSettingsUpdate(patch: {
   twrLiquidityAccountIds?: string[]
   onboardingPresented?: boolean
   onboardingDismissed?: boolean
-  onboardingAccountCompleted?: boolean
-  onboardingMovementCompleted?: boolean
   onboardingCompleted?: boolean
+  onboardingStep?: number
   stockeventsEnabled?: boolean
   stockeventsTradesToCash?: boolean
   stockeventsCashMappings?: Array<{ accountId: string | null; watchlistId: string }>

@@ -59,9 +59,9 @@ export const userSettings = sqliteTable(
     stockeventsTradesToCash: integer('stockevents_trades_to_cash').notNull().default(0),
     onboardingPresented: integer('onboarding_presented').notNull().default(0),
     onboardingDismissed: integer('onboarding_dismissed').notNull().default(0),
-    onboardingAccountCompleted: integer('onboarding_account_completed').notNull().default(0),
-    onboardingMovementCompleted: integer('onboarding_movement_completed').notNull().default(0),
     onboardingCompleted: integer('onboarding_completed').notNull().default(0),
+    /** The setup wizard's step to resume at (0 «Cómo empiezas» … 7 «Listo»). */
+    onboardingStep: integer('onboarding_step').notNull().default(0),
     createdAt: createdAtColumn(),
     updatedAt: updatedAtColumn(),
     version: versionColumn(),

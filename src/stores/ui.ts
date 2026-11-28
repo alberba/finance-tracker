@@ -35,7 +35,8 @@ export const useUiStore = defineStore('ui', () => {
   /** Página montada por el shell: una sección normal o «Mis reportes» (#340). */
   const page = ref<'section' | 'reports'>('section')
   const settingsTab = ref('accounts')
-  const setupAction = ref<'account' | 'movement' | null>(null)
+  /** The setup wizard (#452) is on screen. */
+  const setupOpen = ref(false)
 
   function setActiveSection(sectionId: SectionId): void {
     ui.activeSection = sectionId
@@ -53,7 +54,7 @@ export const useUiStore = defineStore('ui', () => {
     ui,
     page,
     settingsTab,
-    setupAction,
+    setupOpen,
     setActiveSection,
     setPage,
     replaceUiState,

@@ -39,9 +39,8 @@ export const POST: APIRoute = async ({ locals }) =>
           currency: 'EUR',
           onboardingPresented: previousSettings?.onboardingPresented === 1,
           onboardingDismissed: previousSettings?.onboardingDismissed === 1,
-          onboardingAccountCompleted: previousSettings?.onboardingAccountCompleted === 1,
-          onboardingMovementCompleted: previousSettings?.onboardingMovementCompleted === 1,
           onboardingCompleted: previousSettings?.onboardingCompleted === 1,
+          onboardingStep: previousSettings?.onboardingStep ?? 0,
         }),
       )
       const categories = await runServer(

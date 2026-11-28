@@ -2,6 +2,7 @@
 import { storeToRefs } from 'pinia'
 import { ref, watch } from 'vue'
 
+import { useSetup } from '../../../composables/useSetup'
 import { useToast } from '../../../composables/useToast'
 import { useSettingsStore } from '../../../stores/settings'
 import NeonButton from '../../ui/NeonButton.vue'
@@ -15,6 +16,7 @@ import { parseCurrency, parseYear } from './view-model'
 const settingsStore = useSettingsStore()
 const { showToast } = useToast()
 const { viewModel } = storeToRefs(settingsStore)
+const setup = useSetup()
 
 const year = ref(String(viewModel.value.year))
 const currency = ref(viewModel.value.currency)
@@ -55,7 +57,7 @@ const ROW =
         <div class="grid gap-0.5">
           <span class="text-[16px] font-bold">Tema</span>
           <span class="text-muted text-meta"
-            >Se aplica al momento y se recuerda en este dispositivo</span
+            >Se aplica al momento y se recuerda en todos tus dispositivos</span
           >
         </div>
         <NeonThemePicker />
@@ -91,6 +93,16 @@ const ROW =
     </div>
     <div class="grid pbs-1.5 pbe-2 @lg:flex @lg:justify-end @lg:pbe-0">
       <NeonButton variant="primary" @click="save">Guardar ajustes</NeonButton>
+    </div>
+    <div
+      v-if="setup.available.value"
+      class="border-line mbs-4 flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t py-2.5"
+    >
+      <div class="grid gap-0.5">
+        <span class="text-[16px] font-bold">Puesta en marcha</span>
+        <span class="text-muted text-meta">Moneda, cuentas, fijos e inversiones, paso a paso</span>
+      </div>
+      <NeonButton @click="setup.reopen">Abrir</NeonButton>
     </div>
   </NeonSettingsBlock>
 </template>

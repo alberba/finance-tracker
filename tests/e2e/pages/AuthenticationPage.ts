@@ -62,7 +62,7 @@ export class AuthenticationPage {
   async ready() {
     await expect(this.page.locator('html[data-finance-ready="true"]')).toBeAttached()
     if (new URL(this.page.url()).pathname !== '/login') {
-      await new FinanceTrackerPage(this.page).dismissWelcomeIfNeeded()
+      await new FinanceTrackerPage(this.page).dismissSetupIfNeeded()
     }
   }
 }

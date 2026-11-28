@@ -42,8 +42,8 @@ export const test = base.extend<Fixtures>({
       `No se pudo inicializar la identidad E2E (${initialization.status()})`,
     ).toBe(true)
     await seedSyncV2User(context.request, email)
-    // Unrelated journeys start after onboarding; the onboarding spec provisions
-    // untouched sync-v2 users and exercises the real first show.
+    // Unrelated journeys start after the setup wizard; the onboarding spec
+    // provisions untouched sync-v2 users and exercises the real first show.
     const completed = await context.request.post('/api/sync', {
       headers: await syncV2TestHeaders(context.request, email),
       data: {

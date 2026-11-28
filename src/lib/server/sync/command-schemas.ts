@@ -441,9 +441,9 @@ export const settingsUpdateCommandSchema = validator(
     patch: Schema.Struct({
       onboardingPresented: optionalBoolean,
       onboardingDismissed: optionalBoolean,
-      onboardingAccountCompleted: optionalBoolean,
-      onboardingMovementCompleted: optionalBoolean,
       onboardingCompleted: optionalBoolean,
+      /** The setup wizard's step to resume at. */
+      onboardingStep: Schema.optional(nonNegativeInt),
       dashboardLayout: Schema.optional(Schema.NullOr(dashboardLayoutSchema)),
       currency: Schema.optional(nonEmpty),
       locale: optionalText,
