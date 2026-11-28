@@ -153,6 +153,16 @@ async function readContentSql(db: Db, reportId: string, open: boolean) {
 const PRIVATE_COMMENT_BASE = 100_000_000_000_000
 export const isPrivateCommentId = (id: number) => id >= PRIVATE_COMMENT_BASE
 
+/**
+ * 48 random bits behind a leading hex `2`: 0x2000000000000 to 0x2ffffffffffff, always above the
+ * base and below MAX_SAFE_INTEGER. Built as text so no arithmetic touches the random bytes.
+ */
+function privateCommentId(): number {
+  const bytes = crypto.getRandomValues(new Uint8Array(6))
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
+  return Number.parseInt(`2${hex}`, 16)
+}
+
 async function addCommentSql(
   db: Db,
   reportId: string,
@@ -160,8 +170,7 @@ async function addCommentSql(
   attachments: ResolvedAttachment[],
   now: string,
 ) {
-  const random = crypto.getRandomValues(new Uint32Array(2))
-  const id = PRIVATE_COMMENT_BASE + (random[0] & 0xffff) * 2 ** 32 + random[1]
+  const id = privateCommentId()
   const row = { id, reportId, text, createdAt: now, editedAt: null }
   const files = addFiles(db, reportId, id, attachments)
   await atomic(db, db.insert(reportPrivateComments).values(row), ...files.statements)
