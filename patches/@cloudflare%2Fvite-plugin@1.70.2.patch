@@ -1,27 +1,31 @@
+diff --git a/node_modules/@cloudflare/vite-plugin/.bun-tag-10820961a65d20f6 b/.bun-tag-10820961a65d20f6
+new file mode 100644
+index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
 diff --git a/dist/index.mjs b/dist/index.mjs
+index 9ffd8761880c42e047d78ec3d9c7d79a0745a98e..2dd84920ac5616732e14fc7f21faa5170ba4473f 100644
 --- a/dist/index.mjs
 +++ b/dist/index.mjs
-@@ -56324,7 +56324,18 @@
+@@ -39949,7 +39949,18 @@ function createRequestHandler(handler) {
  			if (req.originalUrl) req.url = req.originalUrl;
  			const protocol = getForwardedProto(req);
- 			request$2 = createRequestForIncomingMessage(req, res, protocol ? { protocol } : void 0);
--			let response = await handler(toMiniflareRequest(request$2), req);
+ 			request = createRequestForIncomingMessage(req, res, protocol ? { protocol } : void 0);
+-			let response = await handler(toMiniflareRequest(request), req);
 +			// Retry reads after workerd closes an idle loopback connection.
 +			// Mutations may already have committed, so never replay them.
 +			let response;
 +			try {
-+				response = await handler(toMiniflareRequest(request$2), req);
++				response = await handler(toMiniflareRequest(request), req);
 +			} catch (error$4) {
 +				const code = error$4?.cause?.code;
 +				const socketError = code === "UND_ERR_SOCKET" || code === "ECONNRESET" || code === "EPIPE";
 +				const readOnly = req.method === "GET" || req.method === "HEAD";
-+				if (!socketError || request$2.signal.aborted || !readOnly) throw error$4;
-+				response = await handler(toMiniflareRequest(request$2), req);
++				if (!socketError || request.signal.aborted || !readOnly) throw error$4;
++				response = await handler(toMiniflareRequest(request), req);
 +			}
  			if (req.httpVersionMajor === 2) {
  				response = new Response$1(response.body, response);
  				response.headers.delete("transfer-encoding");
-@@ -56342,9 +56353,6 @@
+@@ -39994,9 +40005,6 @@ function resolveRequestTarget(target, origin) {
  }
  function createRequestForIncomingMessage(req, res, options) {
  	const controller = new AbortController();
@@ -29,5 +33,5 @@ diff --git a/dist/index.mjs b/dist/index.mjs
 -		controller.abort();
 -	});
  	const method = req.method ?? "GET";
- 	const headers = createHeaders(req);
+ 	const headers = createHeadersForIncomingMessage(req);
  	const protocol = options?.protocol ?? getScheme(req) ?? ("encrypted" in req.socket && req.socket.encrypted ? "https:" : "http:");

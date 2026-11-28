@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useScreenDiagnostic } from '../../reports/use-report-diagnostic'
+import { diagnosePositions } from './position-diagnostic'
 import { storeToRefs } from 'pinia'
 import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 
@@ -337,6 +339,23 @@ const asset = computed(() =>
 const instrument = computed(() =>
   route.instrument.value ? instrumentDetail(state.value, vm.value, route.instrument.value) : null,
 )
+
+useScreenDiagnostic('investment', () => ({
+  subview: route.selected.value
+    ? route.movements.value
+      ? 'asset-movements'
+      : 'asset'
+    : 'positions',
+  year: state.value.year,
+  month: month.value,
+  options: [method.value, sortKey.value, sortDirection.value],
+  checks: diagnosePositions(
+    state.value,
+    month.value,
+    vm.value.accounts.map((row) => row.id),
+    route.selected.value,
+  ),
+}))
 
 // Opening or leaving the detail, or its movements, starts a new page.
 watch(

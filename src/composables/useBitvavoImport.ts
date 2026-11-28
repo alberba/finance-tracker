@@ -1,3 +1,4 @@
+import { observeReportOutcome } from '../lib/client/report-observations'
 import { computed, reactive, shallowRef } from 'vue'
 import type {
   BitvavoConnectionState,
@@ -93,13 +94,19 @@ export function useBitvavoImport() {
   }
   /** Runs a sync and always reloads the state, so a failure shows as the last attempt. */
   async function runSync(action: 'sync' | 'retrySkipped') {
+    if (busy.value) return
+    observeReportOutcome('data', 'import-running')
     await perform(async () => {
-      await sync.flush()
       try {
+        await sync.flush()
         const result = await request<{ counts: BitvavoSyncCounts }>({ action })
         await sync.refreshFromServer()
         const { created, updated, unchanged, skipped } = result.counts
+        observeReportOutcome('data', skipped > 0 ? 'import-skipped' : 'import-complete')
         notice.value = `Sincronización completada: ${created} creadas, ${updated} actualizadas, ${unchanged} sin cambios y ${skipped} omitidas.`
+      } catch (failure) {
+        observeReportOutcome('data', 'import-failed')
+        throw failure
       } finally {
         await refresh().catch(() => undefined)
       }
@@ -125,7 +132,8 @@ export function useBitvavoImport() {
     })
   }
   async function confirm() {
-    if (!preview.value || !canConfirm.value) return
+    if (!preview.value || !canConfirm.value || busy.value) return
+    observeReportOutcome('data', 'import-running')
     await perform(async () => {
       const result = await request<{ imported: number }>({
         action: 'confirm',
@@ -140,6 +148,7 @@ export function useBitvavoImport() {
       preview.value = null
       await refresh()
     })
+    observeReportOutcome('data', error.value ? 'import-failed' : 'import-complete')
   }
   return {
     form,

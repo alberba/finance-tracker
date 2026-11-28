@@ -1,8 +1,10 @@
 import { z } from 'zod'
+import { diagnosticSchema, reportTopicSchema } from './report-diagnostic-schema'
 import {
   ISSUE_ATTACHMENT_MAX_BYTES,
   ISSUE_ATTACHMENT_MAX_COUNT,
   ISSUE_ATTACHMENT_TYPES,
+  decodeBase64,
   isIssueAttachmentType,
   sniffImageType,
 } from '../../domain/reports/issue-attachments'
@@ -70,11 +72,17 @@ export const issueReportSchema = z
     // como cortafuegos contra payloads desmedidos.
     description: z.string().trim().max(8000).optional().default(''),
     section: z.string().trim().min(1).max(64),
-    context: z.object({
-      userAgent: z.string().trim().max(512).optional().default(''),
-      pathname: z.string().trim().max(256).optional().default(''),
-      timestamp: z.string().trim().max(64).optional().default(''),
-    }),
+    diagnostic: diagnosticSchema.optional(),
+    topic: reportTopicSchema.optional(),
+    receipt: z.string().max(2048).optional(),
+    context: z
+      .object({
+        userAgent: z.string().trim().max(512).optional().default(''),
+        pathname: z.string().trim().max(256).optional().default(''),
+        timestamp: z.string().trim().max(64).optional().default(''),
+      })
+      .optional()
+      .default({ userAgent: '', pathname: '', timestamp: '' }),
     attachments: z.array(attachmentInputSchema).max(ISSUE_ATTACHMENT_MAX_COUNT).optional(),
   })
   .superRefine((report, ctx) => refineAttachments(report.attachments, ctx))
@@ -113,15 +121,6 @@ function sanitizeText(value: string): string {
 
 export function sanitizeMultilineText(value: string): string {
   return removeControlCharacters(value.replace(/\r\n?/g, '\n'), true).trim()
-}
-
-function decodeBase64(data: string): Uint8Array<ArrayBuffer> {
-  const binary = atob(data)
-  const bytes = new Uint8Array(new ArrayBuffer(binary.length))
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index)
-  }
-  return bytes
 }
 
 function resolveAttachment(attachment: AttachmentInput): ResolvedAttachment {

@@ -1,3 +1,4 @@
+import { observeReportOutcome } from '../lib/client/report-observations'
 import { defineStore } from 'pinia'
 import { computed } from 'vue'
 
@@ -65,6 +66,12 @@ function syncInvestmentCategoriesWithAssets(draft: State): void {
   )
 }
 
+const ENTITY_SUBVIEW = {
+  accounts: 'accounts',
+  investmentAssets: 'assets',
+  liabilities: 'liabilities',
+} as const
+
 export const useSettingsStore = defineStore('settings', () => {
   const financialStateStore = useFinancialStateStore()
   const { showToast } = useToast()
@@ -88,6 +95,7 @@ export const useSettingsStore = defineStore('settings', () => {
         .slice(0, 3)
     })
     void syncSettingsUpdate({ currency: financialStateStore.currency })
+    observeReportOutcome('settings', 'settings-saved', 'preferences')
   }
 
   /** Whether an account counts as liquidity: money the user could use tomorrow. */
@@ -133,7 +141,10 @@ export const useSettingsStore = defineStore('settings', () => {
 
   function addEntity(key: EntityKey, name: string, openingBalance: string): boolean {
     const trimmedName = usableName(key, name)
-    if (!trimmedName) return false
+    if (!trimmedName) {
+      observeReportOutcome('settings', 'settings-rejected', ENTITY_SUBVIEW[key])
+      return false
+    }
 
     // The entity's identity is minted here and never derived from its name
     // (ADR 0001): renaming it later leaves the identity — and the row — alone.
@@ -148,6 +159,7 @@ export const useSettingsStore = defineStore('settings', () => {
       })
     })
     syncEntities(key, before)
+    observeReportOutcome('settings', 'settings-saved', ENTITY_SUBVIEW[key])
     showToast('Elemento agregado.')
     return true
   }
@@ -176,7 +188,10 @@ export const useSettingsStore = defineStore('settings', () => {
   /** Saves the name and opening balance of an entity's card at once. */
   function saveEntity(key: EntityKey, id: string, name: string, openingBalance: number): boolean {
     const trimmedName = usableName(key, name, id)
-    if (!trimmedName) return false
+    if (!trimmedName) {
+      observeReportOutcome('settings', 'settings-rejected', ENTITY_SUBVIEW[key])
+      return false
+    }
 
     const before = financialStateStore.state[key]
     financialStateStore.commitState((draft) => {
@@ -189,6 +204,7 @@ export const useSettingsStore = defineStore('settings', () => {
       }
     })
     syncEntities(key, before)
+    observeReportOutcome('settings', 'settings-saved', ENTITY_SUBVIEW[key])
     showToast('Cambios guardados.')
     return true
   }
@@ -310,6 +326,7 @@ export const useSettingsStore = defineStore('settings', () => {
   function addCategory(key: CategoryKey, name: string): boolean {
     const trimmedName = name.trim()
     if (!trimmedName) {
+      observeReportOutcome('settings', 'settings-rejected', 'categories')
       return false
     }
 
@@ -321,6 +338,7 @@ export const useSettingsStore = defineStore('settings', () => {
     void syncCategoryUpsert(CATEGORY_KIND_BY_KEY[key], trimmedName, {
       sortOrder: financialStateStore.state[key].indexOf(trimmedName),
     })
+    observeReportOutcome('settings', 'settings-saved', 'categories')
     showToast('Categoría agregada.')
     return true
   }
@@ -369,6 +387,7 @@ export const useSettingsStore = defineStore('settings', () => {
   function setCategoryEmoji(key: CategoryKey, name: string, emoji: string): void {
     const trimmedEmoji = emoji.trim()
     if (!trimmedEmoji) {
+      observeReportOutcome('settings', 'settings-rejected', 'categories')
       return
     }
 
@@ -376,6 +395,7 @@ export const useSettingsStore = defineStore('settings', () => {
       draft.categoryEmojis[categoryEmojiKey(categoryKeyToType(key), name)] = trimmedEmoji
     })
     void syncCategoryEmoji(key, name, trimmedEmoji)
+    observeReportOutcome('settings', 'settings-saved', 'categories')
     showToast('Emoji actualizado.')
   }
 

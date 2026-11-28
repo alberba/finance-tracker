@@ -129,18 +129,14 @@ describe('theme controller', () => {
   })
 })
 
-describe('pre-paint scripts', () => {
-  // Inline scripts can't import the controller, so each one repeats the list
-  // of themes; they must name exactly the themes the controller knows.
-  it.each(['neon/app/AppShell.astro', 'neon/auth/NeonAccessPage.astro'])(
-    '%s lists the same themes as the controller',
-    (path) => {
-      const source = readFileSync(new URL(`../../src/${path}`, import.meta.url), 'utf8')
-      const inlineList = source.match(/\[\s*((?:'[a-z-]+',?\s*)+)\]\.includes\(stored\)/)?.[1]
-
-      expect([...(inlineList ?? '').matchAll(/'([a-z-]+)'/g)].map(([, name]) => name)).toEqual([
-        ...NEON_THEMES,
-      ])
-    },
+it('the shared pre-paint script accepts every theme supported by the controller', () => {
+  const source = readFileSync(
+    new URL('../../src/neon/layout/NeonInitialTheme.astro', import.meta.url),
+    'utf8',
   )
+  const inlineList = source.match(/\[\s*((?:'[a-z-]+',?\s*)+)\]\.includes\(stored\)/)?.[1]
+
+  expect([...(inlineList ?? '').matchAll(/'([a-z-]+)'/g)].map(([, name]) => name)).toEqual([
+    ...NEON_THEMES,
+  ])
 })

@@ -90,7 +90,7 @@ test.describe('Mis reportes', () => {
     await own.getByRole('button', { name: 'Borrar' }).click()
     const confirm = own.getByRole('alertdialog', { name: '¿Borrar esta aclaración?' })
     await expect(confirm.getByRole('button', { name: 'Cancelar' })).toBeFocused()
-    await confirm.getByRole('button', { name: 'Borrar de GitHub' }).click()
+    await confirm.getByRole('button', { name: 'Borrar aclaración' }).click()
     await expect(section(page).locator('[data-thread-item="555"]')).toHaveCount(0)
   })
 

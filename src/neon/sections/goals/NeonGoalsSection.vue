@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { getCategoriesForType } from '../../../domain/transactions/categories'
+import { useScreenDiagnostic } from '../../reports/use-report-diagnostic'
 import { computed, ref, watch } from 'vue'
 
 import type { SavingGoal } from '../../../scripts/types'
@@ -18,6 +20,7 @@ import {
   monthlySaving,
   monthNumber,
   monthOf,
+  yearMonth,
   selectedGoal,
   wholeEuros,
 } from './view-model'
@@ -56,6 +59,25 @@ watch(
 )
 
 /** The amount on the slider while it moves; null once let go. */
+useScreenDiagnostic('goals', () => {
+  const plan = selectedPlan.value
+  if (!plan) return { subview: 'home', checks: ['insufficient'] }
+  const start = plan.start !== null ? yearMonth(plan.start) : null
+  const due = plan.due !== null ? yearMonth(plan.due) : null
+  const linked = getCategoriesForType(financialStateStore.state, 'saving').includes(plan.category)
+  return {
+    subview: 'detail',
+    year: due?.year,
+    month: due?.month,
+    fromYear: start?.year,
+    fromMonth: start?.month,
+    checks: [
+      linked ? 'goals-linked' : 'goals-unlinked',
+      ...(!start || !due ? ['goals-no-period' as const] : []),
+    ],
+  }
+})
+
 const sliding = ref<number | null>(null)
 watch(selectedId, () => (sliding.value = null))
 const amount = computed(() => sliding.value ?? selectedPlan.value?.monthly ?? 0)

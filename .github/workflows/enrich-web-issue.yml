@@ -20,7 +20,10 @@ concurrency:
 
 jobs:
   enrich:
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.issue.labels.*.name, 'source:web-report')
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (contains(github.event.issue.labels.*.name, 'source:web-report') &&
+      !contains(github.event.issue.body, '<!-- web-report-private -->'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -37,6 +40,7 @@ jobs:
       # para leerla. El token de GitHub es efímero y solo tiene issues:write en
       # este repositorio.
       - name: Fetch report for OpenCode
+        id: report
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -48,6 +52,10 @@ jobs:
           # El cuerpo original se guarda fuera del workspace: el agente no puede
           # leer el bloque ### Reportero ni el resto de metadatos que no ve.
           gh issue view "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --json title,body,labels,comments > "$RUNNER_TEMP/report-raw.json"
+          if jq -e '(.body // "") | contains("<!-- web-report-private -->")' "$RUNNER_TEMP/report-raw.json" > /dev/null; then
+            echo "private=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           jq '{
                 title,
                 body: ((.body // "") | gsub("<!-- finance-tracker:reporter-comment user=[^>]* -->\\r?\\n?"; "") | split("\n### Reportero")[0] | rtrimstr("\n")),
@@ -56,8 +64,10 @@ jobs:
               }' "$RUNNER_TEMP/report-raw.json" > .scratch/enricher/issue.json
           jq -j '.body // ""' "$RUNNER_TEMP/report-raw.json" > "$RUNNER_TEMP/original-body.md"
       - name: Install OpenCode
+        if: steps.report.outputs.private != 'true'
         run: npm install --global @opencode/cli@2.2.0
       - name: Analyze with create-issue
+        if: steps.report.outputs.private != 'true'
         env:
           OPENCODE_GO_API_KEY: ${{ secrets.OPENCODE_GO_API_KEY }}
           OPENCODE_CONFIG: ${{ github.workspace }}/.github/opencode-issue-enricher.json
@@ -80,6 +90,7 @@ jobs:
           } > "$RUNNER_TEMP/prompt.md"
           opencode run --standalone "$(cat "$RUNNER_TEMP/prompt.md")"
       - name: Publish enriched report
+        if: steps.report.outputs.private != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           ORIGINAL_BODY_PATH: ${{ runner.temp }}/original-body.md

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { observeReportOutcome } from '../../../lib/client/report-observations'
 import { storeToRefs } from 'pinia'
 import { ref, watch } from 'vue'
 
@@ -37,8 +38,14 @@ watch(
 function save(): void {
   const nextYear = parseYear(year.value)
   const nextCurrency = parseCurrency(currency.value)
-  if (nextYear === null) return void showToast('El año de trabajo va de 2000 a 2100.')
-  if (nextCurrency === null) return void showToast('La moneda son tres letras, como EUR.')
+  if (nextYear === null || nextCurrency === null) {
+    observeReportOutcome('settings', 'settings-rejected', 'preferences')
+    return void showToast(
+      nextYear === null
+        ? 'El año de trabajo va de 2000 a 2100.'
+        : 'La moneda son tres letras, como EUR.',
+    )
+  }
   settingsStore.saveGeneral(String(nextYear), nextCurrency)
 }
 

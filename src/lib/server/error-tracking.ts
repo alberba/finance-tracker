@@ -9,6 +9,21 @@ export interface ApiRouteFailure {
   status: number
 }
 
+function isolatePrivateReportEvent(scope: Sentry.Scope) {
+  scope.addEventProcessor?.((event) => {
+    delete event.request
+    delete event.user
+    delete event.breadcrumbs
+    delete event.extra
+    delete event.contexts
+    return event
+  })
+}
+
+function isPrivateReportRoute(route: string) {
+  return /^\/api\/(?:issues\/report|reports|report-files|support\/reports)(?:\/|$)/.test(route)
+}
+
 /**
  * Privacy contract: to Sentry travel the two tags we set (`api.route` and
  * `http.response.status_code`) plus the exception itself, whose type, message
@@ -18,13 +33,13 @@ export interface ApiRouteFailure {
  * The rule that keeps that promise true: an `Error` message on this path must
  * not echo an upstream request or response body. `createIssueFromWebReport` in
  * `github-issues.ts` is the example to follow: its message names the GitHub
- * status only, while the upstream body is logged server-side with
- * `console.error` (the server SDK drops the `Console` integration, so that
- * breadcrumb never reaches Sentry).
+ * status only. Private report routes also drop request data and breadcrumbs
+ * so a failed write cannot attach the submitted text.
  */
 export function reportApiRouteFailure(error: unknown, failure: ApiRouteFailure): void {
   try {
     Sentry.withScope((scope) => {
+      if (isPrivateReportRoute(failure.route)) isolatePrivateReportEvent(scope)
       scope.setTag('api.route', failure.route)
       scope.setTag('http.response.status_code', String(failure.status))
       Sentry.captureException(error)
@@ -76,6 +91,7 @@ export type ReportSideFailureReporter = (failure: ReportSideFailure) => void
 export const reportReportSideFailure: ReportSideFailureReporter = (failure) => {
   try {
     Sentry.withScope((scope) => {
+      isolatePrivateReportEvent(scope)
       scope.setTag('report.stage', failure.stage)
       scope.setTag('report.reason', failure.reason)
       // Sin esto Sentry agrupa por la pila, que es la misma para todos los
@@ -88,5 +104,21 @@ export const reportReportSideFailure: ReportSideFailureReporter = (failure) => {
     })
   } catch {
     console.error('[api] No se pudo reportar a Sentry el fallo auxiliar del reporte.')
+  }
+}
+
+/** Reference for a provider callback or server failure, without credentials or provider text. */
+export function reportAccessFailure(): string | undefined {
+  try {
+    const client = Sentry.getClient()
+    if (!client?.getDsn() || client.getOptions().enabled === false) return undefined
+    const id = Sentry.withScope((scope) => {
+      scope.setTag('api.route', '/api/auth')
+      isolatePrivateReportEvent(scope)
+      return Sentry.captureMessage('No se pudo completar el acceso.')
+    })
+    return /^[a-f0-9]{32}$/.test(id) ? id : undefined
+  } catch {
+    return undefined
   }
 }

@@ -7,6 +7,11 @@ export class AuthenticationPage {
     await expect(this.page.getByRole('heading', { name: 'Accede a Finanzas' })).toBeVisible()
     await this.ready()
   }
+  async submitPassword(email: string, password: string) {
+    await this.page.getByLabel('Correo electrónico').fill(email)
+    await this.page.getByLabel('Contraseña', { exact: true }).fill(password)
+    await this.page.getByRole('button', { name: 'Entrar en Finanzas', exact: true }).click()
+  }
   async signIn(email: string) {
     await this.page.getByRole('button', { name: 'Código por correo', exact: true }).click()
     await expect(this.page.getByLabel('Código de seis cifras')).toBeDisabled()

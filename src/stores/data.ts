@@ -1,3 +1,4 @@
+import { carryImportThroughReload } from '../lib/client/report-observations'
 /** JSON backups use the authenticated relational export; demo remains local. */
 import { defineStore } from 'pinia'
 import { computed } from 'vue'
@@ -115,6 +116,7 @@ export const useDataStore = defineStore('data', () => {
         ? `JSON importado; ${result.value.skipped} elementos sin cuenta o categoría se omitieron. Recargando…`
         : 'JSON importado correctamente. Recargando…',
     )
+    carryImportThroughReload(result.value.skipped > 0 ? 'import-skipped' : 'import-complete')
     window.location.reload()
     return true
   }

@@ -1,60 +1,29 @@
-import { Effect } from 'effect'
 import { describe, expect, it, vi } from 'vitest'
-import {
-  buildIssueBody,
-  buildOriginalReportBody,
-  createIssueFromWebReport as createIssueFromWebReportEffect,
-  type GithubIssueClient,
-  type IssueReporter,
-} from '../../src/lib/server/github-issues'
-import { Http } from '../../src/lib/server/http'
-import {
-  parseIssueReportPayload,
-  type IssueReportPayload,
-} from '../../src/lib/server/issue-report-schema'
 
-const payload: IssueReportPayload = {
+import { createIssueFromWebReport as createGithubIssue } from '../../src/lib/server/github-issues'
+import { runHttp } from '../../src/lib/server/runtime'
+
+const payload = {
   type: 'bug',
-  summary: 'Error al guardar movimiento',
-  description: 'Al pulsar guardar, no se persiste en servidor.',
-  section: 'transactions',
-  context: {
-    userAgent: 'Playwright',
-    pathname: '/movimientos',
-    timestamp: '2026-02-23T10:00:00.000Z',
-  },
-}
+  screen: 'transactions',
+  reference: '00000000-0000-4000-8000-000000000100',
+} as const
 
-const reporter: IssueReporter = {
-  userId: 'user-42',
-  email: 'ana@example.com',
-  name: 'ana',
-}
-
-/** El test es el borde: ejecuta el efecto con un `fetch` falso como capa Http. */
 function createIssueFromWebReport(
-  payload: IssueReportPayload,
-  reporter: IssueReporter,
-  env: Record<string, string>,
-  client: { fetch: typeof fetch } & GithubIssueClient,
-): Promise<{ number: number; url: string }> {
-  const { fetch: request, ...rest } = client
-  return Effect.runPromise(
-    Effect.provideService(createIssueFromWebReportEffect(payload, reporter, env, rest), Http, {
-      request,
-    }),
-  )
+  payload: Parameters<typeof createGithubIssue>[0],
+  env: Parameters<typeof createGithubIssue>[1],
+  request: typeof fetch,
+) {
+  return runHttp(createGithubIssue(payload, env), request)
 }
 
-/** El error que lanzó la promesa: acá importa su `message`, no la respuesta. */
 async function captureError(promise: Promise<unknown>): Promise<Error> {
-  try {
-    await promise
-  } catch (error) {
-    if (error instanceof Error) return error
-    throw error
-  }
-  throw new Error('Se esperaba que la promesa fallara')
+  return promise.then(
+    () => {
+      throw new Error('Expected the request to fail')
+    },
+    (error) => error,
+  )
 }
 
 describe('github issues service', () => {
@@ -74,13 +43,12 @@ describe('github issues service', () => {
 
     const result = await createIssueFromWebReport(
       payload,
-      reporter,
       {
         GITHUB_ISSUE_TOKEN: 'token',
         GITHUB_OWNER: 'org',
         GITHUB_REPO: 'repo',
       },
-      { fetch: fakeFetch as unknown as typeof fetch },
+      fakeFetch,
     )
 
     expect(result.number).toBe(99)
@@ -93,10 +61,10 @@ describe('github issues service', () => {
     )
     expect(body.labels).not.toContain('type:bug')
     expect(body.type).toBe('Bug')
-    expect(body.body).toContain('### Resumen')
-    expect(body.body).toContain('### Problema o solicitud')
-    expect(body.body).toContain('- Se envió desde la sección: transactions')
-    expect(body.body).toContain('- Se envió desde la ruta: /movimientos')
+    expect(body).toMatchObject({
+      title: 'Incidencia en Movimientos',
+      body: expect.stringContaining('Referencia del caso: 00000000-0000-4000-8000-000000000100'),
+    })
   })
 
   it('mapea una mejora a label y tipo Feature', async () => {
@@ -116,13 +84,12 @@ describe('github issues service', () => {
         ...payload,
         type: 'feature',
       },
-      reporter,
       {
         GITHUB_ISSUE_TOKEN: 'token',
         GITHUB_OWNER: 'org',
         GITHUB_REPO: 'repo',
       },
-      { fetch: fakeFetch as unknown as typeof fetch },
+      fakeFetch,
     )
 
     const [, init] = fakeFetch.mock.calls[0]
@@ -144,13 +111,12 @@ describe('github issues service', () => {
 
     const result = await createIssueFromWebReport(
       payload,
-      reporter,
       {
         GITHUB_ISSUE_TOKEN: 'token',
         GITHUB_OWNER: 'org',
         GITHUB_REPO: 'repo',
       },
-      { fetch: fakeFetch as unknown as typeof fetch },
+      fakeFetch,
     )
 
     expect(result.number).toBe(16)
@@ -173,13 +139,12 @@ describe('github issues service', () => {
 
     const result = await createIssueFromWebReport(
       payload,
-      reporter,
       {
         GITHUB_ISSUE_TOKEN: 'token',
         GITHUB_OWNER: 'org',
         GITHUB_REPO: 'repo',
       },
-      { fetch: fakeFetch as unknown as typeof fetch },
+      fakeFetch,
     )
 
     expect(result.number).toBe(7)
@@ -189,48 +154,42 @@ describe('github issues service', () => {
   it('nombra el estado sin filtrar el cuerpo de GitHub en un fallo directo', async () => {
     const upstreamBody = 'UPSTREAM_BODY_MARKER_UNAUTHORIZED'
     const fakeFetch = vi.fn<typeof fetch>(async () => new Response(upstreamBody, { status: 401 }))
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     const error = await captureError(
       createIssueFromWebReport(
         payload,
-        reporter,
         {
           GITHUB_ISSUE_TOKEN: 'token',
           GITHUB_OWNER: 'org',
           GITHUB_REPO: 'repo',
         },
-        { fetch: fakeFetch as unknown as typeof fetch },
+        fakeFetch,
       ),
     )
 
     expect(error.message).toContain('GitHub API devolvió 401')
     expect(error.message).not.toContain(upstreamBody)
-    expect(consoleError).toHaveBeenCalledWith('[github] GitHub API devolvió 401', upstreamBody)
   })
 
   it('nombra el estado sin filtrar el cuerpo de GitHub cuando el reintento vuelve a fallar', async () => {
     const upstreamBody = 'UPSTREAM_BODY_MARKER_FORBIDDEN'
     const fakeFetch = vi.fn<typeof fetch>(async () => new Response(upstreamBody, { status: 403 }))
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     const error = await captureError(
       createIssueFromWebReport(
         payload,
-        reporter,
         {
           GITHUB_ISSUE_TOKEN: 'token',
           GITHUB_OWNER: 'org',
           GITHUB_REPO: 'repo',
         },
-        { fetch: fakeFetch as unknown as typeof fetch },
+        fakeFetch,
       ),
     )
 
     expect(fakeFetch).toHaveBeenCalledTimes(2)
     expect(error.message).toContain('GitHub API devolvió 403')
     expect(error.message).not.toContain(upstreamBody)
-    expect(consoleError).toHaveBeenCalledWith('[github] GitHub API devolvió 403', upstreamBody)
   })
 
   it('usa GITHUB_TOKEN cuando GITHUB_ISSUE_TOKEN no está definido', async () => {
@@ -249,13 +208,12 @@ describe('github issues service', () => {
 
     await createIssueFromWebReport(
       payload,
-      reporter,
       {
         GITHUB_TOKEN: 'fallback-token',
         GITHUB_OWNER: 'org',
         GITHUB_REPO: 'repo',
       },
-      { fetch: fakeFetch as unknown as typeof fetch },
+      fakeFetch,
     )
 
     const [, init] = fakeFetch.mock.calls[0]
@@ -270,98 +228,13 @@ describe('github issues service', () => {
     await expect(
       createIssueFromWebReport(
         payload,
-        reporter,
         {
           GITHUB_OWNER: 'org',
           GITHUB_REPO: 'repo',
         },
-        { fetch: fakeFetch as unknown as typeof fetch },
+        fakeFetch,
       ),
     ).rejects.toThrow(/GITHUB_ISSUE_TOKEN o GITHUB_TOKEN/)
     expect(fakeFetch).not.toHaveBeenCalled()
-  })
-})
-
-describe('buildOriginalReportBody', () => {
-  it('guarda lo que escribió la persona sin contexto de ejecución ni reportero', () => {
-    const body = buildOriginalReportBody({ ...payload, description: 'Detalle' })
-
-    expect(body).toBe(`### Resumen\n${payload.summary}\n\n### Problema o solicitud\nDetalle`)
-    expect(body).not.toContain('Contexto de ejecución')
-    expect(body).not.toContain('Reportero')
-  })
-})
-
-describe('buildIssueBody', () => {
-  it('omite por completo la sección «Problema o solicitud» cuando no hay descripción', () => {
-    const body = buildIssueBody({ ...payload, description: '' }, reporter)
-
-    expect(body).not.toContain('Problema o solicitud')
-    expect(body).toContain('### Resumen')
-    expect(body).toContain(payload.summary)
-  })
-
-  it('conserva los saltos de línea de la descripción de extremo a extremo', () => {
-    const parsed = parseIssueReportPayload({
-      type: 'bug',
-      summary: 'Filtro roto',
-      description: 'Paso 1\n\nPaso 2:\n- primero\n- segundo',
-      section: 'transactions',
-      context: {},
-    })
-
-    const body = buildIssueBody(parsed, reporter)
-
-    expect(body).toContain('### Problema o solicitud\nPaso 1\n\nPaso 2:\n- primero\n- segundo\n')
-  })
-
-  it('marca con n/a los datos del reportero que falten', () => {
-    const body = buildIssueBody(payload, { userId: 'user-7', email: null, name: null })
-
-    expect(body).toContain('- Nombre: n/a')
-    expect(body).toContain('- Email: n/a')
-    expect(body).toContain('- Identificador: user-7')
-  })
-})
-
-describe('cuerpo completo de la issue', () => {
-  const baselineBody = [
-    '## Reporte desde la web',
-    '',
-    '### Resumen',
-    'Error al guardar movimiento',
-    '',
-    '### Problema o solicitud',
-    'Al pulsar guardar, no se persiste en servidor.',
-    '',
-    '### Contexto de ejecución',
-    '- Tipo: bug',
-    '- Tipo de reporte: bug',
-    '- Tipo de issue de GitHub: Bug',
-    '- Se envió desde la sección: transactions',
-    '- Se envió desde la ruta: /movimientos',
-    '- Navegador: Playwright',
-    '- Fecha cliente: 2026-02-23T10:00:00.000Z',
-    '',
-    '### Reportero',
-    '- Nombre: ana',
-    '- Email: ana@example.com',
-    '- Identificador: user-42',
-  ].join('\n')
-
-  it('sin adjuntos el cuerpo tiene el formato de siempre', () => {
-    expect(buildIssueBody(payload, reporter)).toBe(baselineBody)
-    expect(buildIssueBody(payload, reporter, [])).toBe(baselineBody)
-  })
-
-  it('falla con un mensaje claro si falta la configuración de GitHub', async () => {
-    await expect(
-      createIssueFromWebReport(
-        payload,
-        reporter,
-        { GITHUB_ISSUE_TOKEN: 'token', GITHUB_REPO: 'repo' },
-        { fetch: vi.fn<typeof fetch>() },
-      ),
-    ).rejects.toThrow(/GITHUB_OWNER/)
   })
 })

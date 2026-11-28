@@ -2,8 +2,11 @@ import type { APIRoute } from 'astro'
 import { ZodError } from 'zod'
 
 import { getDb } from '../../../db/client'
-import * as issueReportsRepository from '../../../db/repositories/issue-reports'
-import { requirePrincipal, withApiErrorHandling } from '../../../lib/server/api-auth'
+import { getByUserAndNumber } from '../../../db/repositories/issue-reports'
+import * as privateReports from '../../../db/repositories/private-reports'
+import { signReportReceipt, verifyReportReceipt } from '../../../lib/server/issue-reports/receipt'
+import { reportScreenSchema } from '../../../lib/server/report-diagnostic-schema'
+import { jsonResponse, requirePrincipal, withApiErrorHandling } from '../../../lib/server/api-auth'
 import { getRuntimeEnvFromLocals } from '../../../lib/server/cloudflare-env'
 import { reportApiRouteFailure, reportReportSideFailure } from '../../../lib/server/error-tracking'
 import { createIssueFromWebReport } from '../../../lib/server/github-issues'
@@ -11,72 +14,87 @@ import { parseIssueReportPayload } from '../../../lib/server/issue-report-schema
 import { reportSubmissionLimiter } from '../../../lib/server/rate-limit'
 import { runHttp, runServer } from '../../../lib/server/runtime'
 
-function jsonResponse(payload: unknown, status = 200): Response {
-  return new Response(JSON.stringify(payload), {
-    status,
-    headers: {
-      'Content-Type': 'application/json',
-      'Cache-Control': 'no-store',
-    },
-  })
-}
+const ROUTE = '/api/issues/report'
 
 export const POST: APIRoute = async ({ request, locals }) =>
-  withApiErrorHandling('/api/issues/report', async () => {
+  withApiErrorHandling(ROUTE, async () => {
     const principal = requirePrincipal(locals)
     if (!reportSubmissionLimiter.consume(principal.userId)) {
       return jsonResponse({ ok: false, error: 'Rate limit excedido. Intenta en un minuto.' }, 429)
     }
 
     try {
-      const body = await request.json()
-      const payload = parseIssueReportPayload(body)
-      const env = getRuntimeEnvFromLocals(locals)
-      // El reportero sale siempre del principal autenticado: lo que traiga el
-      // payload no puede sobrescribirlo.
-      const reporter = {
-        userId: principal.userId,
-        email: principal.email,
-        name: principal.name ?? null,
-      }
-      const created = await runHttp(createIssueFromWebReport(payload, reporter, env))
+      const payload = parseIssueReportPayload(await request.json())
+      const db = getDb(locals)
+      const now = new Date().toISOString()
+      await runServer(db, privateReports.purgeExpired(now))
 
-      // La propiedad es lo único que guarda el servidor; si falla, la issue ya
-      // existe y el acuse lo dice sin reintentar la creación ([D7]).
+      const env = getRuntimeEnvFromLocals(locals)
+      const recovered = payload.receipt
+        ? await verifyReportReceipt(payload.receipt, principal.userId, env.BETTER_AUTH_SECRET)
+        : null
+      if (payload.receipt && !recovered) {
+        return jsonResponse(
+          { ok: false, error: 'La referencia de recuperación ha caducado o es inválida.' },
+          400,
+        )
+      }
+
+      const screen = reportScreenSchema.safeParse(payload.section).data ?? 'unknown'
+      const reference = recovered?.reference ?? crypto.randomUUID()
+      const created =
+        recovered ??
+        (await runHttp(
+          createIssueFromWebReport(
+            { type: payload.type, screen, reference, topic: payload.topic },
+            env,
+          ),
+        ))
+      const response = { ok: true, issueNumber: created.number, issueUrl: created.url }
+
+      if (recovered) {
+        const existing = await runServer(db, getByUserAndNumber(principal.userId, recovered.number))
+        if (existing?.caseReference === reference) {
+          return jsonResponse({ ...response, tracked: true }, 201)
+        }
+      }
       let tracked = true
       try {
         await runServer(
-          getDb(locals),
-          issueReportsRepository.recordSubmission(
-            principal.userId,
-            created.number,
-            new Date().toISOString(),
-            created.body,
-          ),
+          db,
+          privateReports.saveSubmission(principal.userId, {
+            caseReference: reference,
+            issueNumber: created.number,
+            submittedAt: now,
+            title: payload.summary,
+            body: payload.description,
+            diagnostic: payload.diagnostic,
+            attachments: payload.attachments ?? [],
+          }),
         )
-      } catch (error) {
+      } catch {
+        // The GitHub issue already exists. The client keeps the private draft.
         tracked = false
-        console.error('[issues/report] No se pudo registrar la propiedad del reporte', error)
         reportReportSideFailure({ stage: 'track', reason: 'db' })
       }
 
-      return jsonResponse(
-        {
-          ok: true,
-          issueNumber: created.number,
-          issueUrl: created.url,
-          tracked,
-        },
-        201,
-      )
+      const receipt = tracked
+        ? undefined
+        : (payload.receipt ??
+          (await signReportReceipt(
+            { ...created, reference },
+            principal.userId,
+            env.BETTER_AUTH_SECRET,
+          )))
+      return jsonResponse({ ...response, tracked, receipt }, 201)
     } catch (error) {
-      if (error instanceof ZodError) {
-        return jsonResponse({ ok: false, error: 'Payload inválido.', details: error.issues }, 400)
+      if (error instanceof ZodError || error instanceof SyntaxError) {
+        return jsonResponse({ ok: false, error: 'Payload inválido.' }, 400)
       }
-      console.error('[issues/report] Issue creation failed', error)
-      // El catch resuelve la respuesta, así que `withApiErrorHandling` nunca ve
-      // este fallo: se reporta acá, una sola vez y con la misma forma.
-      reportApiRouteFailure(error, { route: '/api/issues/report', status: 500 })
+      reportApiRouteFailure(new Error('No se pudo crear el reporte web.'), {
+        route: ROUTE,
+        status: 500,
+      })
       return jsonResponse({ ok: false, error: 'No se pudo crear la issue' }, 500)
     }
   })

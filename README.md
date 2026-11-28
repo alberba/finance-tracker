@@ -195,50 +195,18 @@ flujos de navegador están en [`docs/playwright.md`](docs/playwright.md).
 
 ## Reportes web
 
-Este repo permite enviar reportes desde la web y convertirlos en issues de GitHub:
+Desde **Reportar** o desde la hoja «Más» en móvil se puede enviar un error o una mejora y
+revisar un diagnóstico opcional. GitHub recibe el tipo, el resumen técnico mostrado y una
+referencia opaca. El título, la descripción, las capturas y las aclaraciones se guardan en la
+app.
 
-1. Desde el lanzador **Reportar** (o la hoja «Más» en móvil) puedes enviar un reporte (`error` o
-   `mejora`).
-2. El backend crea una issue en GitHub con labels base:
-   - `source:web-report`
-   - `needs-triage`
-   - `bug` o `feature`
-3. El backend intenta asignar también el tipo estructurado de GitHub (`Bug` o `Feature`).
-   Si el repositorio no lo admite, la issue se crea igualmente con sus labels.
-4. Al abrirse una issue con `source:web-report`, **Analyze web report** separa lectura, análisis y
-   publicación. Un paso previo, sin OpenCode, lee la issue con `gh issue view` (título, cuerpo sin el
-   bloque `### Reportero`, labels y comentarios) y escribe `.scratch/enricher/issue.json`. Después,
-   OpenCode ejecuta `opencode run` con DeepSeek V4.1 Flash y un mensaje que empieza por
-   `@create-issue`, identifica la issue por número y repositorio y añade su título y descripción; el
-   texto del reporte se declara dato no fiable. Ese paso no recibe `GH_TOKEN` ni `GITHUB_TOKEN` y no
-   tiene shell: la skill analiza el código y deja el resultado en `.scratch/enricher/body.md`,
-   `comment.md` y `labels.txt`. Un paso posterior, también sin OpenCode, publica esos ficheros con
-   `gh`: si existe `body.md`, quita cualquier `### Reportero` que venga del agente, añade el bloque
-   auténtico del cuerpo original y recupera los adjuntos, imágenes y contexto que falten; comenta
-   `comment.md` y añade solo labels que ya existan en el repositorio (validados contra
-   `gh label list` y una expresión regular estricta, con límites de tamaño). Antes de editar el
-   cuerpo vuelve a leer la issue y, si cambió, publica el resultado como comentario. Escapa toda
-   sintaxis de imagen y HTML en todo el texto, también en código, insertando U+200B; después
-   reinserta solo las imágenes inline exactas del cuerpo original cuya URL sea
-   `user-attachments` o `assets` del repositorio, nunca imágenes de referencia. Neutraliza menciones
-   en todo el texto, también en código (por eso un identificador como `@types/node` conserva un
-   U+200B invisible), salvo correos y URLs con host válido; los enlaces normales, incluidos
-   `localhost`, se conservan, y `<details>` o `<https://...>` se muestran como texto. Limita los
-   labels a la
-   allowlist documentada (triage, tipo y `ui-change`); las líneas `-label` quitan labels y el
-   estado/tipo anterior del mismo eje se sustituye. No hay agente propio ni plantilla, y el agente
-   no puede publicar ni crear labels o issues por sí mismo.
-5. La skill aplica los labels y el estado de triage según las convenciones del tracker. El
-   comentario lo publica el token de Actions (`github-actions[bot]`), que «Mis reportes» clasifica
-   como automatización por ser un bot y no muestra en el hilo. Sin `gh` en el paso de OpenCode, la
-   skill no busca duplicadas ni cierra la issue; solo prepara el cuerpo, el brief y los labels.
+**Mis reportes** (`/reportes`) conserva el seguimiento del estado de GitHub y permite retirar un
+diagnóstico. Las capturas caducan a los 30 días. El equipo de soporte consulta el caso por número
+desde `/soporte/reportes`, con un permiso explícito y registro de acceso. Consulta el
+[flujo y las operaciones de soporte](docs/context/tabs/reportes.md).
 
-El alta guarda una fila de propiedad en `issue_reports` y el acuse enlaza a **Mis reportes**
-(`/reportes`). Esa página lista los reportes de la cuenta con el estado nativo de GitHub, sigue a la
-principal cuando el reporte se cierra como duplicada (hasta tres saltos) y permite añadir, editar y
-borrar aclaraciones propias con adjuntos. GitHub sigue siendo la fuente de verdad del estado; no hay
-sondeos ni caché de estado en el servidor. Un fallo al registrar la propiedad devuelve `201` con
-`tracked: false` y el reporte se recupera con `bun run reports:backfill`.
+El workflow **Analyze web report** se conserva para las issues históricas con texto público.
+Las issues privadas quedan fuera de su análisis y publicación.
 
 La skill `create-issue` se instala con `npx skills` en `.agents/skills/create-issue/` (fijada en
 `skills-lock.json`) y OpenCode la descubre desde ahí. Para adoptar cambios de la skill, actualízala
@@ -275,12 +243,11 @@ reporte se envían al proveedor al leerlos durante el análisis.
 En el runtime (`locals.runtime.env`; en producción, el `.env` del servidor):
 
 - `GITHUB_ISSUE_TOKEN` o `GITHUB_TOKEN`: token personal o de una GitHub App con acceso de escritura
-  a issues. La creación debe generar el evento `issues.opened`; un `GITHUB_TOKEN` de otro workflow
-  no dispara este workflow automáticamente.
+  a issues.
 - `GITHUB_OWNER`
 - `GITHUB_REPO`
-- `GITHUB_BOT_LOGIN` (opcional): login de la cuenta que publica las aclaraciones. Necesario si el
-  token es de una GitHub App, porque `/user` no está disponible para ellas.
+- `GITHUB_BOT_LOGIN` (opcional): login de la cuenta que publicó las aclaraciones históricas.
+  Necesario con un token de GitHub App, porque `/user` no está disponible para ellas.
 
 En GitHub → Settings → Secrets and variables → Actions:
 

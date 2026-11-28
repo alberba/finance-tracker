@@ -2,6 +2,8 @@
 import { storeToRefs } from 'pinia'
 import { computed, ref, useTemplateRef } from 'vue'
 
+import { lastReportOutcome, observeReportOutcome } from '../../../lib/client/report-observations'
+import { useScreenDiagnostic } from '../../reports/use-report-diagnostic'
 import { useDataStore } from '../../../stores/data'
 import { useSyncStore } from '../../../stores/sync'
 import NeonButton from '../../ui/NeonButton.vue'
@@ -44,6 +46,10 @@ const lastImport = ref('')
 const lastExport = ref('')
 
 const step = computed<ImportStep>(() => (done.value ? 'done' : origin.value ? 'review' : 'origin'))
+useScreenDiagnostic('data', () => ({
+  subview: importOpen.value ? 'import' : 'home',
+  checks: [lastReportOutcome('data') ?? 'insufficient'],
+}))
 const contents = computed(() => exportContents(summary.value))
 
 function toggleImport(): void {
@@ -83,11 +89,17 @@ async function confirmJson(): Promise<void> {
   const chosen = file.value
   if (!chosen || working.value) return
   working.value = true
+  observeReportOutcome('data', 'import-running')
   try {
     if (await dataStore.importJson(chosen)) {
       done.value = jsonImported(backsUpServerData)
       lastImport.value = lastImportNote('json')
+      observeReportOutcome('data', 'import-complete')
+    } else {
+      observeReportOutcome('data', 'import-failed')
     }
+  } catch {
+    observeReportOutcome('data', 'import-failed')
   } finally {
     working.value = false
   }

@@ -1,4 +1,5 @@
 import { Effect } from 'effect'
+import type { ReportDiagnostic, ReportTopic } from '../domain/reports/diagnostic'
 
 import { requestApiJson } from '../lib/client/api-client'
 import type { ClientHttp } from '../lib/client/http'
@@ -19,11 +20,14 @@ export interface ReportPayload {
   /** Opcional: se omite del payload cuando la persona no escribe nada. */
   description?: string
   section: string
-  context: {
+  context?: {
     userAgent: string
     pathname: string
     timestamp: string
   }
+  diagnostic?: ReportDiagnostic
+  topic?: ReportTopic
+  receipt?: string
   /** Opcional: se omite del payload cuando no hay capturas. */
   attachments?: ReportAttachment[]
 }
@@ -34,6 +38,7 @@ interface ReportResponseOk {
   issueUrl: string
   /** `false` si la issue se creó pero no se pudo registrar en «Mis reportes». */
   tracked: boolean
+  receipt?: string
 }
 
 interface ReportResponseError {

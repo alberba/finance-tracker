@@ -1,3 +1,4 @@
+import { observeReportOutcome } from '../../../lib/client/report-observations'
 import { useToast } from '../../../composables/useToast'
 import { inferInstrumentType } from '../../../domain/investment/symbol-matching'
 import { formatMoney } from '../../../lib/format'
@@ -64,6 +65,11 @@ export function useEntityActions(kind: EntityKind) {
   function save(row: EntityRef, name: string, balanceText: string): boolean {
     const value = parseAmount(balanceText)
     if (value === null) {
+      observeReportOutcome(
+        'settings',
+        'settings-rejected',
+        kind === 'investmentAssets' ? 'assets' : kind,
+      )
       showToast(`El ${words.balance.toLowerCase()} no es un número.`)
       return false
     }
@@ -77,6 +83,11 @@ export function useEntityActions(kind: EntityKind) {
   function add(name: string, balanceText: string, symbol = ''): boolean {
     const opening = openingBalanceText(balanceText)
     if (opening === null) {
+      observeReportOutcome(
+        'settings',
+        'settings-rejected',
+        kind === 'investmentAssets' ? 'assets' : kind,
+      )
       showToast(`El ${words.balance.toLowerCase()} no es un número.`)
       return false
     }

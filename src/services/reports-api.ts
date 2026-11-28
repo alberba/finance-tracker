@@ -94,7 +94,7 @@ export const postReportComment = (
   return requestApiJson<ReportCommentResponse>(`${detailPath(issueNumber)}/comments`, {
     method: 'POST',
     body: input,
-    fallbackMessage: 'No se pudo publicar en GitHub. Tu texto sigue aquí; inténtalo de nuevo.',
+    fallbackMessage: 'No se pudo guardar la aclaración. Tu texto sigue aquí; inténtalo de nuevo.',
   })
 }
 
@@ -107,7 +107,7 @@ export const patchReportComment = (
   return requestApiJson<ReportCommentResponse>(`${detailPath(issueNumber)}/comments/${commentId}`, {
     method: 'PATCH',
     body: input,
-    fallbackMessage: 'No se pudo guardar en GitHub. Tu texto sigue aquí; inténtalo de nuevo.',
+    fallbackMessage: 'No se pudo guardar la aclaración. Tu texto sigue aquí; inténtalo de nuevo.',
   })
 }
 
@@ -121,5 +121,11 @@ export const deleteReportComment = (
     fallbackMessage: 'No se pudo borrar la aclaración.',
   }).pipe(Effect.as({ ok: true } as const))
 }
+
+export const withdrawReportDiagnostic = (issueNumber: number) =>
+  requestApiNoContent(`${detailPath(issueNumber)}/diagnostic`, {
+    method: 'DELETE',
+    fallbackMessage: 'No se pudo retirar el diagnóstico.',
+  })
 
 export type { ReportDetail }

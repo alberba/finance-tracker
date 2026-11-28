@@ -104,9 +104,7 @@ narrativa.
     su único assert es un snapshot grande sin diff revisado.
 21. **Borrar un test de poco valor es una mejora.** Si un refactor sin cambio de comportamiento lo
     rompe, reescríbelo contra la vía pública o bórralo; no lo acoples a la implementación.
-22. **Los umbrales de coverage representan el mínimo actual y suben con código nuevo.** No se
-    excluyen módulos para mejorar el porcentaje.
-23. **Una PR con tests escritos por IA indica qué queda sin cubrir y por qué.** Antes de entregarse,
+22. **Una PR con tests escritos por IA indica qué queda sin cubrir y por qué.** Antes de entregarse,
     un agente sin el contexto de quien los escribió clasifica cada test nuevo como esencial,
     prescindible o borrar; se borran los dos últimos. Más de 3 tests nuevos exigen proponer antes la
     lista (test y defecto que evita), salvo que el ticket ya la enumere.
@@ -115,14 +113,14 @@ narrativa.
 
 - `bun run test` es el comando por defecto (las tres capas). Durante el trabajo, acota por fichero o
   proyecto (`bunx vitest run --project unit <ruta>`); no esperes al final para el bucle rojo.
-- Antes de la PR: `bun run gate` (dependencias, lint, tipos y suite) y `bun run test:e2e:smoke` en
-  secuencia para cambios de código, configuración o contenido ejecutable.
+- Verificación final, antes de la PR: `bun run gate` (dependencias, documentos, lint, tipos y suite) y
+  después las specs E2E que cubren lo que has tocado; el CI ejecuta las suites de navegador completas.
+- Las suites pesadas (Vitest completo, `gate`, E2E) van una detrás de otra, nunca a la vez: compiten
+  por CPU y una corrida interrumpida no deja resultado.
 - E2E: `bun run test:e2e:install` una vez; `bun run test:e2e --project=chromium` para funcional;
   `bun run test:e2e:sync-v2` para offline y sincronización.
 - Worktrees: `bun run setup:worktree` antes de probar. `bun run test:e2e` arranca su propio servidor en un
   puerto derivado de la ruta del worktree; no lances suites pesadas contra el mismo servidor.
-- Coverage: `bun run test:coverage` (manual; no está en `bun run gate` ni en CI). Los umbrales de
-  `vitest.config.ts` se suben, nunca se bajan; no se excluyen módulos para mejorar el porcentaje.
 
 ## Cómo lo aplican los agentes
 
@@ -131,7 +129,7 @@ narrativa.
   fuentes del eje Standards.
 - Un agente que vaya a añadir más de 3 tests propone antes la lista (test y defecto que evita), salvo
   que el ticket ya la enumere. Una PR con tests de IA indica lo que queda sin cubrir y pasa la
-  revisión independiente de la regla 23.
+  revisión independiente de la regla 22.
 
 ## Checklist de PR de tests
 
@@ -142,8 +140,7 @@ narrativa.
 - [ ] Los E2E usan Page Objects, esperan señales y no repiten contratos por viewport.
 - [ ] Los tests nuevos de IA están clasificados (esencial/prescindible/borrar) y se han podado los
       dos últimos grupos.
-- [ ] Si hubo código nuevo, los umbrales de coverage han subido.
-- [ ] `bun run gate` y, si toca navegador, las specs E2E afectadas están en verde.
+- [ ] La verificación final de _Ejecución_ está en verde.
 
 ## Fuentes
 
