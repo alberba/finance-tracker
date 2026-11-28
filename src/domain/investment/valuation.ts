@@ -35,17 +35,15 @@ export function calculateInstrumentUnits(
     ? Number(instrument.holdingUnits)
     : Number(instrument.openingUnits || 0)
   return round8(
-    startingUnits +
-      transactions.reduce((total, transaction) => {
-        if (
-          !isTransactionForInstrument(transaction, instrument, transactions) ||
-          !isTransactionAfterHoldingsCutoff(transaction, instrument, hasCurrentSnapshot)
-        )
-          return total
-        const units = Number(transaction.units || 0)
-        if (!Number.isFinite(units) || units <= 0) return total
-        return total + (transaction.side === 'sell' ? -units : units)
-      }, 0),
+    startingUnits + transactions.reduce((total, transaction) => {
+      if (
+        !isTransactionForInstrument(transaction, instrument) ||
+        !isTransactionAfterHoldingsCutoff(transaction, instrument, hasCurrentSnapshot)
+      ) return total
+      const units = Number(transaction.units || 0)
+      if (!Number.isFinite(units) || units <= 0) return total
+      return total + (transaction.side === 'sell' ? -units : units)
+    }, 0),
   )
 }
 
@@ -72,8 +70,7 @@ function isTransactionAfterHoldingsCutoff(
     transaction.createdAt &&
     instrument.holdingsUpdatedAt &&
     Date.parse(transaction.createdAt) <= Date.parse(instrument.holdingsUpdatedAt)
-  )
-    return false
+  ) return false
   if (transaction.createdAt && instrument.holdingsUpdatedAt) return true
   return Boolean(instrument.holdingsAsOf && transaction.date > instrument.holdingsAsOf)
 }
@@ -81,14 +78,12 @@ function isTransactionAfterHoldingsCutoff(
 function isTransactionForInstrument(
   transaction: Transaction,
   instrument: Instrument,
-  transactions: Transaction[],
 ): boolean {
   if (transaction.type !== 'investment') return false
-  const hasExplicitLinks = transactions.some(
-    (candidate) => candidate.type === 'investment' && candidate.instrumentId === instrument.id,
-  )
-  if (hasExplicitLinks) return transaction.instrumentId === instrument.id
-  return symbolsMatchInstrument(transaction.symbol, instrument) && !transaction.instrumentId
+  if (transaction.instrumentId) return transaction.instrumentId === instrument.id
+  // A movement without a link still counts when its symbol is the instrument's,
+  // even if other movements of the instrument are linked explicitly.
+  return symbolsMatchInstrument(transaction.symbol, instrument)
 }
 
 export function buildPortfolioValuation(
@@ -100,16 +95,7 @@ export function buildPortfolioValuation(
   const maxAgeMinutes = options.maxAgeMinutes ?? 15
   const valuations = state.instruments
     .filter((instrument) => instrument.active)
-    .map((instrument) =>
-      buildInstrumentValuation(
-        state,
-        instrument,
-        baseCurrency,
-        now,
-        maxAgeMinutes,
-        options.fxRates || {},
-      ),
-    )
+    .map((instrument) => buildInstrumentValuation(state, instrument, baseCurrency, now, maxAgeMinutes, options.fxRates || {}))
 
   const byAsset: Record<string, number> = {}
   valuations.forEach((valuation) => {
@@ -136,12 +122,11 @@ function buildInstrumentValuation(
   const unitPrice = quoteUnitPrice(quote, instrument, baseCurrency, fxRates)
   const value = unitPrice === null ? 0 : round2(units * unitPrice)
   const staleByAge = quote ? isQuoteStale(quote, now, maxAgeMinutes) : true
-  const status =
-    !quote || quote.status === 'unavailable'
-      ? 'unavailable'
-      : staleByAge || quote.isStale
-        ? 'stale'
-        : 'fresh'
+  const status = !quote || quote.status === 'unavailable'
+    ? 'unavailable'
+    : staleByAge || quote.isStale
+      ? 'stale'
+      : 'fresh'
 
   return {
     instrument,
@@ -172,20 +157,14 @@ export function isQuoteStale(quote: Quote, now = new Date(), maxAgeMinutes = 15)
   return now.getTime() - timestamp > maxAgeMinutes * 60_000
 }
 
-function getExchangeRate(
-  fromCurrency: string,
-  toCurrency: string,
-  fxRates: Record<string, number>,
-): number {
+function getExchangeRate(fromCurrency: string, toCurrency: string, fxRates: Record<string, number>): number {
   if (fromCurrency === toCurrency) return 1
   const rate = Number(fxRates[`${fromCurrency}/${toCurrency}`] || fxRates[fromCurrency])
   return Number.isFinite(rate) && rate > 0 ? rate : 1
 }
 
 function calculateWeightedChange(valuations: InstrumentValuation[]): number | null {
-  const priced = valuations.filter(
-    (valuation) => valuation.value > 0 && valuation.dailyChangePercent !== null,
-  )
+  const priced = valuations.filter((valuation) => valuation.value > 0 && valuation.dailyChangePercent !== null)
   const denominator = priced.reduce((total, valuation) => total + valuation.value, 0)
   if (!denominator) return null
   return round2(

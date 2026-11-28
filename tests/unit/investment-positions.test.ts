@@ -183,6 +183,8 @@ describe('buildAccountPositions', () => {
           category: 'Crypto',
           description: 'Aportación por importe',
           amount: 500,
+          instrumentId: 'i-btc',
+          side: 'buy',
         },
       ],
     })
