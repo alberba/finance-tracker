@@ -19,6 +19,7 @@ import {
 import { InvalidCredential, RateLimit, NonEuroOperation, ProviderError } from '../../../lib/server/bitvavo/client'
 import type { BitvavoConnectionState } from '../../../lib/bitvavo-types'
 import { runServer } from '../../../lib/server/runtime'
+import { DataEncryptionError } from '../../../lib/server/crypto/data-encryption'
 
 const actionSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('preview') }).strict(),
@@ -39,6 +40,7 @@ async function handle(locals: App.Locals, work: (context: { db: ReturnType<typeo
       if (error instanceof InvalidCredential) return jsonResponse({ error: error.message }, 422)
       if (error instanceof RateLimit) return jsonResponse({ error: error.message }, 429)
       // Our own sanitized messages: the provider body never reaches the client.
+      if (error instanceof DataEncryptionError) return jsonResponse({ error: `Cifrado de credenciales: ${error.message}` }, 503)
       if (error instanceof ProviderError || error instanceof ImportError) return jsonResponse({ error: error.message }, 502)
       throw error
     }

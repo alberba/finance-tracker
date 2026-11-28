@@ -27,6 +27,8 @@ ensure_var() {
 ensure_var TEST_AUTH_ENABLED true
 # Better Auth no arranca sin secreto; cada worktree tiene el suyo.
 ensure_var BETTER_AUTH_SECRET "$(openssl rand -base64 32)"
+# Cifra las credenciales de integraciones (Stock Events, Bitvavo); sin ella no se pueden guardar.
+ensure_var DATA_ENCRYPTION_KEY "$(openssl rand -base64 32)"
 
 # Better Auth valida el origen contra esta URL: la del puerto propio de este worktree.
 node scripts/dev-worktree.mjs --sync-url
