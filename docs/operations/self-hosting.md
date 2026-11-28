@@ -5,12 +5,12 @@
 Para trabajar en el código y el diseño, sin Docker:
 
 ```sh
-pnpm setup:worktree   # una vez por worktree: .dev.vars, dependencias y D1 local
+pnpm setup:worktree   # una vez por worktree: .dev.vars (con su BETTER_AUTH_URL), dependencias y D1 local
 pnpm dev:worktree     # Astro con hot reload en el puerto del worktree
 ```
 
 `dev:worktree` usa 4321 en el checkout principal y un puerto propio en cada worktree, y ajusta
-`BETTER_AUTH_URL` en `.dev.vars` a ese puerto; se para con `pnpm exec astro dev stop`. Para entrar
+`BETTER_AUTH_URL` en `.dev.vars` a ese puerto (o al de la variable `PORT`, que usa la vista previa de `.claude/launch.json`); se para con `pnpm exec astro dev stop`. Para entrar
 con tu cuenta y tus datos (un export JSON de Datos → Exportar, por ejemplo el de producción):
 
 ```sh

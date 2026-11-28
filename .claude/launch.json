@@ -4,8 +4,9 @@
     {
       "name": "dev",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["dev", "--host", "127.0.0.1", "--port", "4321"],
-      "port": 4321
+      "runtimeArgs": ["dev:worktree", "--host", "127.0.0.1"],
+      "port": 4321,
+      "autoPort": true
     },
     {
       "name": "preview",
