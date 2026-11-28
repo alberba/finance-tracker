@@ -28,7 +28,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
-      - run: pnpm test --maxWorkers=4
+      - run: bun run test --maxWorkers=4
 
   e2e:
     name: Full E2E shard ${{ matrix.shard }}/4
@@ -46,7 +46,7 @@ jobs:
       - name: Enable the test auth shim
         run: printf 'TEST_AUTH_ENABLED=true\n' > .dev.vars
       - name: Run functional E2E shard
-        run: pnpm test:e2e:shard ${{ matrix.shard }}/4
+        run: bun run test:e2e:shard ${{ matrix.shard }}/4
       - name: Upload blob report
         if: ${{ !cancelled() }}
         continue-on-error: true
@@ -71,7 +71,7 @@ jobs:
       - name: Generate an ephemeral integration encryption key
         run: node --input-type=module -e 'import { appendFileSync } from "node:fs"; import { randomBytes } from "node:crypto"; appendFileSync(".dev.vars", "DATA_ENCRYPTION_KEY=" + randomBytes(32).toString("base64") + "\n")'
       - name: Run sync-v2 E2E tests
-        run: pnpm test:e2e:sync-v2
+        run: bun run test:e2e:sync-v2
       - name: Upload sync-v2 blob report
         if: ${{ !cancelled() }}
         continue-on-error: true
@@ -92,7 +92,7 @@ jobs:
         with:
           playwright: true
       - name: Run isolated Better Auth Worker E2E
-        run: pnpm test:e2e:auth --reporter=dot,html
+        run: bun run test:e2e:auth --reporter=dot,html
       - name: Upload authentication report
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
@@ -140,7 +140,7 @@ jobs:
           path: all-blob-reports
           merge-multiple: true
       - name: Merge HTML report
-        run: pnpm exec playwright merge-reports --reporter html ./all-blob-reports
+        run: bunx playwright merge-reports --reporter html ./all-blob-reports
       - name: Upload HTML report
         continue-on-error: true
         uses: actions/upload-artifact@v7

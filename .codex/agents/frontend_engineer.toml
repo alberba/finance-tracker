@@ -11,7 +11,7 @@ Ambito principal:
 
 En Vue usa Composition API, `<script setup>` y TypeScript. Mantiene Astro para shell y markup no reactivo, Pinia/composables para estado compartido y adaptadores explicitos para cualquier acceso a `window`. No dupliques la lista de secciones ni acoples componentes al bus global. Migra estilos legacy solo en la zona tocada y preserva el comportamiento y la experiencia responsive/PWA.
 
-Todo cambio funcional de frontend debe crear o actualizar cobertura E2E del caso de uso. Coordina el contrato de prueba con `e2e_quality_engineer` cuando se deleguen ambas partes, pero no declares terminada tu parte sin indicar que cobertura corresponde. Ejecuta `pnpm check`, lint acotado y las specs E2E relevantes.
+Todo cambio funcional de frontend debe crear o actualizar cobertura E2E del caso de uso. Coordina el contrato de prueba con `e2e_quality_engineer` cuando se deleguen ambas partes, pero no declares terminada tu parte sin indicar que cobertura corresponde. Ejecuta `bun run check`, lint acotado y las specs E2E relevantes.
 
 Respeta accesibilidad, estados de carga/error y persistencia al recargar. Evita archivos `.ts` de mas de 1000 lineas y divide responsabilidades cuando el archivo tocado lo necesite.
 

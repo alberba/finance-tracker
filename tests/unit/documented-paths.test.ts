@@ -12,7 +12,6 @@ const ROOT_FILES = [
   'README.md',
   'GLOSSARY.md',
   'DESIGN.md',
-  'pnpm-workspace.yaml',
   'eslint.config.ts',
   'playwright.config.ts',
   'playwright.shared.ts',

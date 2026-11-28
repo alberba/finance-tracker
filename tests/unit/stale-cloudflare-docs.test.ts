@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 /**
  * Production is Docker + SQLite (docs/operations/self-hosting.md); Cloudflare
- * Workers/D1 only survive for dev, `pnpm preview` and tests. Setup guides that
+ * Workers/D1 only survive for dev, `bun run preview` and tests. Setup guides that
  * still tell an agent to `wrangler secret put` send it to a deploy target that
  * no longer exists, so the command may appear only under a "(anterior)" heading.
  */

@@ -3,7 +3,7 @@
   "version": "2.0.0",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@10.26.0",
+  "packageManager": "bun@1.4.2",
   "scripts": {
     "cf:types": "wrangler types",
     "d1:migrate:local:v2": "wrangler d1 migrations apply finance-tracker-db-v2 --local --persist-to .wrangler/state",
@@ -14,14 +14,14 @@
     "dev:worktree": "node scripts/dev-worktree.mjs",
     "dev:account": "node scripts/dev-account.mjs",
     "build": "astro build",
-    "audit:prod": "pnpm audit --prod --audit-level high",
+    "audit:prod": "bun scripts/audit-prod.mjs",
     "benchmark:performance": "node scripts/benchmark-performance.mjs",
     "benchmark:pages": "node scripts/benchmark-pages.mjs",
     "preview": "astro preview",
     "check": "astro check && vue-tsc --noEmit",
     "check:vue": "vue-tsc --noEmit",
     "lint": "eslint .",
-    "gate": "pnpm check:deps && pnpm lint && pnpm check && pnpm test",
+    "gate": "bun run check:deps && bun run lint && bun run check && bun run test",
     "lint:fix": "eslint . --fix",
     "test": "vitest run",
     "test:all": "node scripts/test-all.mjs",
@@ -51,7 +51,8 @@
     "local:down": "node scripts/local-compose.mjs down",
     "local:archive": "node scripts/archive-local.mjs",
     "local:archive:install": "node scripts/install-orca-archive.mjs",
-    "local:up:prod": "node scripts/local-compose.mjs up production"
+    "local:up:prod": "node scripts/local-compose.mjs up production",
+    "postinstall": "node scripts/check-installed-dependencies.mjs --record"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.12",
@@ -113,5 +114,34 @@
     "vue": "^3.5.45",
     "yahoo-finance2": "^4.0.6",
     "zod": "^4.6.7"
-  }
+  },
+  "overrides": {
+    "brace-expansion": "5.0.12",
+    "devalue": "5.9.3",
+    "undici@7": "7.30.1",
+    "undici@8": "8.12.2",
+    "nanoid": "3.3.18",
+    "picomatch": "2.3.2",
+    "postcss": "8.5.26",
+    "rollup": "4.59.0",
+    "sharp": "0.35.5",
+    "smol-toml": "1.9.1",
+    "source-map-js": "1.2.2",
+    "yaml": "2.8.3",
+    "esbuild@0.18.20": "0.25.12",
+    "fast-uri": "3.1.8",
+    "browserslist": "4.28.7",
+    "baseline-browser-mapping": "^2.11.0",
+    "js-yaml": "4.3.2",
+    "svgo": "4.1.0"
+  },
+  "patchedDependencies": {
+    "@cloudflare/vite-plugin@1.63.1": "patches/@cloudflare__vite-plugin@1.63.1.patch",
+    "http-cache-semantics@4.2.0": "patches/http-cache-semantics@4.2.0.patch"
+  },
+  "trustedDependencies": [
+    "esbuild",
+    "sharp",
+    "workerd"
+  ]
 }

@@ -1,20 +1,20 @@
 # Ejecución local
 
-## Desarrollo diario: `pnpm dev:worktree`
+## Desarrollo diario: `bun run dev:worktree`
 
 Para trabajar en el código y el diseño, sin Docker:
 
 ```sh
-pnpm setup:worktree   # una vez por worktree: .dev.vars (con su BETTER_AUTH_URL), dependencias y D1 local
-pnpm dev:worktree     # Astro con hot reload en el puerto del worktree
+bun run setup:worktree   # una vez por worktree: .dev.vars (con su BETTER_AUTH_URL), dependencias y D1 local
+bun run dev:worktree     # Astro con hot reload en el puerto del worktree
 ```
 
 `dev:worktree` usa 4321 en el checkout principal y un puerto propio en cada worktree, y ajusta
-`BETTER_AUTH_URL` en `.dev.vars` a ese puerto (o al de la variable `PORT`, que usa la vista previa de `.claude/launch.json`); se para con `pnpm exec astro dev stop`. Para entrar
+`BETTER_AUTH_URL` en `.dev.vars` a ese puerto (o al de la variable `PORT`, que usa la vista previa de `.claude/launch.json`); se para con `bunx astro dev stop`. Para entrar
 con tu cuenta y tus datos (un export JSON de Datos → Exportar, por ejemplo el de producción):
 
 ```sh
-pnpm dev:account tu@correo.example ~/Downloads/finance-tracker-AAAA-MM-DD.json
+bun run dev:account tu@correo.example ~/Downloads/finance-tracker-AAAA-MM-DD.json
 ```
 
 Crea la cuenta (o le pone contraseña nueva si ya existe) en la D1 local, guarda la contraseña en
@@ -28,8 +28,8 @@ local se omiten. Producción no se toca.
 Para probar la imagen y SQLite como en producción. Con OrbStack arrancado, desde la raíz del repositorio:
 
 ```sh
-pnpm local:setup
-pnpm local:up
+bun run local:setup
+bun run local:up
 ```
 
 `local:up` arranca Astro en modo desarrollo con hot reload y muestra la URL de esta instancia cuando el contenedor está listo. El checkout
@@ -42,15 +42,15 @@ El correo y la contraseña inicial están en
 `.env.selfhost`, creado con permisos privados y excluido de Git y de la imagen Docker.
 La configuración se guarda en el checkout principal y los worktrees la usan mediante
 un enlace simbólico: al editar ese archivo, todos reciben los mismos cambios.
-`pnpm local:up`, `pnpm local:down` y `pnpm setup:worktree` preparan el enlace automáticamente.
+`bun run local:up`, `bun run local:down` y `bun run setup:worktree` preparan el enlace automáticamente.
 Si un worktree tenía una configuración propia, se conserva en `.env.selfhost.local`
 antes de enlazar la compartida; si ya hay una copia, se usa un sufijo numérico.
 Selecciona «Contraseña» y entra con correo y contraseña. El administrador inicial ya tiene el correo verificado;
 no necesitas configurar un proveedor de correo para este acceso.
 
-La primera creación de la imagen descarga y prepara las dependencias y puede superar un minuto. Las siguientes reutilizan la caché de pnpm y las capas de Docker, compartidas entre worktrees. En desarrollo, el código y la configuración se montan desde el worktree: los cambios en Vue, Astro y CSS aparecen en el navegador sin reconstruir la imagen. Las dependencias Linux permanecen dentro del contenedor; no se monta el `node_modules` de macOS. Si cambias las dependencias, vuelve a ejecutar `pnpm local:up`.
+La primera creación de la imagen descarga y prepara las dependencias y puede superar un minuto. Las siguientes reutilizan la caché de bun y las capas de Docker, compartidas entre worktrees. En desarrollo, el código y la configuración se montan desde el worktree: los cambios en Vue, Astro y CSS aparecen en el navegador sin reconstruir la imagen. Las dependencias Linux permanecen dentro del contenedor; no se monta el `node_modules` de macOS. Si cambias las dependencias, vuelve a ejecutar `bun run local:up`.
 
-Para probar la compilación de producción con el mismo puerto y volumen, usa `pnpm local:up:prod`. Para volver al hot reload, usa `pnpm local:up`.
+Para probar la compilación de producción con el mismo puerto y volumen, usa `bun run local:up:prod`. Para volver al hot reload, usa `bun run local:up`.
 
 El servidor usa Astro con Node y SQLite local; no consulta D1 ni requiere Cloudflare
 Access. La sincronización v2 está activada en ambos modos de Docker. Los datos empiezan vacíos,
@@ -58,8 +58,8 @@ independientes de producción. El importador de Datos admite la copia JSON v2 de
 aplicación; esto no migra las cuentas de autenticación de Cloudflare.
 
 ```sh
-pnpm local:down
-pnpm local:up
+bun run local:down
+bun run local:up
 ```
 
 El volumen `finance-data` conserva la base de datos al parar, recrear o actualizar el
@@ -85,13 +85,13 @@ variables de GitHub que usa el servidor (`GITHUB_ISSUE_TOKEN` o `GITHUB_TOKEN`, 
 
 ```sh
 # 1) Simulación: no escribe nada. Revisa el recuento y las issues saltadas.
-pnpm reports:backfill --v2-sqlite=/ruta/a/finance-tracker-v2.sqlite
+bun run reports:backfill --v2-sqlite=/ruta/a/finance-tracker-v2.sqlite
 
 # 2) Aplicación: inserta solo las filas que faltan.
-pnpm reports:backfill --v2-sqlite=/ruta/a/finance-tracker-v2.sqlite --execute
+bun run reports:backfill --v2-sqlite=/ruta/a/finance-tracker-v2.sqlite --execute
 
 # 3) Opcional: deja el SQL para aplicarlo a D1 con wrangler.
-pnpm reports:backfill --execute --remote-sql-out=.data/reports-backfill.sql
+bun run reports:backfill --execute --remote-sql-out=.data/reports-backfill.sql
 ```
 
 En el paso 3 la lista de usuarios contra la que se valida el plan sigue siendo la de
@@ -106,7 +106,7 @@ lanza una sola vez tras el despliegue; las altas posteriores se registran solas.
 
 ## Diferencia con preview
 
-`pnpm preview` prueba la compilación de Cloudflare mediante workerd. Este despliegue
+`bun run preview` prueba la compilación de Cloudflare mediante workerd. Este despliegue
 ejecuta un servidor Node de producción dentro de Docker. La compilación habitual
 sigue seleccionando Cloudflare (es la que ejercitan los tests); Docker usa `DEPLOY_TARGET=node`.
 
@@ -204,9 +204,9 @@ cliente existente sigue activa. No se han exportado ni modificado datos de Cloud
 
 ### Archivado de worktrees en Orca
 
-`pnpm local:archive` elimina el contenedor, la imagen, la red y el volumen de datos de este worktree, si existen. El volumen contiene su SQLite: el archivado descarta esos datos. El checkout principal está protegido y el `.env.selfhost` compartido se conserva.
+`bun run local:archive` elimina el contenedor, la imagen, la red y el volumen de datos de este worktree, si existen. El volumen contiene su SQLite: el archivado descarta esos datos. El checkout principal está protegido y el `.env.selfhost` compartido se conserva.
 
-Para instalar el script en una ruta estable del checkout principal, ejecuta `pnpm local:archive:install`. Esto permite ejecutar el hook también en ramas antiguas que no contienen el script. Para conservar la identidad de un proyecto anterior, ejecuta una vez `pnpm local:up` con esta versión antes de detenerlo; así el archivado podrá identificar también su volumen cuando ya no quede contenedor. Configura este hook en Orca → Ajustes → finance-tracker → Script de archivado:
+Para instalar el script en una ruta estable del checkout principal, ejecuta `bun run local:archive:install`. Esto permite ejecutar el hook también en ramas antiguas que no contienen el script. Para conservar la identidad de un proyecto anterior, ejecuta una vez `bun run local:up` con esta versión antes de detenerlo; así el archivado podrá identificar también su volumen cuando ya no quede contenedor. Configura este hook en Orca → Ajustes → finance-tracker → Script de archivado:
 
 ```sh
 export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
@@ -223,9 +223,9 @@ Script de configuración (prepara dependencias, variables y D1 local, instala la
 set -eu
 export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 cd "$ORCA_WORKTREE_PATH"
-pnpm setup:worktree
-pnpm local:archive:install
-exec pnpm dev --host 127.0.0.1
+bun run setup:worktree
+bun run local:archive:install
+exec bun run dev --host 127.0.0.1
 ```
 
 Astro muestra el puerto asignado y elige otro si está ocupado. Abre esa URL con `/?demo=1` para usar datos sintéticos. El script de archivado es el del apartado anterior; usa una ruta del checkout principal para seguir disponible aunque la rama archivada no lo contenga.

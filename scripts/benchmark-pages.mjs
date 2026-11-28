@@ -7,7 +7,7 @@
  * data so both reports are comparable.
  *
  * Usage:
- *   BENCHMARK_BASE_URL=http://127.0.0.1:4322 pnpm benchmark:pages
+ *   BENCHMARK_BASE_URL=http://127.0.0.1:4322 bun run benchmark:pages
  *
  * A cold context is created per iteration. The dashboard loads first, then the
  * sections are opened in order; each section is measured on its first visit so

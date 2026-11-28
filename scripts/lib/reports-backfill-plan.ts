@@ -1,5 +1,5 @@
 /**
- * Plan de `pnpm reports:backfill` (#340), puro y testeable.
+ * Plan de `bun run reports:backfill` (#340), puro y testeable.
  *
  * Recupera la propiedad de los reportes enviados antes de que existiera
  * `issue_reports`: lee el `Identificador` del bloque `### Reportero` que escribe

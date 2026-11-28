@@ -47,7 +47,7 @@ registra en su commit.
 3. Servidor: `src/lib/server`, `src/services` y las integraciones restantes (`stockevents`,
    `market-data`, `github-issues`), siguiendo el patrón de Bitvavo.
 4. Endpoints: `src/pages/api` y middleware ejecutan sobre el runtime de servidor.
-5. Cliente: `stores/sync`, outbox y composables. **Antes** de empezar, `pnpm benchmark:performance`.
+5. Cliente: `stores/sync`, outbox y composables. **Antes** de empezar, `bun run benchmark:performance`.
 6. Componentes: solo los puntos de entrada de eventos.
 7. Esquemas: zod a Effect Schema y retirada de zod.
 
@@ -56,7 +56,7 @@ E2E smoke solo al final de cada PR.
 
 ## Medición previa a la fase 5
 
-`pnpm benchmark:performance` sobre el build de producción (`pnpm build` y `astro preview`) con la
+`bun run benchmark:performance` sobre el build de producción (`bun run build` y `astro preview`) con la
 red simulada del script (CPU 4×, 10 Mbps, 40 ms) y 7 iteraciones, mediana: **835,32 KB de JS
 transferido** en 36 peticiones, `appReady` 1.162 ms, LCP 780 ms. Es la línea base del cliente
 antes de tocar stores, outbox y composables; el presupuesto de 200,29 KB sigue siendo el ancla

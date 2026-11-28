@@ -70,9 +70,9 @@ Es una muestra local, no una predicción del arranque en producción ni evidenci
 de velocidad; no mostró regresión de arranque. Para reproducir con el build Astro:
 
 ```sh
-pnpm build
-pnpm exec wrangler deploy --dry-run --config dist/server/wrangler.json --outfile /tmp/bitvavo-worker.bundle
-pnpm exec wrangler check startup --worker /tmp/bitvavo-worker.bundle --outfile /tmp/bitvavo-startup.cpuprofile
+bun run build
+bunx wrangler deploy --dry-run --config dist/server/wrangler.json --outfile /tmp/bitvavo-worker.bundle
+bunx wrangler check startup --worker /tmp/bitvavo-worker.bundle --outfile /tmp/bitvavo-startup.cpuprofile
 ```
 
 ## Pruebas
@@ -84,6 +84,6 @@ las identidades del proveedor de autenticación de pruebas, exclusivamente en lo
 a Bitvavo real. La cabecera no altera el proveedor de una identidad de producción.
 
 ```sh
-pnpm exec vitest run tests/unit/bitvavo.test.ts tests/integration/d1-v2/bitvavo.test.ts
-pnpm exec playwright test --config playwright.bitvavo.config.ts
+bunx vitest run tests/unit/bitvavo.test.ts tests/integration/d1-v2/bitvavo.test.ts
+bunx playwright test --config playwright.bitvavo.config.ts
 ```

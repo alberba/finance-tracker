@@ -20,7 +20,7 @@ export function requestedPort(value) {
 /** Better Auth valida origen, cookies y passkeys contra esta URL: debe coincidir con el puerto. */
 function writeAuthUrl(port) {
   const devVars = resolve('.dev.vars')
-  if (!existsSync(devVars)) throw new Error('Falta .dev.vars: ejecuta pnpm setup:worktree.')
+  if (!existsSync(devVars)) throw new Error('Falta .dev.vars: ejecuta bun run setup:worktree.')
   const current = readFileSync(devVars, 'utf8')
   const next = upsertEnvVar(current, 'BETTER_AUTH_URL', `http://localhost:${port}`)
   if (next !== current) writeFileSync(devVars, next)
@@ -29,14 +29,14 @@ function writeAuthUrl(port) {
 async function run(extraArgs) {
   const checkout = realpathSync(process.cwd())
   const own = preferredPort(checkout, primaryCheckout(checkout))
-  // `--sync-url` (pnpm setup:worktree) solo fija la URL con el puerto propio del worktree: no
+  // `--sync-url` (bun run setup:worktree) solo fija la URL con el puerto propio del worktree: no
   // arranca nada, ignora `PORT` y no la cambia por un puerto ocupado de un servidor en marcha.
   if (extraArgs[0] === '--sync-url') return writeAuthUrl(own)
   // `PORT` lo fija quien lanza el servidor (la vista previa de `.claude/launch.json` con autoPort).
   const port = await availablePort(requestedPort(process.env.PORT) ?? own)
   writeAuthUrl(port)
   console.log(`Servidor de desarrollo en http://localhost:${port}`)
-  const child = spawn('pnpm', ['dev', '--port', String(port), '--strictPort', ...extraArgs], {
+  const child = spawn('bun', ['run', 'dev', '--port', String(port), '--strictPort', ...extraArgs], {
     stdio: 'inherit',
   })
   child.on('exit', (code, signal) => {
