@@ -8,8 +8,7 @@ import { defineConfig } from 'vitest/config'
  * Kept apart from `vitest.config.ts` (which scopes `tests/unit/**` only,
  * per the `tests-tooling` map) because these tests spin up an actual
  * SQLite engine per test file and apply `migrations-v2/*.sql` — slower
- * and heavier than the pure unit tier, and not part of its coverage
- * thresholds.
+ * and heavier than the pure unit tier.
  */
 export default defineConfig({
   resolve: {
