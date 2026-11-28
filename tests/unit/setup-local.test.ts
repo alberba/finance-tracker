@@ -66,18 +66,6 @@ describe('local environment setup', () => {
     expect(realpathSync(join(worktree, '.env.selfhost'))).toBe(realpathSync(shared))
   })
 
-  it('propagates edits to the shared configuration', () => {
-    const shared = join(directory, '.env.selfhost')
-    writeFileSync(shared, 'LOCAL_ADMIN_EMAIL=shared@example.test\n')
-    setup()
-
-    writeFileSync(shared, 'LOCAL_ADMIN_EMAIL=updated@example.test\n')
-
-    expect(readFileSync(join(worktree, '.env.selfhost'), 'utf8')).toBe(
-      'LOCAL_ADMIN_EMAIL=updated@example.test\n',
-    )
-  })
-
   it('creates private shared configuration when first run from a worktree', () => {
     setup()
 

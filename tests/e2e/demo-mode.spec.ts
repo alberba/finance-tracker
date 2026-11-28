@@ -40,8 +40,7 @@ test.describe('Modo demo', () => {
       description: 'Cambio local de demo',
     })
 
-    await tracker.filterTransactionsMonth('AGOSTO')
-    await expect(tracker.transactionRow('Cambio local de demo')).toBeVisible()
+    await tracker.expectTransactionDescriptionVisible('Cambio local de demo')
 
     await tracker.submitIssueReport({
       type: 'bug',

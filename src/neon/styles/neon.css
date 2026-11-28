@@ -1,0 +1,661 @@
+/* «Neón de garaje»: the app's tokens, with the names of DESIGN.md. Four
+   themes: the unmarked block is «oscuro suave», the default; the others are
+   picked with `data-theme`, which the pre-paint script and the controller
+   (src/lib/client/neon-theme.ts) always set to one of the four names: the
+   user's choice in Configuración, else «oscuro suave», or «claro melocotón»
+   if the system asks for light. The @theme block registers each token as a
+   utility with the default theme's value; the blocks below redefine it per
+   theme at runtime. The faces Unbounded and Manrope are declared in
+   common.css (fonts.test.ts). */
+
+@layer base {
+  :root,
+  [data-theme='oscuro-suave'] {
+    /* Colors */
+    --color-bg: #1b1a18;
+    --color-side: #171614;
+    --color-side-line: #2b2926;
+    --color-panel: #232220;
+    --color-panel2: #2c2b28;
+    --color-line: #33312e;
+    --color-grid: #3a3834;
+    --color-ctrl-line: #47443f;
+    --color-text: #e6e1d7;
+    --color-soft: #c4beb3;
+    --color-muted: #9b958a;
+    --color-faint: #969186;
+    --color-accent: #e8703f;
+    --color-on-accent: #1b1a18;
+    --color-accent-text: #e8703f;
+    --color-gain: #86cfa5;
+    --color-loss: #e99383;
+    --color-lilac: #aba0e6;
+    --color-lilac3: #625aa0;
+    --color-peach: #e8b79c;
+    --color-neutral-bar: #6f6a62;
+    --color-nav-active-bg: #2c2b28;
+    --color-nav-active-text: #e8703f;
+    --color-sel-bg: #e6e1d7;
+    --color-sel-text: #1b1a18;
+    --color-sel-border: #e6e1d7;
+    --area-opacity: 0.12;
+    /* The chart's trace: the lamp turned up, lighter on the dark themes and more saturated on all. */
+    --color-accent-bright: oklch(from var(--color-accent) calc(l + 0.07) calc(c * 1.2) h);
+    --shadow-float: 0 24px 60px rgba(0, 0, 0, 0.5);
+    color-scheme: dark;
+  }
+
+  [data-theme='oscuro-fuerte'] {
+    --color-bg: #121110;
+    --color-side: #0b0a09;
+    --color-side-line: #2a2825;
+    --color-panel: #1c1b19;
+    --color-panel2: #262421;
+    --color-line: #2c2a26;
+    --color-grid: #2f2d29;
+    --color-ctrl-line: #3a3833;
+    --color-text: #f2eee6;
+    --color-soft: #cfcac0;
+    --color-muted: #a39e94;
+    --color-faint: #8f8a80;
+    --color-accent: #ff5a1f;
+    --color-on-accent: #121110;
+    --color-accent-text: #ff5a1f;
+    --color-gain: #6edc9f;
+    --color-loss: #ff8875;
+    --color-lilac: #b7a3ff;
+    --color-lilac2: #8c76f0;
+    --color-lilac3: #5e4bb8;
+    --color-peach: #ffb896;
+    --color-neutral-bar: #8c877e;
+    --color-nav-active-bg: #ff5a1f;
+    --color-nav-active-text: #121110;
+    --color-sel-bg: #f2eee6;
+    --color-sel-text: #121110;
+    --color-sel-border: #f2eee6;
+    --area-opacity: 0.14;
+    /* The chart's trace: the lamp turned up, lighter on the dark themes and more saturated on all. */
+    --color-accent-bright: oklch(from var(--color-accent) calc(l + 0.06) calc(c * 1.15) h);
+    --shadow-float: 0 24px 60px rgba(0, 0, 0, 0.55);
+    color-scheme: dark;
+  }
+
+  [data-theme='claro-hueso'] {
+    --color-bg: #f1eee8;
+    --color-side: #f1eee8;
+    --color-side-line: #e2ddd3;
+    --color-panel: #ffffff;
+    --color-panel2: #f5f2ec;
+    --color-line: #ece7df;
+    --color-grid: #e6e1d8;
+    --color-ctrl-line: #d6d0c5;
+    --color-text: #1c1b19;
+    --color-soft: #3f3c37;
+    --color-muted: #6b665d;
+    --color-faint: #716c63;
+    --color-accent: #e8703f;
+    --color-on-accent: #1c1b19;
+    --color-accent-text: #a8431a;
+    --color-gain: #1f7a4c;
+    --color-loss: #b8392a;
+    --color-lilac: #6a5bc4;
+    --color-lilac2: #9c91dc;
+    --color-lilac3: #4c3f99;
+    --color-peach: #f2bc9c;
+    --color-neutral-bar: #c9c3b8;
+    --color-nav-active-bg: #fbe1d3;
+    --color-nav-active-text: #8e3510;
+    --color-sel-bg: #fbe1d3;
+    --color-sel-text: #8e3510;
+    --color-sel-border: #f2c2a8;
+    --area-opacity: 0.16;
+    /* The chart's trace: the lamp turned up, lighter on the dark themes and more saturated on all. */
+    --color-accent-bright: oklch(from var(--color-accent) calc(l + 0) calc(c * 1.2) h);
+    --shadow-float: 0 20px 50px rgba(60, 40, 20, 0.14);
+    color-scheme: light;
+  }
+
+  [data-theme='claro-melocoton'] {
+    --color-bg: #f7ebe2;
+    --color-side: #f7ebe2;
+    --color-side-line: #ebd8cb;
+    --color-panel: #fffdfb;
+    --color-panel2: #fbf1ea;
+    --color-line: #f1e2d7;
+    --color-grid: #edddd1;
+    --color-ctrl-line: #e3cdbf;
+    --color-text: #2a1a12;
+    --color-soft: #4d3a30;
+    --color-muted: #7a6458;
+    --color-faint: #7d675c;
+    --color-accent: #f0652b;
+    --color-on-accent: #2a1a12;
+    --color-accent-text: #a8401a;
+    --color-gain: #1e7a4e;
+    --color-loss: #b8392a;
+    --color-lilac: #6a5bc4;
+    --color-lilac2: #a196e0;
+    --color-lilac3: #4c3f99;
+    --color-peach: #f7bc98;
+    --color-neutral-bar: #d9c4b6;
+    --color-nav-active-bg: #f0652b;
+    --color-nav-active-text: #2a1a12;
+    --color-sel-bg: #ffe0ce;
+    --color-sel-text: #8e3510;
+    --color-sel-border: #f7c3a6;
+    --area-opacity: 0.18;
+    /* The chart's trace: the lamp turned up, lighter on the dark themes and more saturated on all. */
+    --color-accent-bright: oklch(from var(--color-accent) calc(l + 0) calc(c * 1.2) h);
+    --shadow-float: 0 22px 50px rgba(140, 70, 30, 0.16);
+    color-scheme: light;
+  }
+
+  :root {
+    /* Typography — Font Families */
+    --font-display: 'Unbounded', ui-sans-serif, system-ui, sans-serif;
+    --font-sans: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+    --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
+
+    /* Typography — Scale */
+    --text-brand: 24px;
+    --tracking-brand: -0.03em;
+    --text-h1: clamp(30px, 3.2cqi, 44px);
+    --leading-h1: 1.1;
+    --tracking-h1: -0.03em;
+    --text-h1-detail: 22px;
+    --text-lede: 16px;
+    --text-block-title: 18px;
+    --text-label: 12px;
+    --tracking-label: 0.08em;
+    --text-body: 16px;
+    --leading-body: 1.45;
+    --text-row: 16px;
+    --text-note: 14px;
+    --text-meta: 13px;
+    --text-delta: 14px;
+    --text-tab: 12px;
+    --text-figure-row: 16px;
+    --text-figure-block: 22px;
+    --tracking-figure-block: -0.02em;
+    --text-figure-lg: clamp(34px, 3.4cqi, 44px);
+    --tracking-figure-lg: -0.04em;
+    --text-figure-hero: 56px;
+    --leading-figure-hero: 1.05;
+    --tracking-figure-hero: -0.035em;
+    --text-cents: 0.42em;
+
+    /* Typography — Weights */
+    --font-weight-regular: 400;
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
+    --font-weight-extrabold: 800;
+
+    /* Spacing */
+    --space-2: 2px;
+    --space-4: 4px;
+    --space-6: 6px;
+    --space-8: 8px;
+    --space-10: 10px;
+    --space-12: 12px;
+    --space-14: 14px;
+    --space-16: 16px;
+    --space-20: 20px;
+    --space-24: 24px;
+    --space-32: 32px;
+    --space-40: 40px;
+
+    /* Layout */
+    --page-max-width: 1640px;
+    --sidebar-width: 236px;
+    --column-gap: 20px;
+    --card-padding: 22px 24px;
+    --card-padding-mobile: 16px 12px;
+    --row-height: 64px;
+    --control-height: 44px;
+    --chip-height: 38px;
+    --segment-height: 36px;
+
+    /* Border Radius */
+    --radius-ticker: 8px;
+    --radius-field: 14px;
+    --radius-tile: 18px;
+    --radius-popover: 20px;
+    --radius-card: 22px;
+    --radius-sheet: 28px;
+    --radius-pill: 999px;
+
+    /* Elevation */
+    --shadow-sheet: 0 -20px 60px oklch(0% 0 none / 0.5);
+
+    /* Icons */
+    --icon-stroke: 2;
+
+    /* Motion */
+    --ease-out-expo: cubic-bezier(0.22, 1, 0.36, 1);
+    --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+    --duration-rise: 520ms;
+    --duration-sheet: 380ms;
+    --duration-pop: 220ms;
+    --stagger: 70ms;
+  }
+}
+
+/* Desktop density. The sizes are fixed px, tuned for the full-width layout
+   (sidebar plus the 1640px page, about 1920px). Below that the cards narrow
+   but the type would not, so the whole design zooms out in step with the
+   window (≈ width / 1920), like the browser's own zoom, and keeps the
+   proportions of a wide screen. Phones keep 1. Zoom also shrinks viewport
+   units, so a full-height box uses `--ui-dvh`. */
+@layer base {
+  :root {
+    --ui-zoom: 1;
+    --ui-dvh: calc(100dvh / var(--ui-zoom));
+    /* eslint-disable-next-line css/use-baseline -- Chrome and Safari for years, Firefox since 126 (May 2024). */
+    zoom: var(--ui-zoom);
+  }
+
+  @media (min-width: 61.3125rem) {
+    :root {
+      --ui-zoom: 0.72;
+    }
+  }
+
+  @media (min-width: 1440px) {
+    :root {
+      --ui-zoom: 0.78;
+    }
+  }
+
+  @media (min-width: 1600px) {
+    :root {
+      --ui-zoom: 0.85;
+    }
+  }
+
+  @media (min-width: 1760px) {
+    :root {
+      --ui-zoom: 0.92;
+    }
+  }
+
+  @media (min-width: 1920px) {
+    :root {
+      --ui-zoom: 1;
+    }
+  }
+}
+
+/* Page base: canvas, text and font. Headings keep the weights the frame was
+   drawn with; a page title asks for Unbounded with its class. */
+@layer base {
+  body {
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: var(--leading-body);
+    -webkit-font-smoothing: antialiased;
+    transition:
+      background-color 0.3s ease,
+      color 0.3s ease;
+  }
+
+  h1,
+  h2 {
+    font-weight: 800;
+  }
+
+  h3,
+  h4 {
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  dialog {
+    color: var(--color-text);
+  }
+
+  /* Tailwind 4's preflight leaves buttons with the arrow; every control that
+     acts shows the hand, unless it is disabled. A utility (`cursor-not-allowed`,
+     `cursor-text`) still wins: this sits in the base layer. */
+  button:not(:disabled):not([aria-disabled='true']),
+  a[href]:not([aria-disabled='true']),
+  [role='button']:not([aria-disabled='true']),
+  summary {
+    cursor: pointer;
+  }
+}
+
+/* Every token as a utility (bg-panel, text-soft, rounded-pill…), with the
+   default theme's values; `:root` above redefines the colors per theme at
+   runtime. `--breakpoint-frame` is the one media query of the frame: sidebar
+   from here up, bars below. */
+@theme {
+  --breakpoint-frame: 61.3125rem;
+
+  --font-display: 'Unbounded', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --color-panel: #232220;
+  --color-line: #33312e;
+  --color-accent: #e8703f;
+  --color-gain: #86cfa5;
+  --color-loss: #e99383;
+
+  --color-bg: #1b1a18;
+  --color-side: #171614;
+  --color-side-line: #2b2926;
+  --color-panel2: #2c2b28;
+  --color-ctrl-line: #47443f;
+  --color-text: #e6e1d7;
+  --color-soft: #c4beb3;
+  --color-muted: #9b958a;
+  --color-faint: #969186;
+  --color-on-accent: #1b1a18;
+  --color-accent-text: #e8703f;
+  --color-nav-active-bg: #2c2b28;
+  --color-nav-active-text: #e8703f;
+  --color-sel-bg: #e6e1d7;
+  --color-sel-text: #1b1a18;
+  /* The dashboard (#429): chart grid, series and data bars. */
+  --color-grid: #3a3834;
+  --color-lilac: #aba0e6;
+  --color-lilac2: #867bcb;
+  --color-lilac3: #625aa0;
+  /* Movimientos (#431): the selected chip's border; it also uses the lilac
+     (investment) and peach (saving) hues and the neutral fill of data bars. */
+  --color-sel-border: #e6e1d7;
+  --color-peach: #e8b79c;
+  --color-neutral-bar: #6f6a62;
+  /* Presupuesto (#433): chart baselines and empty rings, and the saving hue
+     of the month's split. */
+  --color-grid: #3a3834;
+  --color-lilac3: #625aa0;
+
+  --text-brand: 24px;
+  --tracking-brand: -0.03em;
+  --text-meta: 13px;
+  --text-tab: 12px;
+  --text-label: 12px;
+  --tracking-label: 0.08em;
+  --text-h1-detail: 22px;
+  --tracking-h1: -0.03em;
+  /* The dashboard (#429): page title, lede, block titles and figures. */
+  --text-h1: clamp(30px, 3.2cqi, 44px);
+  --text-h1--line-height: 1.1;
+  --text-h1--letter-spacing: -0.03em;
+  --text-lede: 16px;
+  --text-row: 16px;
+  --text-block-title: 18px;
+  /* Card title on desktop, scaled by the desktop zoom like everything else.
+     Phones keep the block title. */
+  --text-card-title: 22px;
+  --text-card-title--line-height: 1.2;
+  --text-note: 14px;
+  --text-delta: 14px;
+  --text-figure-row: 16px;
+  --text-figure-block: 22px;
+  --text-figure-block--line-height: 1.2;
+  --text-figure-block--letter-spacing: -0.02em;
+  --text-figure-lg: clamp(34px, 3.4cqi, 44px);
+  --text-figure-lg--line-height: 1;
+  --text-figure-lg--letter-spacing: -0.04em;
+  --text-figure-hero: 56px;
+  --text-figure-hero--line-height: 1.05;
+  --text-figure-hero--letter-spacing: -0.035em;
+
+  --radius-sm: 7px;
+  --radius-md: 11px;
+  --radius-lg: 18px;
+  --radius-ticker: 8px;
+  --radius-tile: 18px;
+  --radius-sheet: 28px;
+  --radius-field: 14px;
+  --radius-popover: 20px;
+  --radius-card: 22px;
+  --radius-pill: 999px;
+
+  --shadow-float: 0 24px 60px rgba(0, 0, 0, 0.5);
+  --shadow-sheet: 0 -20px 60px oklch(0% 0 none / 0.5);
+
+  /* Bottom sheets arrive from below (DESIGN.md, `anim-sheet`). */
+  --animate-sheet-in: neon-sheet-in 380ms cubic-bezier(0.32, 0.72, 0, 1);
+  /* The detail side panel slides in whole from the edge it lives on
+     (`anim-panel`); its content follows it, staggered by the panel itself. */
+  --animate-side-in: neon-side-in 400ms cubic-bezier(0.32, 0.72, 0, 1);
+  /* Popovers (`anim-pop`, origin top right) and scrims (`anim-fade`). */
+  --animate-pop-in: neon-pop-in 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  /* A popover beside a row comes out of its arrow, towards the end edge
+     (`anim-pop-side`); its transform origin is the arrow. */
+  --animate-pop-side: neon-pop-side 260ms cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-fade-in: neon-fade-in 260ms ease-out;
+  /* Blocks rise 14px as they come in (`anim-rise`), staggered 70ms by the caller. */
+  --animate-rise: neon-rise 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  /* An evolution chart draws itself from left to right when it first shows
+     (`anim-draw`); today's dot lights up as the line reaches it (`anim-dot`). */
+  --animate-draw: neon-draw 1500ms cubic-bezier(0.23, 1, 0.32, 1) 120ms backwards;
+  --animate-dot: neon-dot 320ms cubic-bezier(0.22, 1, 0.36, 1) 1000ms backwards;
+  /* A bar draws itself up to its value, as the line does (`anim-wipe`); the
+     month columns of «Te quedan» grow from their base (`anim-grow`); the rows of
+     a list come in after their card (`anim-row`). The caller sets the delay. */
+  --animate-wipe: neon-wipe 1100ms cubic-bezier(0.23, 1, 0.32, 1) backwards;
+  --animate-grow: neon-grow 700ms cubic-bezier(0.23, 1, 0.32, 1) backwards;
+  /* A bar split in shares grows as one from its start, every share at its
+     proportion, instead of being uncovered share by share (`anim-stretch`). */
+  --animate-stretch: neon-stretch 1100ms cubic-bezier(0.23, 1, 0.32, 1) backwards;
+  --animate-row: neon-row 420ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  /* A figure that changes in place (`anim-swap`): the new value settles in. */
+  --animate-swap: neon-swap 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* The clip runs past every edge so the stroke and the top of the line are never
+   cut; with `backwards` it only holds before the start, never after the end. */
+@keyframes neon-draw {
+  from {
+    clip-path: inset(-10% 100% -10% -10%);
+  }
+  /* Ends just past the right edge (the stroke's half width), not 10% out:
+     the line must arrive with the end of the curve, or the ease-out happens
+     off-view and the line stops dead. */
+  to {
+    clip-path: inset(-10% -2px -10% -10%);
+  }
+}
+
+@keyframes neon-dot {
+  from {
+    opacity: 0;
+    scale: 0.4;
+  }
+}
+
+@keyframes neon-wipe {
+  from {
+    clip-path: inset(0 100% 0 0 round 999px);
+  }
+  to {
+    clip-path: inset(0 0 0 0 round 999px);
+  }
+}
+
+@keyframes neon-stretch {
+  from {
+    scale: 0 1;
+  }
+}
+
+@keyframes neon-grow {
+  from {
+    scale: 1 0;
+  }
+}
+
+@keyframes neon-row {
+  from {
+    opacity: 0;
+    translate: 0 6px;
+  }
+}
+
+@keyframes neon-swap {
+  from {
+    opacity: 0;
+    translate: 0 3px;
+    filter: blur(2px);
+  }
+}
+
+@keyframes neon-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+
+@keyframes neon-side-in {
+  from {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes neon-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(48px);
+  }
+}
+
+@keyframes neon-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-6px);
+  }
+}
+
+@keyframes neon-pop-side {
+  from {
+    opacity: 0;
+    transform: translateX(var(--pop-side-x, -12px)) scale(0.92);
+  }
+}
+
+@keyframes neon-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* A text field shows its focus in its own border, in the text color, not with
+   the accent ring the other controls carry (DESIGN.md, Foco). In the utilities
+   layer and more specific than `focus-visible:outline-2`, so it wins there. */
+@layer utilities {
+  :root
+    :is(
+      input:not(
+        [type='checkbox'],
+        [type='radio'],
+        [type='range'],
+        [type='button'],
+        [type='submit']
+      ),
+      select,
+      textarea
+    ):focus-visible {
+    outline-style: none;
+    border-color: var(--color-text);
+  }
+}
+
+/* Scrollbars in the palette (DESIGN.md, Barras de desplazamiento): thin, no
+   track, a thumb in the control line that darkens while the pointer is over
+   the box it scrolls. `scrollbar-color` inherits; the width does not, so it goes
+   on every box. Safari reads the -webkit- pseudo-elements instead. */
+@layer base {
+  @supports (scrollbar-color: auto) {
+    :root {
+      scrollbar-color: var(--color-ctrl-line) transparent;
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      :root *:hover {
+        scrollbar-color: var(--color-muted) transparent;
+      }
+    }
+  }
+
+  @supports (scrollbar-width: thin) {
+    :root,
+    :root * {
+      scrollbar-width: thin;
+    }
+  }
+
+  :root ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+    background: transparent;
+  }
+
+  :root ::-webkit-scrollbar-thumb {
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background: var(--color-ctrl-line) padding-box;
+  }
+
+  :root ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-muted);
+  }
+
+  :root ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+}
+
+/* The list swap of a Movimientos filter (ledger-swap.ts): only the ledger
+   (view-transition-name tx-ledger, NeonRegistry.vue) crossfades; the rest of
+   the page changes in place. The snapshots keep their own height, pinned to the
+   top and clipped by the group, so neither list stretches while the ledger
+   eases to its new height. */
+/* eslint-disable css/use-baseline -- same-document View Transitions: Chrome 111, Safari 18, Firefox 144 (October 2025); without them the list changes at once. */
+:root::view-transition-old(root),
+:root::view-transition-new(root) {
+  animation: none;
+}
+
+:root::view-transition-group(tx-ledger) {
+  overflow: clip;
+  animation-duration: 320ms;
+  animation-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+:root::view-transition-old(tx-ledger),
+:root::view-transition-new(tx-ledger) {
+  block-size: auto;
+  object-fit: none;
+  object-position: top;
+}
+
+:root::view-transition-old(tx-ledger) {
+  animation: neon-ledger-out 160ms ease-out both;
+}
+
+:root::view-transition-new(tx-ledger) {
+  animation: neon-ledger-in 320ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+/* eslint-enable css/use-baseline */
+
+@keyframes neon-ledger-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes neon-ledger-in {
+  from {
+    opacity: 0;
+    filter: blur(3px);
+  }
+}

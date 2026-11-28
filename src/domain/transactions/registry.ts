@@ -1,7 +1,7 @@
 import type { Month } from '../../lib/month'
 import { round2 } from '../../lib/number'
 import type { TransactionSort } from '../../scripts/transactions'
-import { TRANSACTION_TYPES, type Transaction, type TransactionType } from '../../scripts/types'
+import { TRANSACTION_TYPES, type Transaction } from '../../scripts/types'
 
 type Dated = Pick<Transaction, 'date' | 'month'>
 
@@ -111,6 +111,34 @@ function comparator(sort: TransactionSort): (a: Transaction, b: Transaction) => 
   return (a, b) => String(a.date).localeCompare(String(b.date)) * direction
 }
 
+export interface MonthFold {
+  /** Months from the selected one (or the latest with movements) to the newest. */
+  shown: MonthGroup[]
+  /** Older months, folded away until asked for. */
+  hidden: MonthGroup[]
+}
+
+/**
+ * The months the ledger shows, from groups sorted newest month first: the
+ * selected month, or the latest month with movements when the selected one has
+ * none, plus any newer ones. Older months fold away behind a reveal. When
+ * asked for everything (the filters are active or the user revealed the older
+ * months), nothing folds.
+ */
+export function foldMonthGroups(
+  groups: MonthGroup[],
+  selectedMonth: Month,
+  revealAll = false,
+): MonthFold {
+  if (revealAll) return { shown: groups, hidden: [] }
+  const newest = groups[0]?.month ?? selectedMonth
+  const cutoff = Math.min(selectedMonth, newest)
+  return {
+    shown: groups.filter((group) => group.month >= cutoff),
+    hidden: groups.filter((group) => group.month < cutoff),
+  }
+}
+
 /** The year's movements that match the filters, grouped by month, newest month first. */
 export function buildMonthGroups(
   transactions: Transaction[],
@@ -143,32 +171,4 @@ export function registryYears(transactions: Transaction[], currentYear: number):
     if (year !== null) years.add(year)
   })
   return Array.from(years).sort((a, b) => b - a)
-}
-
-export interface CategoryShare {
-  category: string
-  amount: number
-  /** Share of the type's month total, 0–100. */
-  share: number
-}
-
-/** One type of a month split by category, largest first. */
-export function categoryBreakdown(
-  transactions: Transaction[],
-  year: number,
-  month: Month,
-  type: TransactionType,
-): CategoryShare[] {
-  const byCategory = new Map<string, number>()
-  transactions.forEach((tx) => {
-    if (tx.type !== type || !inMonth(tx, year, month)) return
-    const category = tx.category || 'Sin categoría'
-    byCategory.set(category, (byCategory.get(category) ?? 0) + Number(tx.amount || 0))
-  })
-  const total = Array.from(byCategory.values()).reduce((sum, amount) => sum + amount, 0)
-  return Array.from(byCategory, ([category, amount]) => ({
-    category,
-    amount: round2(amount),
-    share: total > 0 ? (amount / total) * 100 : 0,
-  })).sort((a, b) => b.amount - a.amount || a.category.localeCompare(b.category, 'es'))
 }

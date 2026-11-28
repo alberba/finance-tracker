@@ -15,7 +15,7 @@ import { runServer } from '../../lib/server/runtime'
 function parseSince(url: URL): number | "invalid" {
   const raw = url.searchParams.get("since") ?? url.searchParams.get("cursor") ?? "0";
   const since = Number(raw);
-  if (!Number.isFinite(since) || since < 0) {
+  if (!Number.isInteger(since) || since < 0) {
     return "invalid";
   }
   return since;

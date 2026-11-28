@@ -29,6 +29,21 @@ describe('projectSyncV2State', () => {
     })])
   })
 
+  it('preserves snapshots from other years outside the active month map', () => {
+    const data = bootstrap()
+    data.wealthSnapshots = [2025, 2026].map((year) => ({
+      id: `snapshot-${year}`,
+      year,
+      month: 1,
+      balances: [{ id: `balance-${year}`, accountId: 'server-account', balance: year }],
+    }))
+
+    const state = projectSyncV2State(data, 2026)
+
+    expect(state.snapshots[1].accounts).toEqual({ 'local-account': 2026 })
+    expect(state.historicalSnapshots?.[2025][1].accounts).toEqual({ 'local-account': 2025 })
+  })
+
   it('counts a movement in its persisted accounting month, else in the month of its date', () => {
     const b = bootstrap()
     b.transactions[0] = { ...b.transactions[0], date: '2026-01-31', accountingMonth: 2 }

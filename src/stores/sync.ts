@@ -280,6 +280,11 @@ export const useSyncStore = defineStore('sync', () => {
     stop()
   }
 
+  /** The outbox as it is now; empty before the client runtime exists. */
+  async function listPending(): Promise<OutboxEntry[]> {
+    return isReady() ? run(listOutbox()) : []
+  }
+
   /**
    * Closes this page's IndexedDB connections (a real unload does that for us).
    * The integration harness uses it to restart the runtime against the same
@@ -389,7 +394,8 @@ export const useSyncStore = defineStore('sync', () => {
       return
     }
     stop()
-    await runtime?.dispose()
+    const previousRuntime = runtime
+    runtime = null
     // Page-local link targets belong to the leaving session; a different user
     // must never inherit them (#487 review).
     resetLinkTargets()
@@ -398,17 +404,21 @@ export const useSyncStore = defineStore('sync', () => {
     detached = false
     userId.value = nextUserId
     email.value = options.email ?? null
-    try {
-      runtime = await createClientRuntime(nextUserId)
-    } catch (error) {
-      runtime = null
-      const message = errorMessage(error, 'No se pudo abrir el almacenamiento local.')
-      lastError.value = message
-      syncStatus.value = 'error'
-      showToast(`⚠️ ${message}`)
-      throw error
-    }
+    // `initializing` is set before the first await: a second caller (shell and
+    // workspace both start it) must wait for this one instead of opening a
+    // second runtime whose connections would block the wipe on logout.
     initializing = (async () => {
+      await previousRuntime?.dispose()
+      try {
+        runtime = await createClientRuntime(nextUserId)
+      } catch (error) {
+        runtime = null
+        const message = errorMessage(error, 'No se pudo abrir el almacenamiento local.')
+        lastError.value = message
+        syncStatus.value = 'error'
+        showToast(`⚠️ ${message}`)
+        throw error
+      }
       const cached = await run(
         Effect.gen(function* () {
           const bootstrap = yield* getCachedBootstrap<SyncV2Bootstrap>()
@@ -986,6 +996,9 @@ export const useSyncStore = defineStore('sync', () => {
       // moving, instead of parking the command and freezing everything
       // behind it (audit §2.4).
       const retries: OutboxCommandInput[] = []
+      // Whether a retry deserves the notice: any of them but a settings
+      // change that only collided with this device's own.
+      let noticed = false
       // A link-owned command from a build without intents (#489 queue) is not
       // blindly rebased: the old recovery path re-reads the movement.
       const linkConflicts: Array<{
@@ -1070,6 +1083,7 @@ export const useSyncStore = defineStore('sync', () => {
           } else if (command.action === 'update' || command.action === 'remove') {
             plainAcked.push(entry.seq)
             const baseVersion = result.currentVersion ?? command.baseVersion
+            noticed = true
             retries.push(
               command.action === 'update'
                 ? {
@@ -1091,6 +1105,15 @@ export const useSyncStore = defineStore('sync', () => {
             // version instead of leaving the entry queued, where a stale
             // `baseVersion` would conflict forever.
             plainAcked.push(entry.seq)
+            // Two settings changes queued back to back (the setup wizard
+            // saves one per step) both read the same cached version, so the
+            // later one conflicts with this device's own earlier one. When
+            // the server is at the version this device already holds,
+            // nobody else touched the settings: reapply without the notice.
+            const cached = yield* getCachedSettings<{ version?: unknown } | null>()
+            if (result.currentVersion === undefined || cached?.version !== result.currentVersion) {
+              noticed = true
+            }
             retries.push({
               action: 'settingsUpdate',
               baseVersion: result.currentVersion ?? command.baseVersion,
@@ -1174,7 +1197,7 @@ export const useSyncStore = defineStore('sync', () => {
       // a hard failure, that more actionable message is the one left on
       // screen — `showToast` is a single shared banner (`useToast.ts`), so
       // whichever call lands last wins the visible text.
-      if (retries.length > 0) {
+      if (noticed) {
         showToast('Un cambio tuyo se reaplicó sobre la versión más reciente del servidor.')
       }
       if (linkConflicts.length > 0) {
@@ -1556,6 +1579,8 @@ export const useSyncStore = defineStore('sync', () => {
     flush,
     pullChanges,
     syncNow,
+    /** The commands still waiting to be sent, oldest first (the Datos queue). */
+    listPending,
     /** Reloads the whole read model after a server-side write (Bitvavo import and link). */
     refreshFromServer: () => syncNow({ full: true }),
     detach,

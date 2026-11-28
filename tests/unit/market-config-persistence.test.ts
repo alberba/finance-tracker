@@ -22,7 +22,7 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
-it('guarda el ticker elegido aunque el alta ya esté confirmada y aún no aparezca en la caché', async () => {
+it('guarda el ticker elegido al dar de alta el símbolo', async () => {
   let persisted: Record<string, unknown> | null = null
   resolve.mockImplementation(async (type: string) => (type === 'account' ? 'owned-asset' : null))
   create.mockImplementation(async (_type, _id, data) => {
@@ -38,11 +38,11 @@ it('guarda el ticker elegido aunque el alta ya esté confirmada y aún no aparez
     investmentAssetId: 'asset',
     type: 'etf',
     symbol: 'XDWH.XETRA',
+    quoteSymbol: 'XDWH.DE',
     market: '',
     currency: 'EUR',
     provider: 'yahoo',
   })
-  market.configureInstrumentSymbols(market.instruments[0].id, 'XDWH.XETRA', 'XDWH.DE')
   await vi.waitFor(() => {
     expect(persisted).toMatchObject({
       quoteConfig: { symbol: 'XDWH.XETRA', quoteSymbol: 'XDWH.DE' },

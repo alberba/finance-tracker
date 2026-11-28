@@ -3,9 +3,10 @@ import { dirname, join, relative } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 /**
- * Agents follow doc links and `docs/...` paths literally, so a dead one costs
- * calls or silently sends them to a guide that was never written. Guards the
- * root markdown files and everything under docs/.
+ * Agents follow doc links literally, so a dead one costs calls or silently
+ * sends them to a guide that was never written. Guards the root markdown files
+ * and everything under docs/. Repo-relative paths in backticks
+ * (`docs/x.md`) are guarded by documented-paths.test.ts.
  */
 
 const root = new URL('../../', import.meta.url).pathname
@@ -33,11 +34,6 @@ function deadReferences(docPath: string): string[] {
   for (const [, target] of text.matchAll(/\]\(([^)\s#]+)(?:#[^)]*)?\)/g)) {
     if (/^[a-z]+:/i.test(target)) continue
     if (!existsSync(join(root, dirname(docPath), target))) dead.push(target)
-  }
-
-  // Backticked repo-relative paths to markdown files, as in "`docs/x.md`".
-  for (const [, target] of text.matchAll(/`((?:docs\/)[\w./-]+\.md)`/g)) {
-    if (!existsSync(join(root, target))) dead.push(target)
   }
 
   return dead

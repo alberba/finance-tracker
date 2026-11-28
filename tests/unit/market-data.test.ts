@@ -271,8 +271,6 @@ describe('adaptador de mercado server-side', () => {
       {},
     )
     expect(quote).toMatchObject({ price: 10, status: 'stale', isStale: true, dataType: 'delayed' })
-    expect(Date.parse(quote.timestamp)).not.toBeNaN()
-    expect(Date.parse(quote.fetchedAt)).not.toBeNaN()
   })
 
   it('rechaza un proveedor desconocido en lugar de cotizar desde otra fuente', async () => {

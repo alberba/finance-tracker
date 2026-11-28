@@ -111,17 +111,4 @@ describe('issue report schema', () => {
     expect(parsed).not.toHaveProperty('email')
     expect(parsed.description).toBe('Texto libre que sí se conserva.')
   })
-
-  it('sigue aceptando el alias enhancement junto a los campos retirados', () => {
-    const parsed = parseIssueReportPayload({
-      type: 'enhancement',
-      summary: 'Pestaña antigua sin descripción',
-      section: 'reports',
-      context: {},
-      expectedResult: 'algo',
-    })
-
-    expect(parsed.type).toBe('feature')
-    expect(parsed.description).toBe('')
-  })
 })

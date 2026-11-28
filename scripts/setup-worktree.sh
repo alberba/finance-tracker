@@ -25,6 +25,8 @@ ensure_var() {
   grep -q "^$1=" .dev.vars || { printf '%s=%s\n' "$1" "$2" >> .dev.vars; echo "setup-worktree: añadido $1"; }
 }
 ensure_var TEST_AUTH_ENABLED true
+# Better Auth no arranca sin secreto; cada worktree tiene el suyo.
+ensure_var BETTER_AUTH_SECRET "$(openssl rand -base64 32)"
 
 pnpm install --frozen-lockfile
 

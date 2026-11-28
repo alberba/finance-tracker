@@ -84,6 +84,6 @@ las identidades del proveedor de autenticación de pruebas, exclusivamente en lo
 a Bitvavo real. La cabecera no altera el proveedor de una identidad de producción.
 
 ```sh
-pnpm exec vitest run tests/unit/bitvavo.test.ts tests/integration/d1-v2/bitvavo.test.ts tests/component/BitvavoImportPanel.test.ts
+pnpm exec vitest run tests/unit/bitvavo.test.ts tests/integration/d1-v2/bitvavo.test.ts
 pnpm exec playwright test --config playwright.bitvavo.config.ts
 ```

@@ -1,0 +1,21 @@
+---
+import NeonButton from '../ui/NeonButton.vue'
+
+/**
+ * Strip above the content while the demo mode is on: a panel strip with a 1px
+ * rule, «Modo demo» as a label and «Salir» as a secondary button.
+ * src/scripts/shell.ts shows it and wires the exit by its ids.
+ */
+---
+
+<div id="demo-banner" class="bg-panel border-line border-be" role="status" hidden>
+  <div class="mx-auto flex w-full max-w-(--page-max-width) items-center gap-3 px-[clamp(16px,2.6%,40px)] py-1">
+    <p class="text-soft min-w-0 flex-1 text-[14px]">
+      <span class="text-muted text-label tracking-label font-extrabold uppercase">Modo demo</span>
+      {' · '}datos ficticios
+    </p>
+    <NeonButton id="demo-banner-exit" class="shrink-0">
+      <span class="frame:hidden">Salir</span><span class="max-frame:hidden">Salir del modo demo</span>
+    </NeonButton>
+  </div>
+</div>

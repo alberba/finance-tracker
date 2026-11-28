@@ -17,7 +17,10 @@ narrativa.
    _mutación → tests que fallan_ de los tests nuevos o reescritos; un test sin fila no se entrega.
 2. **La capa más baja que represente la regla con fidelidad.** Unit, component, integration o E2E
    según `docs/testing.md`; no subas de capa por comodidad ni bajes saltándote la persistencia.
-3. **Un test falla por una sola razón observable.** Nómbralo por el comportamiento, no por el
+3. **Un test sobrevive a un rediseño o refactor.** Si cambiar colores, tipografía, tamaños o
+   posición lo rompe, probaba diseño: la estética se revisa a mano y ningún test compara píxeles.
+   Localiza por rol y nombre accesible, etiqueta, texto o un hook `data-*` de datos, nunca por
+   clases de estilo. **Falla por una sola razón observable.** Nómbralo por el comportamiento, no por el
    helper ni por la fase interna. Nada de aserciones sobre flags de fase, closures, orden
    accidental de helpers, métodos privados o la forma de un snapshot.
 4. **Datos y nombres deterministas.** Sin depender del orden global de la suite; sin `Date.now()` o
@@ -79,20 +82,16 @@ narrativa.
     `html[data-finance-ready="true"]`. Para recargar, `tracker.reload()`; el lint rechaza
     `page.reload()` en los specs.
 17. **`@smoke` es autosuficiente** y cubre recorridos críticos. Los escenarios que necesitan volumen
-    no son smoke: corren en Browser regression o en `pnpm test:all`, no en el gate de PR. `@visual`
-    corre como gate independiente y `@snapshot` fija identidad y tiempo antes del primer render.
+    no son smoke: corren en Browser regression o en `pnpm test:all`, no en el gate de PR.
 18. **Un contrato no se repite por viewport o tema.** Añade una combinación solo si hay una
-    diferencia de comportamiento o de layout concreta. Los snapshots Linux se actualizan a mano tras
-    revisar el diff: un cambio de texto, pestaña o fecha es real; el antialiasing es ruido. Una vista
-    visual comprueba geometría y píxeles en el mismo escenario cuando usa el mismo estado; conserva
-    escenarios separados para estados o recorridos independientes y no compartas usuarios mutables
-    para ahorrar preparación.
+    diferencia de comportamiento concreta. Conserva escenarios separados para estados o recorridos
+    independientes y no compartas usuarios mutables para ahorrar preparación.
 19. **Sin carreras tapadas.** No subas timeouts o workers ni añadas reintentos para estabilizar;
     corrige el aislamiento. En CI, un caso que solo pasa al reintentarlo falla el gate
     (`failOnFlakyTests`). La cuarentena es solo el procedimiento de #233, con sus diez ejecuciones.
     El presupuesto de la suite completa es de seis minutos de reloj (`pnpm test:all`); los cambios de
     infraestructura registran tres ejecuciones consecutivas locales y de Browser regression con
-    duración y resultado. No se reduce cobertura ni se relajan umbrales visuales para conseguirlo;
+    duración y resultado. No se reduce cobertura ni se relajan aserciones para conseguirlo;
     toda fusión o eliminación identifica la cobertura que queda.
 
 ## Revisar y podar
@@ -119,7 +118,7 @@ narrativa.
 - Antes de la PR: `pnpm gate` (dependencias, lint, tipos y suite) y `pnpm test:e2e:smoke` en
   secuencia para cambios de código, configuración o contenido ejecutable.
 - E2E: `pnpm test:e2e:install` una vez; `pnpm test:e2e --project=chromium` para funcional;
-  `pnpm test:e2e:sync-v2` para offline y sincronización; `pnpm test:e2e:visual` para píxeles.
+  `pnpm test:e2e:sync-v2` para offline y sincronización.
 - Worktrees: `pnpm setup:worktree` antes de probar. `pnpm test:e2e` arranca su propio servidor en un
   puerto derivado de la ruta del worktree; no lances suites pesadas contra el mismo servidor.
 - Coverage: `pnpm test:coverage` (manual; no está en `pnpm gate` ni en CI). Los umbrales de

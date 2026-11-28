@@ -14,7 +14,6 @@ function createDefaultUiState(): UiState {
 
   return {
     activeSection: 'dashboard',
-    month,
     txYear: new Date().getFullYear(),
     txFilterMonth: month,
     txSort: { column: 'date', direction: 'desc' },
@@ -27,20 +26,7 @@ function createDefaultUiState(): UiState {
     txTab: 'registry',
     snapshotMonth: month,
     investmentMonth: month,
-    wealthCalcTargetId: '',
-    wealthCalcTargetName: '',
-    investmentTab: 'dashboard',
-    investmentTxEditingId: '',
-    investmentYearFilter: new Date().getFullYear(),
-    investmentOnlyUndeclared: false,
     investmentReturnMode: 'simple',
-    contributionWorkflowStep: 1,
-    contributionWorkflowMonth: month,
-    contributionWorkflowDate: '',
-    contributionWorkflowAmount: 0,
-    contributionCalcTargetKind: '',
-    contributionCalcTargetId: '',
-    contributionCalcTargetName: '',
   }
 }
 
@@ -49,7 +35,14 @@ export const useUiStore = defineStore('ui', () => {
   /** Página montada por el shell: una sección normal o «Mis reportes» (#340). */
   const page = ref<'section' | 'reports'>('section')
   const settingsTab = ref('accounts')
-  const setupAction = ref<'account' | 'movement' | null>(null)
+  /** The setup wizard (#452) is on screen. */
+  const setupOpen = ref(false)
+  /** Whether the wizard opens on this visit is decided: until then the tour waits. */
+  const setupSettled = ref(false)
+  /** The guided tour (#527) is on screen. */
+  const tourOpen = ref(false)
+  /** The tours finished or skipped on this page («desktop», «mobile»). */
+  const toursDone = ref<string[]>([])
 
   function setActiveSection(sectionId: SectionId): void {
     ui.activeSection = sectionId
@@ -57,10 +50,6 @@ export const useUiStore = defineStore('ui', () => {
 
   function setPage(nextPage: 'section' | 'reports'): void {
     page.value = nextPage
-  }
-
-  function setDashboardMonth(month: Month): void {
-    ui.month = month
   }
 
   function replaceUiState(nextUi: UiState): void {
@@ -71,10 +60,12 @@ export const useUiStore = defineStore('ui', () => {
     ui,
     page,
     settingsTab,
-    setupAction,
+    setupOpen,
+    setupSettled,
+    tourOpen,
+    toursDone,
     setActiveSection,
     setPage,
-    setDashboardMonth,
     replaceUiState,
   }
 })

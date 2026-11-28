@@ -1,73 +1,18 @@
-import { Effect } from 'effect'
-
 import { isDemoMode, setDemoModeEnabled } from './demo-mode'
 import { requestReportDialogOpen } from './report-dialog'
 import { useSectionNavigation } from '../composables/useSectionNavigation'
 import { initReportsBadge } from './app/reports-badge'
-import { getThemeController } from '../lib/client/theme'
-import { wipeAllClientData, wipeLegacyClientData } from '../lib/client/wipe'
+import { getNeonThemeController } from '../lib/client/neon-theme'
+import { logOut } from './app/logout'
 import { pinia } from '../stores/pinia'
 import { useSyncStore } from '../stores/sync'
-
 import { describeCheckAge } from '../lib/client/sync-connection'
 import { isRecurringIntentKind, runRecurringIntentAction } from '../lib/client/recurring-write'
 import { loadSession } from '../lib/client/session'
 
-const SIDEBAR_COLLAPSED_KEY = 'sidebar-collapsed'
-
-interface BeforeInstallPromptEvent extends Event {
-  prompt: () => Promise<void>
-  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>
-}
-
-function writeStorageValue(key: string, value: string): void {
-  try {
-    localStorage.setItem(key, value)
-  } catch {
-    return
-  }
-}
-
-function applySidebarState(collapsed: boolean, toggleButton: HTMLElement): void {
-  document.documentElement.dataset.sidebar = collapsed ? 'collapsed' : 'expanded'
-  toggleButton.setAttribute(
-    'aria-label',
-    collapsed ? 'Expandir barra lateral' : 'Colapsar barra lateral',
-  )
-  toggleButton.setAttribute('aria-expanded', collapsed ? 'false' : 'true')
-  toggleButton
-    .querySelector('[data-sidebar-toggle-label]')
-    ?.replaceChildren(collapsed ? 'Expandir' : 'Colapsar')
-}
-
-function initSidebarToggle(): void {
-  const toggleButton = document.getElementById('sidebar-toggle')
-  if (!toggleButton) {
-    return
-  }
-
-  // The pre-paint script already set data-sidebar; this syncs the button.
-  applySidebarState(document.documentElement.dataset.sidebar === 'collapsed', toggleButton)
-
-  toggleButton.addEventListener('click', () => {
-    const nextCollapsed = document.documentElement.dataset.sidebar !== 'collapsed'
-    applySidebarState(nextCollapsed, toggleButton)
-    writeStorageValue(SIDEBAR_COLLAPSED_KEY, nextCollapsed ? 'true' : 'false')
-  })
-}
-
-function repaintThemeAwareCharts(): void {
-  const renderAll = (window as Window & { __ftRenderAll?: () => void }).__ftRenderAll
-  if (typeof renderAll === 'function') {
-    requestAnimationFrame(() => {
-      renderAll()
-    })
-  }
-}
-
-/** Starts the theme controller (so "Sistema" tracks the OS) and repaints charts on change. */
+/** Starts the theme controller, so a theme with no choice tracks the OS. */
 function initTheme(): void {
-  getThemeController().subscribe(repaintThemeAwareCharts)
+  getNeonThemeController()
 }
 
 function initMobileMoreMenu(): void {
@@ -114,33 +59,6 @@ function initReportDialogActions(): void {
   const { navigateToReports } = useSectionNavigation()
   document.querySelectorAll<HTMLElement>('[data-reports-open]').forEach((action) => {
     action.addEventListener('click', () => navigateToReports())
-  })
-}
-
-function initPwaInstall(): void {
-  const installButton = document.getElementById('pwa-install-button')
-  if (!(installButton instanceof HTMLButtonElement)) {
-    return
-  }
-
-  let installPrompt: BeforeInstallPromptEvent | null = null
-  window.addEventListener('beforeinstallprompt', (event) => {
-    event.preventDefault()
-    installPrompt = event as BeforeInstallPromptEvent
-    installButton.hidden = false
-  })
-  installButton.addEventListener('click', async () => {
-    if (!installPrompt) {
-      return
-    }
-    await installPrompt.prompt()
-    await installPrompt.userChoice
-    installPrompt = null
-    installButton.hidden = true
-  })
-  window.addEventListener('appinstalled', () => {
-    installPrompt = null
-    installButton.hidden = true
   })
 }
 
@@ -358,29 +276,7 @@ function initSyncMenu(): void {
     void loadSession()
       .catch(() => null)
       .then(async (session) => {
-        if (syncStore?.userId) {
-          try {
-            await syncStore.prepareLogout()
-          } catch {
-            const discardPending = window.confirm(
-              'Hay cambios pendientes que no se pudieron sincronizar. ¿Descartarlos definitivamente y cerrar sesión?',
-            )
-            if (!discardPending) {
-              logoutAction.removeAttribute('aria-disabled')
-              return
-            }
-          }
-        }
-        // The auth client (better-auth + passkey) is only needed to sign out;
-        // loading it with the startup shell made every page pay for it.
-        const { authentication, requireAuthenticationResult } = await import(
-          '../lib/client/authentication'
-        )
-        await requireAuthenticationResult(await authentication.signOut())
-        if (syncStore?.userId) await syncStore.logout({ discardPending: true })
-        else if (session?.user?.id) await Effect.runPromise(wipeAllClientData(session.user.id))
-        else wipeLegacyClientData()
-        window.location.href = '/login'
+        if (!(await logOut(session))) logoutAction.removeAttribute('aria-disabled')
       })
       .catch((error: unknown) => {
         logoutAction.removeAttribute('aria-disabled')
@@ -390,12 +286,10 @@ function initSyncMenu(): void {
 }
 
 function initShellInteractions(): void {
-  initSidebarToggle()
   initTheme()
   initMobileMoreMenu()
   initReportDialogActions()
   initReportsBadge()
-  initPwaInstall()
   initServiceWorker()
   initDemoModeActions()
   initUserMenu()

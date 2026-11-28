@@ -88,6 +88,7 @@ function buildSeedExport(seed: State) {
     userId: 'e2e-seed',
     settings: {
       currency,
+      dashboardLayout: seed.dashboardLayout,
       stockeventsEnabled: seed.stockEvents.enabled,
       stockeventsTradesToCash: seed.stockEvents.tradesToCash,
     },

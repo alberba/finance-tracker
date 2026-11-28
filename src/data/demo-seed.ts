@@ -290,14 +290,20 @@ export function buildDemoSeed(now: Date = new Date()): State {
       version: 1,
       savedAt: null,
     },
+    dashboardLayout: null,
     onboardingPresented: false,
     onboardingDismissed: false,
-    onboardingAccountCompleted: false,
-    onboardingMovementCompleted: false,
     onboardingCompleted: false,
+    onboardingStep: 0,
+    tourDesktopSeen: false,
+    tourMobileSeen: false,
+    theme: null,
     year,
     currency: 'EUR',
-    twrLiquidityAccountIds: ['cuenta-corriente', 'cuenta-ahorro'],
+    // The bank accounts are not a broker's cash: marking them as TWR liquidity
+    // would add them to the portfolio at each month's close but not to the
+    // contributions of the 3rd, and the TWR would swing every month.
+    twrLiquidityAccountIds: [],
     accounts,
     investmentAssets,
     liabilities,

@@ -11,11 +11,15 @@ export function buildOccurrenceKey(ruleId: string, occurrenceDate: string): stri
 }
 
 export function nextOccurrenceDate(
-  rule: Pick<RecurringRule, 'frequency' | 'interval'>,
+  rule: Pick<RecurringRule, 'frequency' | 'interval' | 'startDate'>,
   occurrenceDate: string,
 ): string {
   const date = parseDate(occurrenceDate)
   const interval = Math.max(1, Math.floor(rule.interval || 1))
+  // Monthly/yearly rules keep the day of `startDate` as their anchor. Deriving
+  // it from the previous occurrence would turn 31 Jan into 28 Feb and then keep
+  // 28 Mar instead of returning to 31 Mar.
+  const anchorDay = isValidDate(rule.startDate) ? parseDate(rule.startDate).getUTCDate() : undefined
 
   switch (rule.frequency) {
     case 'daily':
@@ -23,11 +27,11 @@ export function nextOccurrenceDate(
     case 'weekly':
       return formatDate(addDays(date, interval * 7))
     case 'monthly':
-      return formatDate(addMonths(date, interval))
+      return formatDate(addMonths(date, interval, anchorDay))
     case 'monthEnd':
       return formatDate(lastDayOfMonth(addMonths(date, interval)))
     case 'yearly':
-      return formatDate(addYears(date, interval))
+      return formatDate(addYears(date, interval, anchorDay))
   }
 }
 
@@ -36,6 +40,11 @@ export function getDueOccurrences(rule: RecurringRule, today: string): string[] 
 
   const lastProcessedDate = rule.lastExecutionDate || null
   let occurrenceDate = normalizeFirstOccurrenceDate(rule, rule.nextOccurrenceDate || rule.startDate)
+  // Editing a rule can leave an old `nextOccurrenceDate` before the new
+  // `startDate`; never generate occurrences before the rule starts.
+  if (occurrenceDate < rule.startDate) {
+    occurrenceDate = normalizeFirstOccurrenceDate(rule, rule.startDate)
+  }
   if (lastProcessedDate && occurrenceDate <= lastProcessedDate) {
     occurrenceDate = nextOccurrenceDate(rule, lastProcessedDate)
   }
@@ -60,7 +69,12 @@ export function getNextRuleDate(rule: RecurringRule, today: string): string | nu
     return nextOccurrenceDate(rule, due[due.length - 1])
   }
 
-  const candidate = rule.nextOccurrenceDate || rule.startDate
+  const candidate = normalizeFirstOccurrenceDate(
+    rule,
+    rule.nextOccurrenceDate && rule.nextOccurrenceDate >= rule.startDate
+      ? rule.nextOccurrenceDate
+      : rule.startDate,
+  )
   if (rule.endDate && candidate > rule.endDate) return null
   return candidate > today ? candidate : nextOccurrenceDate(rule, today)
 }
@@ -84,21 +98,19 @@ function addDays(date: Date, days: number): Date {
   return result
 }
 
-function addMonths(date: Date, months: number): Date {
-  const day = date.getUTCDate()
-  const result = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + months, 1))
-  const lastDay = lastDayOfMonth(result).getUTCDate()
-  result.setUTCDate(Math.min(day, lastDay))
-  return result
+function addMonths(date: Date, months: number, anchorDay = date.getUTCDate()): Date {
+  const targetMonth = date.getUTCMonth() + months
+  const targetYear = date.getUTCFullYear() + Math.floor(targetMonth / 12)
+  const normalizedMonth = ((targetMonth % 12) + 12) % 12
+  const lastDay = new Date(Date.UTC(targetYear, normalizedMonth + 1, 0)).getUTCDate()
+  return new Date(Date.UTC(targetYear, normalizedMonth, Math.min(anchorDay, lastDay)))
 }
 
-function addYears(date: Date, years: number): Date {
-  const day = date.getUTCDate()
+function addYears(date: Date, years: number, anchorDay = date.getUTCDate()): Date {
+  const year = date.getUTCFullYear() + years
   const month = date.getUTCMonth()
-  const result = new Date(Date.UTC(date.getUTCFullYear() + years, month, 1))
-  const lastDay = lastDayOfMonth(result).getUTCDate()
-  result.setUTCDate(Math.min(day, lastDay))
-  return result
+  const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate()
+  return new Date(Date.UTC(year, month, Math.min(anchorDay, lastDay)))
 }
 
 function lastDayOfMonth(date: Date): Date {

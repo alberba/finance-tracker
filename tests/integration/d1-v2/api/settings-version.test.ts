@@ -5,6 +5,11 @@ import { applySyncBatch } from "../../../../src/lib/server/sync/apply-command";
 import { createTestDb, type TestDatabase } from "../setup";
 import { seedAccount, seedUser } from "../repositories/fixtures";
 import { runWithDb } from '../../../../src/db/database'
+import * as syncRepository from "../../../../src/db/repositories/sync"
+import { projectSyncV2State } from '../../../../src/lib/client/v2-state-projection'
+import { applyPendingCommands } from '../../../../src/lib/client/pending-overlay'
+import { settingsUpdateCommandSchema } from '../../../../src/lib/server/sync/command-schemas'
+import { applyRemoteChanges, emptyReadModel } from "../../../../src/lib/client/sync-read-model"
 
 /**
  * `user_settings` has no `entityId` to address, so `baseVersion` is its only
@@ -39,6 +44,17 @@ describe("settingsUpdate carries optimistic concurrency (audit §6.4)", () => {
 
     expect(result.results[0].status).toBe("applied");
     expect((await runWithDb(testDb.db, userSettingsRepository.get(userId)))?.currency).toBe("USD");
+
+    // The change log must carry the resulting row (including `version`), not
+    // the patch: otherwise another device throws the settings away and loses
+    // the version guard for its next write.
+    const changes = await runWithDb(testDb.db, syncRepository.listChangesSince(userId, 0));
+    const settingsChange = changes.find((change) => change.entityType === "userSettings");
+    expect(settingsChange).toBeDefined();
+    const payload = JSON.parse(settingsChange!.payload!);
+    expect(payload).toMatchObject({ currency: "USD", version: settings.version + 1 });
+    const projected = applyRemoteChanges(emptyReadModel(), [settingsChange!], settingsChange!.revision);
+    expect(projected.settings).toMatchObject({ currency: "USD", version: settings.version + 1 });
   });
 
   it("conflicts on a stale baseVersion, reports the stored version and leaves the row alone", async () => {
@@ -119,5 +135,44 @@ describe("settingsUpdate carries optimistic concurrency (audit §6.4)", () => {
 
     expect(result.results[0].status).toBe("applied");
     expect((await runWithDb(testDb.db, userSettingsRepository.get(userId)))?.currency).toBe("USD");
+
   });
 });
+
+describe('dashboard layout through sync', () => {
+  it('survives the outbox schema, offline projection, storage and remote changes', async () => {
+    const database = createTestDb()
+    try {
+      const user = await seedUser(database.db)
+      const layout = { version: 1 as const, items: [{ id: 'goals', col: 0, row: 0, w: 2, h: 3 }] }
+      const command = settingsUpdateCommandSchema.parse({
+        commandId: 'layout-save',
+        action: 'settingsUpdate',
+        patch: { dashboardLayout: layout },
+      })
+      expect(
+        projectSyncV2State(applyPendingCommands(emptyReadModel(), [command])).dashboardLayout,
+      ).toEqual(layout)
+      const result = await runWithDb(database.db, applySyncBatch(user.id, [command]))
+      expect(result.results[0].status).toBe('applied')
+      expect(
+        (await runWithDb(database.db, userSettingsRepository.get(user.id)))?.dashboardLayout,
+      ).toEqual(layout)
+      const changes = await runWithDb(database.db, syncRepository.listChangesSince(user.id, 0))
+      const remote = applyRemoteChanges(emptyReadModel(), changes, result.revision)
+      expect(projectSyncV2State(remote).dashboardLayout).toEqual(layout)
+      const reset = settingsUpdateCommandSchema.parse({
+        commandId: 'layout-reset',
+        action: 'settingsUpdate',
+        patch: { dashboardLayout: null },
+      })
+      expect(projectSyncV2State(applyPendingCommands(remote, [reset])).dashboardLayout).toBeNull()
+      await runWithDb(database.db, applySyncBatch(user.id, [reset]))
+      expect(
+        (await runWithDb(database.db, userSettingsRepository.get(user.id)))?.dashboardLayout,
+      ).toBeNull()
+    } finally {
+      database.close()
+    }
+  })
+})

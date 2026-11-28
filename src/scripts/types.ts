@@ -1,3 +1,4 @@
+import type { DashboardLayoutPreference } from '../lib/dashboard-layout'
 import type { Month } from '../lib/month'
 
 export const TRANSACTION_TYPES = ['income', 'expense', 'saving', 'investment'] as const
@@ -9,7 +10,6 @@ export type InvestmentSide = (typeof INVESTMENT_SIDES)[number]
 export type BudgetType = TransactionType
 export type TxSortColumn = 'date' | 'amount' | 'account' | 'type' | 'category' | 'description'
 export type SortDirection = 'asc' | 'desc'
-export type InvestmentSubTab = 'dashboard' | 'movements' | 'contributions' | 'recurring'
 export type TransactionsSubTab = 'registry' | 'subscriptions'
 export type SnapshotKind = 'accounts' | 'investments' | 'liabilities'
 export type EntityKey = 'accounts' | 'investmentAssets' | 'liabilities'
@@ -42,6 +42,11 @@ export interface SavingGoal {
   targetAmount: number
   /** Name of the saving category it sums. */
   category: string
+  /** The month it is due (year and 1-12, ADR 0008); a goal without them has no deadline. */
+  targetYear?: number
+  targetMonth?: number
+  /** What the user plans to put into it each month; absent when never planned. */
+  monthlyAmount?: number
 }
 
 export interface Entity {
@@ -237,11 +242,17 @@ export interface StateMeta {
 }
 
 export interface State {
+  dashboardLayout: DashboardLayoutPreference | null
   onboardingPresented: boolean
   onboardingDismissed: boolean
-  onboardingAccountCompleted: boolean
-  onboardingMovementCompleted: boolean
   onboardingCompleted: boolean
+  /** The setup wizard's step to resume at (0 «Cómo empiezas» … 6 «Listo»). */
+  onboardingStep: number
+  /** The guided tour (#527), seen or skipped, on the desktop and on the mobile frame. */
+  tourDesktopSeen: boolean
+  tourMobileSeen: boolean
+  /** The theme chosen by the user, shared by their devices; `null` lets each device decide. */
+  theme: string | null
 
   meta: StateMeta
   year: number
@@ -263,6 +274,8 @@ export interface State {
   transactions: Transaction[]
   subscriptions: Subscription[]
   snapshots: Record<string, SnapshotRow>
+  /** Sync snapshots outside the active accounting year, grouped by year and month. */
+  historicalSnapshots?: Record<string, Record<string, SnapshotRow>>
   budget: Record<BudgetType, Record<string, number[]>>
   goals: Record<GoalKey, Goal>
   savingGoals: SavingGoal[]
@@ -272,13 +285,6 @@ export interface State {
   recurringRules: RecurringRule[]
   pendingMovements: PendingMovement[]
   stockEvents: StockEventsSettings
-}
-
-export interface MonthTotals {
-  income: number
-  expense: number
-  saving: number
-  investment: number
 }
 
 export interface ContributionMetricRow {

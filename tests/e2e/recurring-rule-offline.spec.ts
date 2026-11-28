@@ -1,5 +1,4 @@
 import { test, expect } from './fixtures'
-import { LiveMarketPage } from './pages/LiveMarketPage'
 import { blockSyncApi, expectSyncCommand } from './pages/sync'
 
 /**
@@ -11,17 +10,7 @@ import { blockSyncApi, expectSyncCommand } from './pages/sync'
  * reload, which is the window the module closes.
  */
 
-const RULE = {
-  account: 'Revolut',
-  category: 'Fondos Indexados',
-  description: 'Compra offline',
-  amount: 300,
-  frequency: 'monthly',
-  startDate: '2026-11-01',
-  symbol: 'VWCE',
-  units: 1,
-  unitPrice: 300,
-}
+const RULE = { description: 'Compra offline', amount: 300 }
 
 test.describe('regla recurrente tras recargar (#493)', () => {
   test.use({ fixedTime: '2026-11-12T10:00:00Z' })
@@ -30,27 +19,23 @@ test.describe('regla recurrente tras recargar (#493)', () => {
     page,
     tracker,
   }) => {
-    const liveMarket = new LiveMarketPage(page)
-    await tracker.openInvestmentRecurringTab()
-
+    await tracker.openSettings()
     const reconnect = await blockSyncApi(page)
-    await liveMarket.createRecurringRule(RULE, { waitForSync: false })
-    const rows = liveMarket.recurringRuleRows
+    await tracker.addRecurringRule(RULE)
+    const rows = tracker.recurringRuleRows.filter({ hasText: RULE.description })
     await expect(rows).toHaveCount(1)
-    await expect(rows).toContainText(RULE.description)
 
     // Reload with the API still failing: the accepted rule, its occurrence
     // and the calendar come from the durable record, not from memory.
     await tracker.reload()
-    await tracker.openInvestmentRecurringTab()
+    await tracker.openSettings()
     await expect(rows).toHaveCount(1)
-    await expect(rows).toContainText(RULE.description)
     await expect(tracker.syncStatus).toContainText('pendiente')
     await expect(tracker.syncStatus).not.toContainText('Sincronizado')
-
-    await tracker.openTransactions()
-    await expect(liveMarket.pendingItems()).toHaveCount(1)
-    await expect(liveMarket.pendingItems().first()).toContainText(RULE.description)
+    await tracker.openDashboard()
+    const pendings = tracker.dashboardPendingCard.getByRole('listitem')
+    await expect(pendings).toHaveCount(1)
+    await expect(pendings).toContainText(RULE.description)
 
     // Reconnect: the queued commands are sent once and the local work drains.
     // Both listeners exist before the route is lifted, so a fast response
@@ -75,10 +60,10 @@ test.describe('regla recurrente tras recargar (#493)', () => {
     await expect(tracker.syncStatus).toContainText('Sincronizado')
 
     await tracker.reload()
-    await tracker.openInvestmentRecurringTab()
+    await tracker.openSettings()
     await expect(rows).toHaveCount(1)
-    await expect(rows).toContainText(RULE.description)
-    await tracker.openTransactions()
-    await expect(liveMarket.pendingItems()).toHaveCount(1)
+    await tracker.openDashboard()
+    await expect(pendings).toHaveCount(1)
+    await expect(pendings).toContainText(RULE.description)
   })
 })

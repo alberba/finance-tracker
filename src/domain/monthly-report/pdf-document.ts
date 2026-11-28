@@ -16,17 +16,16 @@ import type {
 } from './view-model'
 
 /**
- * The site fonts, as the PDF names them. Each style maps to a file under
+ * The report's fonts, as the PDF names them. Each style maps to a file under
  * `assets/fonts/report` that the generator loads when the report is downloaded.
  */
 export const REPORT_FONT_FILES = {
-  Syne: { normal: 'Syne-SemiBold.ttf', bold: 'Syne-Bold.ttf' },
-  DMSans: { normal: 'DMSans-Regular.ttf', bold: 'DMSans-Bold.ttf' },
-  DMSansMedium: { normal: 'DMSans-Medium.ttf', bold: 'DMSans-Bold.ttf' },
-  DMMono: { normal: 'DMMono-Regular.ttf', bold: 'DMMono-Regular.ttf' },
+  Unbounded: { normal: 'Unbounded-SemiBold.ttf', bold: 'Unbounded-Bold.ttf' },
+  Manrope: { normal: 'Manrope-Regular.ttf', bold: 'Manrope-Bold.ttf' },
+  ManropeLabel: { normal: 'Manrope-ExtraBold.ttf', bold: 'Manrope-ExtraBold.ttf' },
 } as const
 
-/** The light theme's tokens (`global.css`): the PDF is read on paper, whatever the app's theme. */
+/** The report's own light palette: the PDF is read on paper, whatever the app's theme. */
 const INK = '#0d1626'
 const MUTED = '#5a6678'
 const LINE = '#e4e8f1'
@@ -46,12 +45,12 @@ const TYPE_NAME: Record<TransactionType, string> = {
 }
 
 /** Digits in the display face with fixed width, so amounts line up in a column. */
-const FIGURE = { font: 'Syne', fontFeatures: ['tnum' as const] }
+const FIGURE = { font: 'Unbounded', fontFeatures: ['tnum' as const] }
 
 function kicker(text: string): ContentText {
   return {
     text: text.toUpperCase(),
-    font: 'DMMono',
+    font: 'ManropeLabel',
     fontSize: 7.5,
     color: MUTED,
     characterSpacing: 1,
@@ -63,8 +62,8 @@ function heading(number: string, title: string): Content {
     stack: [
       {
         text: [
-          { text: `${number}  `, font: 'DMMono', color: MUTED, fontSize: 8 },
-          { text: title, font: 'Syne', bold: true, fontSize: 13 },
+          { text: `${number}  `, font: 'ManropeLabel', color: MUTED, fontSize: 8 },
+          { text: title, font: 'Unbounded', bold: true, fontSize: 13 },
         ],
       },
     ],
@@ -77,7 +76,7 @@ function heading(number: string, title: string): Content {
 function th(text: string, alignment: 'left' | 'right' = 'left'): TableCell {
   return {
     text: text.toUpperCase(),
-    font: 'DMSansMedium',
+    font: 'ManropeLabel',
     fontSize: 7,
     color: MUTED,
     characterSpacing: 0.6,
@@ -137,7 +136,7 @@ function categoryTable(
     )
     return cells
   })
-  const widths = withBars ? ['*', 28, BAR_WIDTH, 70, 44] : ['*', 28, 70, 44]
+  const widths = withBars ? ['*', 28, BAR_WIDTH, 84, 52] : ['*', 28, 84, 52]
   return ledger({ widths, body: [head, ...body] })
 }
 
@@ -163,7 +162,7 @@ function movementsTable(rows: MonthlyReportMovementRow[], currency: string): Con
     td(TYPE_NAME[row.type]),
     amountCell(movementAmount(row, currency)),
   ])
-  return ledger({ widths: [62, '*', 66, 62, 44, 62], body: [head, ...body] })
+  return ledger({ widths: [58, '*', 64, 52, 42, 80], body: [head, ...body] })
 }
 
 function figure(label: string, value: string): Content {
@@ -171,7 +170,7 @@ function figure(label: string, value: string): Content {
     stack: [
       {
         text: label.toUpperCase(),
-        font: 'DMSansMedium',
+        font: 'ManropeLabel',
         fontSize: 7,
         color: MUTED,
         characterSpacing: 0.6,
@@ -199,12 +198,12 @@ function figureStrip(figures: Array<[string, string]>): Content {
   }
 }
 
-/** The report as a pdfmake document, in the app's language: Syne for titles and figures. */
+/** The report as a pdfmake document, in the app's language: Unbounded for titles and figures, Manrope for the rest. */
 export function buildMonthlyReportDocument(report: MonthlyReportViewModel): TDocumentDefinitions {
   const { currency } = report
   const content: Content[] = [
     kicker('Informe mensual'),
-    { text: report.periodLabel, font: 'Syne', bold: true, fontSize: 22, margin: [0, 4, 0, 2] },
+    { text: report.periodLabel, font: 'Unbounded', bold: true, fontSize: 22, margin: [0, 4, 0, 2] },
   ]
   if (report.appliedFilters.length) {
     content.push({
@@ -279,7 +278,7 @@ export function buildMonthlyReportDocument(report: MonthlyReportViewModel): TDoc
       title: `Informe mensual ${report.periodLabel}`,
       subject: 'Informe mensual de movimientos',
     },
-    defaultStyle: { font: 'DMSans', fontSize: 9, color: INK, lineHeight: 1.15 },
+    defaultStyle: { font: 'Manrope', fontSize: 9, color: INK, lineHeight: 1.15 },
     footer: (currentPage: number, pageCount: number): Content => ({
       columnGap: 16,
       columns: [
@@ -291,7 +290,7 @@ export function buildMonthlyReportDocument(report: MonthlyReportViewModel): TDoc
         },
         {
           text: `Página ${currentPage} de ${pageCount}`,
-          font: 'DMMono',
+          font: 'ManropeLabel',
           width: 'auto',
           alignment: 'right',
           color: MUTED,

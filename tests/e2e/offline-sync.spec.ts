@@ -84,11 +84,6 @@ test.describe('Sincronización offline (sync v2)', () => {
         amount: 15,
         description: 'Compra sin conexión',
       })
-      // The transactions list defaults to filtering on the current month —
-      // point it at the month the seeded transaction actually falls in.
-      // `filterTransactionsMonth` only touches an in-page <select>, so it
-      // works while offline too.
-      await tracker.filterTransactionsMonth('FEBRERO')
       await tracker.expectTransactionDescriptionVisible('Compra sin conexión')
 
       // Note: a `page.reload()` *while offline* isn't exercised here —
@@ -106,7 +101,7 @@ test.describe('Sincronización offline (sync v2)', () => {
       // Reload again post-sync: the row must appear exactly once, proving
       // the outbox replay didn't duplicate it on reconnect.
       await tracker.reload()
-      await tracker.filterTransactionsMonth('FEBRERO')
+      await tracker.openTransactions()
       await tracker.revealOlderTransactions()
       const rows = tracker.transactionRows.filter({ hasText: 'Compra sin conexión' })
       await expect(rows).toHaveCount(1)
@@ -128,13 +123,9 @@ test.describe('Sincronización offline (sync v2)', () => {
       const { tracker: deviceOne, page: pageOne } = await provisionUser(contextDeviceOne, email)
       await deviceOne.addAccount({ name: 'Cuenta Compartida', openingBalance: 0 })
       // Wait for the account's own `create` command to sync before
-      // referencing it from a transaction: a *seeded* account (the
-      // `addCustomTransaction` default, "Revolut") has no v2 `account`
-      // row at all — `resolveEntityId` can never resolve it, so the
-      // transaction's own sync-v2 create would be silently skipped
-      // forever (see the doc comment on `addCustomTransaction`'s
-      // `accountLabel` param). Only a freshly-created, already-synced
-      // account round-trips correctly.
+      // referencing it from a transaction: `resolveEntityId` only resolves
+      // an account that already has its v2 row, so the transaction's own
+      // sync-v2 create would otherwise be skipped.
       await waitForSynced(pageOne)
       await deviceOne.addCustomTransaction({
         date: '2026-02-05',
@@ -145,11 +136,9 @@ test.describe('Sincronización offline (sync v2)', () => {
         description: 'Movimiento en disputa',
         accountLabel: 'Cuenta Compartida',
       })
-      await deviceOne.filterTransactionsMonth('FEBRERO')
       await waitForSynced(pageOne)
 
       const { tracker: deviceTwo, page: pageTwo } = await provisionUser(contextDeviceTwo, email)
-      await deviceTwo.filterTransactionsMonth('FEBRERO')
       await deviceTwo.expectTransactionDescriptionVisible('Movimiento en disputa')
       // Wait for device two's *pull* (not just "nothing queued to push") to
       // land before editing offline: `getEntityRef` only ever resolves
@@ -191,7 +180,7 @@ test.describe('Sincronización offline (sync v2)', () => {
       // The queue kept moving through the conflict and drained on its own —
       // device two's own edit is what both devices see after reloading.
       await deviceTwo.reload()
-      await deviceTwo.filterTransactionsMonth('FEBRERO')
+      await deviceTwo.openTransactions()
       await deviceTwo.revealOlderTransactions()
       const disputedRow = deviceTwo.transactionRows.filter({ hasText: 'Movimiento en disputa' })
       await expect(disputedRow).toContainText('22,00 €')
@@ -211,7 +200,8 @@ test.describe('Sincronización offline (sync v2)', () => {
       const { tracker: desktop, page: desktopPage } = await provisionUser(desktopContext, email)
       await desktop.addAccount({ name: 'Cuenta Viva', openingBalance: 0 })
       await waitForSynced(desktopPage)
-      await desktop.filterTransactionsMonth('FEBRERO')
+      await desktop.openTransactions()
+      await desktop.revealOlderTransactions()
 
       const { tracker: mobile, page: mobilePage } = await provisionUser(mobileContext, email)
       await waitForSynced(mobilePage)

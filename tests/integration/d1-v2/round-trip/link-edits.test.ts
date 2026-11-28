@@ -35,18 +35,13 @@ describe('vinculación que respeta las ediciones posteriores (#489)', () => {
     const held = trip.holdSync()
     expect((await useMarketStore().linkExistingMovements(instrumentId)).targets).toBe(1)
 
-    useInvestmentStore().saveEditedMovement(targetId, {
+    useMovementsStore().saveEdit(targetId, {
       date: '2026-01-15',
-      time: '11:45',
-      side: 'buy',
-      symbol: 'LINK',
-      category: 'Link Asset',
-      unitPrice: '40',
-      units: '5',
-      fee: '2',
-      movementCurrency: 'EUR',
       accountId: CASH_ID,
-      declared: true,
+      type: 'investment',
+      category: 'Link Asset',
+      description: 'Compra editada',
+      amount: '205',
     })
     // Created after Vincular was requested: it matches the instrument, but the
     // fixed target set must leave it out.
@@ -65,15 +60,9 @@ describe('vinculación que respeta las ediciones posteriores (#489)', () => {
     const state = await trip.reload()
 
     expect(state.transactions.find((item) => item.id === targetId)).toMatchObject({
-      description: edited.description,
+      description: 'Compra editada',
       amount: edited.amount,
       instrumentId,
-      units: 5,
-      unitPrice: 40,
-      fee: 2,
-      time: '11:45',
-      declared: true,
-      movementCurrency: 'EUR',
     })
     const late = state.transactions.find((item) => item.description === 'Compra tardía')
     expect(late).toBeDefined()
@@ -115,34 +104,6 @@ describe('vinculación que respeta las ediciones posteriores (#489)', () => {
     expect(state.transactions.find((item) => item.id === targetId)).toMatchObject({
       type: 'expense',
       description: 'Gasto reclasificado',
-    })
-    expect(state.transactions.find((item) => item.id === targetId)?.instrumentId).toBeUndefined()
-  })
-
-  it('respeta un desvínculo explícito posterior al solicitar Vincular', async () => {
-    const instrumentId = await addLinkInstrument()
-    const held = trip.holdSync()
-    expect((await useMarketStore().linkExistingMovements(instrumentId)).targets).toBe(1)
-
-    useInvestmentStore().saveEditedMovement(targetId, {
-      date: '2026-01-15',
-      time: '09:30',
-      side: 'buy',
-      symbol: 'OTHER',
-      category: 'Link Asset',
-      unitPrice: '100',
-      units: '2',
-      fee: '1',
-      movementCurrency: 'EUR',
-      accountId: CASH_ID,
-      declared: false,
-    })
-
-    held.release()
-    const state = await trip.reload()
-
-    expect(state.transactions.find((item) => item.id === targetId)).toMatchObject({
-      symbol: 'OTHER',
     })
     expect(state.transactions.find((item) => item.id === targetId)?.instrumentId).toBeUndefined()
   })
@@ -242,7 +203,15 @@ describe('vinculación que respeta las ediciones posteriores (#489)', () => {
     })
     state = await trip.reload()
     const investmentId = state.transactions.find((item) => item.date === '2026-01-22')!.id
-    useInvestmentStore().toggleDeclared(investmentId)
+    const investment = state.transactions.find((item) => item.id === investmentId)!
+    useMovementsStore().saveEdit(investmentId, {
+      date: investment.date,
+      accountId: investment.accountId,
+      type: 'investment',
+      category: investment.category,
+      description: 'Compra editada',
+      amount: String(investment.amount),
+    })
     useMovementsStore().deleteTransaction(expenseId)
     await trip.reload()
 

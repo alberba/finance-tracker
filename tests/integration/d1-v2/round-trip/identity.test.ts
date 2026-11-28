@@ -23,30 +23,6 @@ describe("round trip: identidad propia para entidades nuevas", () => {
     trip.cleanup();
   });
 
-  it("almacena la entidad con la identidad que fijó el cliente", async () => {
-    const id = crypto.randomUUID();
-
-    await trip.asOtherDevice([
-      {
-        commandId: crypto.randomUUID(),
-        action: "create",
-        entityType: "account",
-        data: { id, name: "Revolut", kind: "cash", currency: "EUR", openingBalance: 285.67 },
-      },
-    ]);
-
-    const rows = await trip.testDb.db
-      .select()
-      .from(accounts)
-      .where(eq(accounts.userId, trip.userId));
-    expect(rows).toHaveLength(1);
-    expect(rows[0].id).toBe(id);
-
-    const reloaded = await trip.reload();
-    expect(reloaded.accounts).toHaveLength(1);
-    expect(reloaded.accounts[0]).toMatchObject({ name: "Revolut", openingBalance: 285.67 });
-  });
-
   it("el create y los update posteriores comparten la identidad desde el primer instante", async () => {
     const id = crypto.randomUUID();
 

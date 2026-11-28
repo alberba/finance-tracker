@@ -1,6 +1,31 @@
-# Ejecución local en OrbStack
+# Ejecución local
 
-Con OrbStack arrancado, desde la raíz del repositorio:
+## Desarrollo diario: `pnpm dev:worktree`
+
+Para trabajar en el código y el diseño, sin Docker:
+
+```sh
+pnpm setup:worktree   # una vez por worktree: .dev.vars, dependencias y D1 local
+pnpm dev:worktree     # Astro con hot reload en el puerto del worktree
+```
+
+`dev:worktree` usa 4321 en el checkout principal y un puerto propio en cada worktree, y ajusta
+`BETTER_AUTH_URL` en `.dev.vars` a ese puerto; se para con `pnpm exec astro dev stop`. Para entrar
+con tu cuenta y tus datos (un export JSON de Datos → Exportar, por ejemplo el de producción):
+
+```sh
+pnpm dev:account tu@correo.example ~/Downloads/finance-tracker-AAAA-MM-DD.json
+```
+
+Crea la cuenta (o le pone contraseña nueva si ya existe) en la D1 local, guarda la contraseña en
+`.data/dev-account-password` e importa el JSON sustituyendo los datos de esa cuenta; sin JSON solo
+deja la cuenta. Necesita el servidor en marcha para importar. Las credenciales de integraciones
+no viajan en el export, y los instrumentos propios cuyo instrumento de mercado no exista en la D1
+local se omiten. Producción no se toca.
+
+## Docker en OrbStack
+
+Para probar la imagen y SQLite como en producción. Con OrbStack arrancado, desde la raíz del repositorio:
 
 ```sh
 pnpm local:setup
@@ -25,7 +50,7 @@ no necesitas configurar un proveedor de correo para este acceso.
 
 La primera creación de la imagen descarga y prepara las dependencias y puede superar un minuto. Las siguientes reutilizan la caché de pnpm y las capas de Docker, compartidas entre worktrees. En desarrollo, el código y la configuración se montan desde el worktree: los cambios en Vue, Astro y CSS aparecen en el navegador sin reconstruir la imagen. Las dependencias Linux permanecen dentro del contenedor; no se monta el `node_modules` de macOS. Si cambias las dependencias, vuelve a ejecutar `pnpm local:up`.
 
-Para probar la compilación de producción con el mismo puerto y volumen, usa `pnpm local:up:prod`. Para volver al hot reload, usa `pnpm local:up`. Para trabajar a diario sin Docker, recomendamos `pnpm setup:worktree` y `pnpm dev`; este modo usa D1 local y puedes abrir `/?demo=1`.
+Para probar la compilación de producción con el mismo puerto y volumen, usa `pnpm local:up:prod`. Para volver al hot reload, usa `pnpm local:up`.
 
 El servidor usa Astro con Node y SQLite local; no consulta D1 ni requiere Cloudflare
 Access. La sincronización v2 está activada en ambos modos de Docker. Los datos empiezan vacíos,

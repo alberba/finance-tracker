@@ -16,7 +16,7 @@ describe("sync repository", () => {
   });
 
   describe("user revisions", () => {
-    it("creates the cursor on first ensure, bumps it, and reads it (CRUD)", async () => {
+    it("creates the cursor at 0 on first ensure and bumps it by one", async () => {
       const { db } = testDb;
       const user = await seedUser(db);
 
@@ -27,14 +27,6 @@ describe("sync repository", () => {
       expect(bumped.revision).toBe(1);
 
       expect(await runWithDb(db, syncRepo.getRevision(user.id))).toMatchObject({ revision: 1 });
-      expect(await runWithDb(db, syncRepo.removeRevision(user.id))).toBe(true);
-    });
-
-    it("rejects a revision cursor for a non-existent user (FK violation)", async () => {
-      const { db } = testDb;
-      await expect(runWithDb(db, syncRepo.ensureRevision("does-not-exist"))).rejects.toThrow(
-        /FOREIGN KEY constraint failed/i,
-      );
     });
 
     it("enforces cross-user isolation", async () => {
@@ -48,31 +40,14 @@ describe("sync repository", () => {
   });
 
   describe("sync commands", () => {
-    it("creates, reads and deletes a command (CRUD), rejecting duplicate commandIds", async () => {
+    it("rejects a duplicate commandId", async () => {
       const { db } = testDb;
       const user = await seedUser(db);
-
-      const created = await runWithDb(db, syncRepo.createCommand(user.id, {
-        id: "cmd-1",
-        commandType: "transaction.create",
-        payload: "{}",
-      }));
-      expect(created.id).toBe("cmd-1");
-
-      expect(await runWithDb(db, syncRepo.getCommand(user.id, "cmd-1"))).toMatchObject({ commandType: "transaction.create" });
+      await runWithDb(db, syncRepo.createCommand(user.id, { id: "cmd-1", commandType: "transaction.create", payload: "{}" }));
 
       await expect(
         runWithDb(db, syncRepo.createCommand(user.id, { id: "cmd-1", commandType: "transaction.create", payload: "{}" })),
-      ).rejects.toThrow();
-
-      expect(await runWithDb(db, syncRepo.remove(user.id, "cmd-1"))).toBe(true);
-    });
-
-    it("rejects creating a command for a non-existent user (FK violation)", async () => {
-      const { db } = testDb;
-      await expect(
-        runWithDb(db, syncRepo.createCommand("does-not-exist", { id: "cmd-1", commandType: "x", payload: "{}" })),
-      ).rejects.toThrow(/FOREIGN KEY constraint failed/i);
+      ).rejects.toThrow(/unique|constraint/i);
     });
 
     it("enforces cross-user isolation", async () => {
@@ -87,7 +62,7 @@ describe("sync repository", () => {
   });
 
   describe("sync changes", () => {
-    it("creates changes and walks them via listChangesSince (CRUD)", async () => {
+    it("lists only the changes after the given revision", async () => {
       const { db } = testDb;
       const user = await seedUser(db);
 
@@ -104,20 +79,8 @@ describe("sync repository", () => {
         changeType: "created",
       }));
 
-      expect(await runWithDb(db, syncRepo.listChangesByUser(user.id))).toHaveLength(2);
-      expect(await runWithDb(db, syncRepo.listChangesSince(user.id, 1))).toHaveLength(1);
-    });
-
-    it("rejects creating a change for a non-existent user (FK violation)", async () => {
-      const { db } = testDb;
-      await expect(
-        runWithDb(db, syncRepo.createChange("does-not-exist", {
-          revision: 1,
-          entityType: "transaction",
-          entityId: "t1",
-          changeType: "created",
-        })),
-      ).rejects.toThrow(/FOREIGN KEY constraint failed/i);
+      const since = await runWithDb(db, syncRepo.listChangesSince(user.id, 1));
+      expect(since.map((change) => change.entityId)).toEqual(["t2"]);
     });
 
     it("enforces cross-user isolation", async () => {

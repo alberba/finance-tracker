@@ -6,7 +6,7 @@ import {
   monthIndex,
   type Month,
 } from '../../lib/month'
-import type { Tone } from '../../components/ui/tone'
+import type { Tone } from '../../lib/tone'
 import { decorateCategoryLabel } from '../../scripts/category-emoji'
 import { MONTHS, type BudgetType, type State } from '../../scripts/types'
 import { round2 } from '../../scripts/utils'

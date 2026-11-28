@@ -135,16 +135,23 @@ y conserva los precios transitorios solo si no cambia su fuente.
 Añadir o cambiar un tipo (`income`, `expense`, `investment`, `saving`…) afecta además a sitios que
 el compilador no siempre marca. Tras `pnpm check`, busca el tipo con `grep -rn` en:
 
-- `src/lib/finance-core.ts` y `src/domain/dashboard/view-model.ts`: totales y patrimonio.
-- `src/domain/transactions/registry.ts` y `src/components/transactions/`: etiquetas, formulario
-  y `TransactionPanel.vue`.
+- `src/lib/finance-core.ts` y `src/neon/dashboard/view-model.ts`: totales y patrimonio.
+- `src/domain/transactions/registry.ts`, `src/neon/entry/` (tipos de la hoja de alta,
+  `entry-types.ts`) y `src/neon/sections/transactions/`: etiquetas y formulario.
 - `src/stores/recurring.ts` y `src/domain/recurring/pending.ts`: reglas y pendientes.
-- `src/data/demo-seed.ts`, `src/lib/client/webmcp.ts` y `src/styles/global.css` (color del tipo,
-  vigilado por `tests/unit/styles-guards.test.ts`).
-- `tests/unit/finance-core.test.ts` y `tests/unit/dashboard-view-model.test.ts`.
+- `src/data/demo-seed.ts` y `src/lib/client/webmcp.ts`.
+- `tests/unit/finance-core.test.ts` y `tests/unit/neon-dashboard-view-model.test.ts`.
 
 ## Test
 
 `tests/integration/d1-v2/round-trip/` ejecuta los stores reales contra SQLite con
 `migrations-v2/` aplicadas y cubre la ida y la vuelta completas. Un campo nuevo lleva su caso en el
 fichero de su entidad.
+
+La distribución del inicio de escritorio viaja como un único ajuste JSON versionado,
+`dashboardLayout`. El comando `settingsUpdate` reemplaza el documento entero. `null` delega en
+la distribución por defecto, mientras que `{ version: 1, items: [] }` conserva un inicio vacío.
+Cada elemento lleva su casilla (`id`, `col`, `row`, `w`, `h`) y, en los widgets con gráfica,
+un `chart: 'end'` opcional cuando la gráfica va después de las cifras; sin él va antes.
+La cola pendiente proyecta el mismo valor antes de que lo confirme el servidor. El estado y la
+copia JSON conservan el documento, y el diseño interpreta los widgets y sus tamaños mínimos.

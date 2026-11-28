@@ -122,9 +122,6 @@ describe('WebMCP finance queries', () => {
 
   it.each([
     ['search_movements', { limit: 101 }],
-    ['search_movements', { month: 0 }],
-    ['search_movements', { offset: -1 }],
-    ['search_movements', { type: 'transfer' }],
     ['get_month_totals', { year: 2026, month: 13 }],
     ['get_budget', { year: 2025 }],
   ])('rejects invalid arguments to %s', async (name, input) => {

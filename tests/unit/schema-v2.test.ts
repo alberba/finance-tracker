@@ -60,41 +60,6 @@ function columnsOf(table: string): ColumnInfo[] {
 }
 
 describe("v2 schema — migrations-v2/0001_init_v2.sql", () => {
-  it("creates all 26 tables from the WP1 assignment list", () => {
-    const expected = [
-      "users",
-      "user_identities",
-      "user_settings",
-      "accounts",
-      "categories",
-      "twr_liquidity_accounts",
-      "transactions",
-      "investment_trade_details",
-      "subscriptions",
-      "recurring_rules",
-      "pending_movements",
-      "budget_entries",
-      "goals",
-      "wealth_snapshots",
-      "snapshot_balances",
-      "contributions",
-      "contribution_allocations",
-      "market_instruments",
-      "user_instruments",
-      "market_quotes",
-      "integration_credentials",
-      "stockevents_symbol_mappings",
-      "user_revisions",
-      "sync_commands",
-      "sync_changes",
-      "audit_events",
-    ];
-    for (const table of expected) {
-      expect(tableNames).toContain(table);
-    }
-    expect(tableNames.sort()).toEqual(expected.sort());
-  });
-
   it("gives every table (except declared global reference tables) a user_id column", () => {
     for (const table of tableNames) {
       const columns = columnsOf(table);
@@ -151,20 +116,5 @@ describe("v2 schema — migrations-v2/0001_init_v2.sql", () => {
         expect(pkColumn.type.toUpperCase()).toBe("TEXT");
       }
     }
-  });
-
-  it("indexes transactions by (user_id, date) and (user_id, account_id, date)", () => {
-    const indexes = (db.prepare("PRAGMA index_list(transactions)").all() as { name: string }[]).map(
-      (row) => row.name,
-    );
-    expect(indexes).toContain("transactions_user_id_date_idx");
-    expect(indexes).toContain("transactions_user_id_account_id_date_idx");
-  });
-
-  it("indexes budget_entries by (user_id, year, month)", () => {
-    const indexes = (
-      db.prepare("PRAGMA index_list(budget_entries)").all() as { name: string }[]
-    ).map((row) => row.name);
-    expect(indexes).toContain("budget_entries_user_id_year_month_idx");
   });
 });

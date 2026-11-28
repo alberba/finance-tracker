@@ -1,12 +1,6 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { getInvestmentBuckets } from '../../src/domain/investment/buckets'
 import { formatDecimalInput, parseDecimal, round2 } from '../../src/lib/number'
-import { createJsonResponse } from '../../src/lib/server/json-response'
-import { resolveCssColor } from '../../src/scripts/css-color'
-
-afterEach(() => {
-  vi.unstubAllGlobals()
-})
 
 describe('shared helpers', () => {
   it('agrupa fondos y cripto usando el calculador recibido', () => {
@@ -27,29 +21,6 @@ describe('shared helpers', () => {
   it('aplica una única política de redondeo a dos decimales', () => {
     expect(round2(12.345)).toBe(12.35)
     expect(round2(undefined)).toBe(0)
-  })
-
-  it('resuelve variables CSS y conserva el fallback durante SSR', () => {
-    expect(resolveCssColor('--accent', '#fff')).toBe('#fff')
-
-    vi.stubGlobal('window', {})
-    vi.stubGlobal('document', { documentElement: {} })
-    vi.stubGlobal('getComputedStyle', () => ({
-      getPropertyValue: (name: string) => (name === '--accent' ? ' #123456 ' : ''),
-    }))
-
-    expect(resolveCssColor('var(--accent)', '#fff')).toBe('#123456')
-    expect(resolveCssColor('invalid', '#fff')).toBe('#fff')
-  })
-
-  it('crea respuestas JSON preservando estado y política de caché', async () => {
-    const json = createJsonResponse('private, max-age=30')
-    const response = json({ ok: true }, 201)
-
-    expect(response.status).toBe(201)
-    expect(response.headers.get('Content-Type')).toBe('application/json')
-    expect(response.headers.get('Cache-Control')).toBe('private, max-age=30')
-    expect(await response.json()).toEqual({ ok: true })
   })
 })
 

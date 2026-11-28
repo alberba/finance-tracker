@@ -18,15 +18,13 @@ import {
 } from '../../src/services/stockevents-api'
 import { ApiClientError } from '../../src/lib/client/api-error'
 import { useFinancialStateStore } from '../../src/stores/financial-state'
-import { useInvestmentStore } from '../../src/stores/investment'
 import { useStockEventsStore } from '../../src/stores/stockevents'
 
 /**
  * Regression coverage for the silent-loss path: an ETH buy
  * (0.0047 @ 2110.30) was saved locally and never reached Stock Events
  * because `syncMovement` returned without a word when no synced mapping
- * resolved. These tests pin the three new guarantees — a visible skip
- * warning, a manual per-movement resend, and a resend on edit.
+ * resolved. These tests pin the guarantee that a skip is visible.
  */
 
 const ethBuy: Transaction = {
@@ -75,12 +73,6 @@ function seedState(transactions: Transaction[], tradesToCash = false): void {
 
 function toastText(): string {
   return document.getElementById('toast')?.textContent || ''
-}
-
-async function settle(): Promise<void> {
-  for (let i = 0; i < 5; i += 1) {
-    await new Promise((resolve) => setTimeout(resolve, 0))
-  }
 }
 
 beforeEach(() => {
@@ -201,109 +193,7 @@ describe('stockEvents syncMovement — éxito y fallo', () => {
   })
 })
 
-describe('investment store — reenvío manual', () => {
-  it('reenvía el movimiento sembrado y devuelve true', async () => {
-    seedState([ethBuy])
-    const store = useStockEventsStore()
-    await store.initializeCredential()
-    const investmentStore = useInvestmentStore()
-
-    const result = await investmentStore.resyncMovement(ethBuy.id)
-
-    expect(result).toBe(true)
-    expect(createStockEventsTransaction).toHaveBeenCalledTimes(1)
-    expect(vi.mocked(createStockEventsTransaction).mock.calls[0]?.[0]).toMatchObject({
-      symbol: 'ETH.CRYPTO',
-      change: 0.0047,
-      price: 2110.3,
-    })
-  })
-
-  it('avisa cuando el movimiento no existe y no llama a la API', async () => {
-    seedState([ethBuy])
-    const store = useStockEventsStore()
-    await store.initializeCredential()
-    const investmentStore = useInvestmentStore()
-
-    const result = await investmentStore.resyncMovement('tx-inexistente')
-
-    expect(result).toBe(false)
-    expect(createStockEventsTransaction).not.toHaveBeenCalled()
-    expect(toastText()).toBe('Movimiento no encontrado.')
-  })
-
-  it('pide activar la conexión cuando el reenvío queda en skipped sin conexión', async () => {
-    seedState([btcBuy])
-    vi.mocked(fetchStockEventsCredentialStatus).mockReturnValue(Effect.succeed(false))
-    const store = useStockEventsStore()
-    await store.initializeCredential()
-    expect(store.isConnected).toBe(false)
-    const investmentStore = useInvestmentStore()
-
-    const result = await investmentStore.resyncMovement(btcBuy.id)
-
-    expect(result).toBe(false)
-    expect(createStockEventsTransaction).not.toHaveBeenCalled()
-    expect(toastText()).toBe('Activa la conexión con Stock Events para reenviar.')
-  })
-})
-
-describe('investment store — sincronización al editar', () => {
-  it('reenvía el movimiento actualizado tras guardar la edición', async () => {
-    seedState([ethBuy])
-    const store = useStockEventsStore()
-    await store.initializeCredential()
-    const investmentStore = useInvestmentStore()
-
-    const saved = investmentStore.saveEditedMovement(ethBuy.id, {
-      date: '2026-07-16',
-      time: '11:45',
-      side: 'buy',
-      symbol: 'ETH',
-      category: 'Crypto',
-      unitPrice: '2110.30',
-      units: '0.0047',
-      fee: '0',
-      movementCurrency: 'EUR',
-      accountId: 'broker',
-      declared: false,
-    })
-    await settle()
-
-    expect(saved).toBe(true)
-    expect(createStockEventsTransaction).toHaveBeenCalledTimes(1)
-    expect(vi.mocked(createStockEventsTransaction).mock.calls[0]?.[0]).toMatchObject({
-      symbol: 'ETH.CRYPTO',
-      date: '2026-07-16T11:45:00Z',
-      change: 0.0047,
-      price: 2110.3,
-      type: 'buy',
-    })
-  })
-})
-
 describe('stockEvents syncMovement — ajuste global de efectivo', () => {
-  it('no envía toCash cuando el ajuste está desactivado', async () => {
-    seedState([ethBuy])
-    const store = useStockEventsStore()
-    await store.initializeCredential()
-
-    await store.syncMovement(ethBuy)
-
-    expect(vi.mocked(createStockEventsTransaction).mock.calls[0]?.[0]).not.toHaveProperty('toCash')
-  })
-
-  it('el reenvío manual descuenta efectivo cuando el ajuste está activado', async () => {
-    seedState([ethBuy], true)
-    await useStockEventsStore().initializeCredential()
-
-    await useInvestmentStore().resyncMovement(ethBuy.id)
-
-    expect(vi.mocked(createStockEventsTransaction).mock.calls[0]?.[0]).toMatchObject({
-      toCash: true,
-    })
-  })
-
   it('la opción del movimiento prevalece sobre el ajuste global', async () => {
     seedState([ethBuy], true)
     const store = useStockEventsStore()

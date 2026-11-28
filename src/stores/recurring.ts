@@ -12,7 +12,7 @@ import {
   resolvePendingEdit,
   type PendingMovementEdit,
 } from '../domain/recurring/pending'
-import { nextOccurrenceDate, todayISO } from '../domain/recurring/occurrences'
+import { todayISO } from '../domain/recurring/occurrences'
 import {
   confirmPendingMovement as confirmPendingMovementWrite,
   discardPendingConfirmation,
@@ -184,35 +184,6 @@ export const useRecurringStore = defineStore('recurring', () => {
     )
   }
 
-  async function updateRule(id: string, input: NewRecurringRuleInput): Promise<boolean> {
-    const currentRule = rules.value.find((rule) => rule.id === id)
-    if (
-      !currentRule ||
-      !input.accountId ||
-      !input.category ||
-      !input.description.trim() ||
-      input.amount <= 0 ||
-      !input.startDate ||
-      !isValidSaving(input)
-    ) {
-      return false
-    }
-    const hasExistingExecution =
-      currentRule.lastExecutionDate !== null ||
-      pendingMovements.value.some((pending) => pending.ruleId === id)
-    const nextRule = applyRuleInput(currentRule, input, hasExistingExecution)
-    const { calendar, generated } = generateFor(nextRule, pendingMovements.value, resolveToday())
-    const beforePendingIds = new Set(pendingMovements.value.map((item) => item.id))
-    const pendings = generated.pendingMovements.filter((item) => !beforePendingIds.has(item.id))
-    return persistRuleWrite(
-      'update',
-      nextRule,
-      pendings,
-      calendarChanged(nextRule, calendar) ? calendar : null,
-      'Regla recurrente actualizada.',
-    )
-  }
-
   /** Pausing or resuming only changes the rule; no occurrence is generated. */
   async function toggleRule(id: string, active: boolean): Promise<void> {
     const current = rules.value.find((rule) => rule.id === id)
@@ -329,7 +300,6 @@ export const useRecurringStore = defineStore('recurring', () => {
     pendingCount,
     refreshPending,
     addRule,
-    updateRule,
     toggleRule,
     removeRule,
     confirmPending,
@@ -339,56 +309,11 @@ export const useRecurringStore = defineStore('recurring', () => {
       readPendingConfirmationStatus(id),
     editPending,
     skipPending: (id: string) => changePendingStatus(id, 'skipped'),
-    cancelPending: (id: string) => changePendingStatus(id, 'cancelled'),
     retryRuleWrite,
     discardRuleWrite,
     ruleWriteStatus,
   }
 })
-
-/** The accepted edit, applied to a copy of the rule; the calendar is decided later. */
-function applyRuleInput(
-  currentRule: RecurringRule,
-  input: NewRecurringRuleInput,
-  hasExistingExecution: boolean,
-): RecurringRule {
-  const rule: RecurringRule = { ...currentRule }
-  const nextDate = hasExistingExecution
-    ? rule.nextOccurrenceDate ||
-      (rule.lastExecutionDate ? nextOccurrenceDate(rule, rule.lastExecutionDate) : input.startDate)
-    : input.startDate
-  rule.type = input.type
-  rule.accountId = input.accountId
-  if (input.type === 'saving' && input.destinationAccountId) {
-    rule.destinationAccountId = input.destinationAccountId
-  } else {
-    delete rule.destinationAccountId
-  }
-  rule.category = input.category
-  rule.description = input.description.trim()
-  rule.amount = round2(input.amount)
-  rule.frequency = input.frequency
-  rule.interval = Math.max(1, Math.floor(input.interval || 1))
-  rule.startDate = input.startDate
-  rule.endDate = input.endDate || null
-  rule.nextOccurrenceDate = nextDate
-
-  delete rule.symbol
-  delete rule.side
-  delete rule.units
-  delete rule.unitPrice
-  delete rule.fee
-  delete rule.time
-  if (input.type === 'investment') {
-    if (input.symbol?.trim()) rule.symbol = input.symbol.trim().toUpperCase()
-    if (input.side) rule.side = input.side
-    if (input.units !== undefined) rule.units = input.units
-    if (input.unitPrice !== undefined) rule.unitPrice = input.unitPrice
-    if (input.fee !== undefined) rule.fee = round2(input.fee)
-    if (input.time) rule.time = input.time
-  }
-  return rule
-}
 
 function calendarChanged(rule: RecurringRule, calendar: RecurringRule): boolean {
   return (

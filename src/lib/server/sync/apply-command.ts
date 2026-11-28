@@ -541,14 +541,14 @@ function performMutation(
           ...(typeof settingsPatch.onboardingDismissed === 'boolean'
             ? { onboardingDismissed: settingsPatch.onboardingDismissed ? 1 : 0 }
             : {}),
-          ...(typeof settingsPatch.onboardingAccountCompleted === 'boolean'
-            ? { onboardingAccountCompleted: settingsPatch.onboardingAccountCompleted ? 1 : 0 }
-            : {}),
-          ...(typeof settingsPatch.onboardingMovementCompleted === 'boolean'
-            ? { onboardingMovementCompleted: settingsPatch.onboardingMovementCompleted ? 1 : 0 }
-            : {}),
           ...(typeof settingsPatch.onboardingCompleted === 'boolean'
             ? { onboardingCompleted: settingsPatch.onboardingCompleted ? 1 : 0 }
+            : {}),
+          ...(typeof settingsPatch.tourDesktopSeen === 'boolean'
+            ? { tourDesktopSeen: settingsPatch.tourDesktopSeen ? 1 : 0 }
+            : {}),
+          ...(typeof settingsPatch.tourMobileSeen === 'boolean'
+            ? { tourMobileSeen: settingsPatch.tourMobileSeen ? 1 : 0 }
             : {}),
 
           ...(typeof settingsPatch.stockeventsEnabled === 'boolean'
@@ -620,22 +620,27 @@ function performMutation(
               ...stockeventsCashMappings,
             ])
           : undefined
+        const entity = {
+          ...row,
+          ...(twrLiquidityAccounts ? { twrLiquidityAccounts } : {}),
+          ...(cashMappings ? { stockeventsCashMappings: cashMappings } : {}),
+        }
+        // The change log must carry the resulting row, not the patch: the
+        // other device applies it as a whole and needs `version` to keep its
+        // optimistic-concurrency guard (a patch has no version, so
+        // `applyRemoteChanges` would discard it).
         const revision = yield* recordChange(
           userId,
           'userSettings',
           userId,
           'update',
-          command.patch,
+          entity,
         )
         return {
           status: 'applied',
           entityType: 'userSettings',
           entityId: userId,
-          entity: {
-            ...row,
-            ...(twrLiquidityAccounts ? { twrLiquidityAccounts } : {}),
-            ...(cashMappings ? { stockeventsCashMappings: cashMappings } : {}),
-          },
+          entity,
           revision,
         }
       }

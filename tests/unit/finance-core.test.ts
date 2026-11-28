@@ -4,8 +4,6 @@ import {
   computeContributionMetrics,
   computeInvestmentValue,
   computeLiabilityValue,
-  getCategoryActuals,
-  getMonthTotals,
   getSnapshotValue,
   getWealthByMonth,
   matchesInvestmentAsset,
@@ -99,19 +97,6 @@ describe("finance-core helpers", () => {
     expect(matchesInvestmentAsset("Fondos Indexados", investments[0])).toBe(true);
     expect(matchesInvestmentAsset("fondos-indexados", investments[0])).toBe(true);
     expect(matchesInvestmentAsset("Crypto", investments[0])).toBe(false);
-  });
-
-  it("calcula totales mensuales por tipo", () => {
-    const totals = getMonthTotals(transactions, 1);
-    expect(totals).toEqual({ income: 2000, expense: 250, saving: 0, investment: 500 });
-  });
-
-  it("calcula reales por categoría", () => {
-    const actuals = getCategoryActuals(transactions, "expense", 1, [
-      "Comida",
-      "Transporte",
-    ]);
-    expect(actuals).toEqual({ Comida: 250, Transporte: 0 });
   });
 
   it("calcula saldo de cuenta considerando snapshot previo", () => {
@@ -222,7 +207,6 @@ describe("finance-core helpers", () => {
     const liquidity = (list: Transaction[]) =>
       getWealthByMonth(1, accounts, investments, liabilities, list, {}).liquidity;
     expect(liquidity(withSaving)).toBe(liquidity(transactions));
-    expect(getMonthTotals(withSaving, 1).saving).toBe(300);
   });
 
   it("calcula patrimonio neto mensual", () => {
@@ -357,13 +341,7 @@ describe("finance-core helpers", () => {
     expect(metrics[2].periodReturn).toBeCloseTo(-0.1, 6);
 
     // TWR acumulado: gestión real = -1%
+    // (no el -5,5 % del retorno simple, sesgado por la aportación grande).
     expect(metrics[2].cumulativeReturn).toBeCloseTo(-0.01, 6);
-
-    // Retorno simple: (18900 - 20000) / 20000 = -5.5% ← sesgado por la aportación grande
-    const simpleReturn = (18900 - 20000) / 20000;
-    expect(simpleReturn).toBeCloseTo(-0.055, 6);
-
-    // La divergencia entre TWR y simple es el problema que resuelve el modo TWR
-    expect(metrics[2].cumulativeReturn).not.toBeCloseTo(simpleReturn, 3);
   });
 });

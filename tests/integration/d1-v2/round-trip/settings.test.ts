@@ -6,6 +6,7 @@
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { startRoundTrip, type RoundTrip } from "./harness";
+import { setTwrLiquidity } from "./twr-liquidity";
 import { runWithDb } from '../../../../src/db/database'
 
 describe("round trip: cuentas, activos y pasivos", () => {
@@ -106,11 +107,10 @@ describe("round trip: cuentas, activos y pasivos", () => {
       }
     });
     await trip.reload();
-    const { useSettingsStore } = await import("../../../../src/stores/settings");
     const { useFinancialStateStore } = await import("../../../../src/stores/financial-state");
     const { computeTwrLiquidityValue } = await import("../../../../src/domain/investment/calculations");
 
-    useSettingsStore().toggleTwrLiquidity("revolut", true);
+    setTwrLiquidity("revolut", true);
     const before = computeTwrLiquidityValue(useFinancialStateStore().state, 11);
 
     const reloaded = await trip.reload();

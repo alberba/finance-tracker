@@ -18,7 +18,6 @@ import {
   resolveCategoryId,
   resolveEntityId,
   resolveOrCreateCategoryId,
-  syncGoalUpsert,
   syncCreate,
   syncListDiff,
   syncRemove,
@@ -64,7 +63,7 @@ describe('command-mapping (WP7b)', () => {
 
   describe('authenticated sync', () => {
     it("syncCreate enqueues a create command carrying the entity's own identity", async () => {
-      const store = await initSyncStore()
+      await initSyncStore()
       await syncCreate('account', 'local-acc-1', {
         name: 'Cuenta',
         kind: 'checking',
@@ -80,7 +79,6 @@ describe('command-mapping (WP7b)', () => {
         entityType: 'account',
         data: { name: 'Cuenta', id: 'local-acc-1' },
       })
-      expect(store.pendingCount).toBeGreaterThanOrEqual(0)
       outboxDb.close()
     })
 
@@ -154,12 +152,15 @@ describe('command-mapping (WP7b)', () => {
       outboxDb.close()
     })
 
-    it('syncUpdate warns (does not throw) when the entity is neither cached nor pending', async () => {
+    it('syncUpdate enqueues nothing (and does not throw) when the entity is neither cached nor pending', async () => {
       await initSyncStore()
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
       await syncUpdate('account', 'unknown-id', { name: 'x' })
-      expect(warnSpy).toHaveBeenCalledOnce()
       warnSpy.mockRestore()
+
+      const outboxDb = await openStorage(USER_ID)
+      expect(await listAll(outboxDb)).toHaveLength(0)
+      outboxDb.close()
     })
 
     it('syncRemove enqueues a remove for a synced entity', async () => {
@@ -199,41 +200,6 @@ describe('command-mapping (WP7b)', () => {
       const entries = await listAll(outboxDb)
       expect(entries).toHaveLength(0)
       outboxDb.close()
-    })
-
-    it('syncGoalUpsert creates when unknown and updates when a server ref exists', async () => {
-      await initSyncStore()
-      await syncGoalUpsert('short', {
-        key: 'short',
-        name: 'Meta',
-        targetYear: 2030,
-        targetAmount: 1000,
-        currency: 'EUR',
-      })
-
-      const outboxDbFirst = await openStorage(USER_ID)
-      const firstEntries = await listAll(outboxDbFirst)
-      expect(firstEntries[0]?.command.action).toBe('create')
-      outboxDbFirst.close()
-
-      // Simulate the create having synced by seeding the cache directly
-      // (the natural-key lookup is checked before the still-pending outbox
-      // create, so this alone is enough to flip the next call onto the
-      // update path — no need to touch/close the outbox's live connection).
-      const cacheDb = await openStorage(USER_ID)
-      await putEntity(cacheDb, 'goal', { id: 'server-goal-1', key: 'short', version: 1 })
-      cacheDb.close()
-
-      await syncGoalUpsert('short', { key: 'short', name: 'Meta actualizada' })
-      const outboxDbSecond = await openStorage(USER_ID)
-      const secondEntries = await listAll(outboxDbSecond)
-      const update = secondEntries.find((entry) => entry.command.action === 'update')
-      expect(update?.command).toMatchObject({
-        action: 'update',
-        entityId: 'server-goal-1',
-        baseVersion: 1,
-      })
-      outboxDbSecond.close()
     })
 
     it('syncSettingsUpdate enqueues a settingsUpdate command', async () => {
@@ -361,7 +327,7 @@ describe('command-mapping (WP7b)', () => {
     })
 
     describe('syncListDiff', () => {
-      it('emits create for new rows, update for changed rows, and remove for dropped rows', async () => {
+      it('emits create for new rows, update for changed rows and nothing for unchanged ones', async () => {
         await initSyncStore()
         // tx-1/tx-2 are "already synced" — seed the cache so `syncUpdate`
         // resolves them via `getEntityRef` instead of warning that they're

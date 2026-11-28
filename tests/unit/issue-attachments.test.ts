@@ -65,7 +65,6 @@ describe('issue attachments: schema', () => {
       reportWith([attachment('image/png'), attachment('image/jpeg'), attachment('image/webp')]),
     )
 
-    expect(ISSUE_ATTACHMENT_MAX_COUNT).toBe(3)
     expect(parsed.attachments).toHaveLength(3)
     expect(parsed.attachments?.[0]).toMatchObject({
       name: 'captura.png',
@@ -118,17 +117,6 @@ describe('issue attachments: schema', () => {
     expect(() =>
       parseIssueReportPayload(reportWith([attachment('image/png', { data: 'no es base64!!' })])),
     ).toThrow()
-  })
-
-  it('un reporte sin adjuntos no los trae', () => {
-    const parsed = parseIssueReportPayload({
-      type: 'bug',
-      summary: 'Sin adjuntos en absoluto',
-      section: 'reports',
-      context: {},
-    })
-
-    expect(parsed.attachments ?? []).toEqual([])
   })
 })
 

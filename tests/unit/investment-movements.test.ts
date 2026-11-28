@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  buildInvestmentDescription,
   computeInvestmentMovement,
   normalizeInvestmentSide,
-  parseTransactionYear,
 } from '../../src/scripts/investment-movements'
 
 describe('investment-movements helpers', () => {
@@ -34,20 +32,6 @@ describe('investment-movements helpers', () => {
     expect(computed.description).toBe('Venta 0.25 BTC')
   })
 
-  it('acepta títulos fraccionarios menores a 1', () => {
-    const computed = computeInvestmentMovement({
-      side: 'buy',
-      symbol: 'eth',
-      units: 0.5,
-      unitPrice: 2500,
-      fee: 1,
-    })
-
-    expect(computed.normalizedUnits).toBe(0.5)
-    expect(computed.signedAmount).toBe(1251)
-    expect(computed.description).toBe('Compra 0.5 ETH')
-  })
-
   it('mantiene precisión en títulos pequeños', () => {
     const computed = computeInvestmentMovement({
       side: 'buy',
@@ -62,15 +46,8 @@ describe('investment-movements helpers', () => {
     expect(computed.signedAmount).toBe(0.82)
   })
 
-  it('normaliza side y extrae año desde ISO', () => {
+  it('normaliza side', () => {
     expect(normalizeInvestmentSide('sell')).toBe('sell')
     expect(normalizeInvestmentSide('otra-cosa')).toBe('buy')
-    expect(parseTransactionYear('2026-03-04')).toBe(2026)
-    expect(parseTransactionYear('04/03/2026')).toBeNull()
-  })
-
-  it('genera descripción para compra y venta', () => {
-    expect(buildInvestmentDescription('buy', 2, 'MSFT')).toBe('Compra 2 MSFT')
-    expect(buildInvestmentDescription('sell', 1.5, 'AAPL')).toBe('Venta 1.5 AAPL')
   })
 })

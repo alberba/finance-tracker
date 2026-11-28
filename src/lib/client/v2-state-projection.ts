@@ -109,9 +109,12 @@ export function projectSyncV2State(
     currency: bootstrap.settings?.currency || 'EUR',
     onboardingPresented: bootstrap.settings?.onboardingPresented === 1,
     onboardingDismissed: bootstrap.settings?.onboardingDismissed === 1,
-    onboardingAccountCompleted: bootstrap.settings?.onboardingAccountCompleted === 1,
-    onboardingMovementCompleted: bootstrap.settings?.onboardingMovementCompleted === 1,
     onboardingCompleted: bootstrap.settings?.onboardingCompleted === 1,
+    onboardingStep: bootstrap.settings?.onboardingStep ?? 0,
+    tourDesktopSeen: bootstrap.settings?.tourDesktopSeen === 1,
+    tourMobileSeen: bootstrap.settings?.tourMobileSeen === 1,
+    theme: bootstrap.settings?.theme ?? null,
+    dashboardLayout: bootstrap.settings?.dashboardLayout ?? null,
     twrLiquidityAccountIds: [],
     accounts: [],
     investmentAssets: [],
@@ -182,8 +185,7 @@ export function projectSyncV2State(
     return {
       id: legacyId(transaction),
       date: String(transaction.date),
-      month:
-        asMonth(transaction.accountingMonth) ?? monthFromISO(String(transaction.date)) ?? 1,
+      month: asMonth(transaction.accountingMonth) ?? monthFromISO(String(transaction.date)) ?? 1,
       type: String(transaction.type) as State['transactions'][number]['type'],
       accountId:
         accountIds.get(String(transaction.accountId)) || String(transaction.accountId || ''),
@@ -264,6 +266,10 @@ export function projectSyncV2State(
           name: String(goal.name || ''),
           targetAmount: Number(goal.targetAmount || 0),
           category,
+          // normalizeState keeps the plan only when it is whole and valid.
+          ...(goal.targetYear != null && { targetYear: Number(goal.targetYear) }),
+          ...(goal.targetMonth != null && { targetMonth: Number(goal.targetMonth) }),
+          ...(goal.monthlyAmount != null && { monthlyAmount: Number(goal.monthlyAmount) }),
         })
       }
       continue
@@ -290,36 +296,33 @@ export function projectSyncV2State(
     })),
   }))
 
-  // A snapshot's identity is `(year, month)` (ADR 0001), while the UI's map is
-  // keyed by month alone for the state's year: a row from another year must
-  // never take a slot in it (audit §4.6 — projecting every row into the same
-  // month-keyed map mixed the years together).
-  projected.snapshots = Object.fromEntries(
-    bootstrap.wealthSnapshots
-      .filter((snapshot) => Number(snapshot.year) === projected.year)
-      .map((snapshot) => {
-        const month = asMonth(Number(snapshot.month))
-        if (!month) return null
-        const balances: State['snapshots'][string] = {
-          month,
-          accounts: {},
-          investments: {},
-          liabilities: {},
-        }
-        for (const balance of snapshot.balances || []) {
-          const accountId =
-            accountIds.get(String(balance.accountId)) || String(balance.accountId || '')
-          if (!accountId) continue
-          const kind = bootstrap.accounts.find((account) => account.id === balance.accountId)?.kind
-          if (kind === 'investment') balances.investments[accountId] = Number(balance.balance || 0)
-          else if (kind === 'liability')
-            balances.liabilities[accountId] = Number(balance.balance || 0)
-          else balances.accounts[accountId] = Number(balance.balance || 0)
-        }
-        return [String(month), balances]
-      })
-      .filter((entry): entry is [string, State['snapshots'][string]] => entry !== null),
-  )
+  // Preserve history without mixing years in the active year's month-keyed map.
+  const historicalSnapshots: NonNullable<State['historicalSnapshots']> = {}
+  for (const snapshot of bootstrap.wealthSnapshots) {
+    const snapshotYear = Number(snapshot.year)
+    const month = asMonth(Number(snapshot.month))
+    if (!month) continue
+    const balances: State['snapshots'][string] = {
+      month,
+      accounts: {},
+      investments: {},
+      liabilities: {},
+    }
+    for (const balance of snapshot.balances || []) {
+      const accountId = accountIds.get(String(balance.accountId)) || String(balance.accountId || '')
+      if (!accountId) continue
+      const kind = bootstrap.accounts.find((account) => account.id === balance.accountId)?.kind
+      if (kind === 'investment') balances.investments[accountId] = Number(balance.balance || 0)
+      else if (kind === 'liability') balances.liabilities[accountId] = Number(balance.balance || 0)
+      else balances.accounts[accountId] = Number(balance.balance || 0)
+    }
+    const snapshots =
+      snapshotYear === projected.year
+        ? projected.snapshots
+        : (historicalSnapshots[snapshotYear] ??= {})
+    snapshots[month] = balances
+  }
+  projected.historicalSnapshots = historicalSnapshots
 
   const recurringRuleIds = new Map(
     bootstrap.recurringRules.map((rule) => [rule.id, legacyId(rule)]),

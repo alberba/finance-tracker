@@ -1,0 +1,154 @@
+import type { Page } from '@playwright/test'
+import { test, expect } from './fixtures'
+import { expectSyncCommand } from './pages/sync'
+import { editScenarioState, readScenarioState } from './seed-sync-v2'
+import type { RecurringRule } from '../../src/scripts/types'
+
+/**
+ * Recorridos del dashboard en el marco móvil (#430), en el proyecto
+ * móvil. Las cifras las
+ * prueba el unit del view-model; aquí, lo que hace el usuario y lo que obtiene.
+ */
+test.use({ fixedTime: '2026-07-10T10:00:00' })
+
+const dashboard = (page: Page) => page.locator('#dashboard')
+const left = (page: Page) => dashboard(page).locator('[data-dashboard-left]')
+const pendingSheet = (page: Page) => page.getByRole('dialog', { name: 'Por confirmar' })
+
+/** «1.233,55 €» → 1233.55 */
+function amountOf(text: string): number {
+  return Number(
+    text
+      .replace(/[^\d,−-]/g, '')
+      .replace('−', '-')
+      .replace(',', '.'),
+  )
+}
+
+async function addMonthlyRules(page: Page, rules: Array<[string, string, number]>): Promise<void> {
+  await editScenarioState(page, (state) => {
+    for (const [id, description, amount] of rules) {
+      state.recurringRules.push({
+        id,
+        type: 'expense',
+        accountId: state.accounts[0].id,
+        category: state.expenseCategories[0],
+        description,
+        amount,
+        frequency: 'monthly',
+        interval: 1,
+        startDate: '2026-07-01',
+        endDate: null,
+        active: true,
+        lastExecutionDate: null,
+        nextOccurrenceDate: '2026-07-01',
+      } satisfies RecurringRule)
+    }
+  })
+}
+
+test('confirma un pendiente desde la hoja «Por confirmar» de la cifra', async ({
+  page,
+  tracker,
+}) => {
+  await addMonthlyRules(page, [
+    ['rent-rule', 'Alquiler', 900],
+    ['gym-rule', 'Gimnasio', 39.9],
+  ])
+  await tracker.reload()
+  const before = amountOf(await left(page).innerText())
+
+  await dashboard(page)
+    .getByRole('button', { name: /por confirmar$/ })
+    .click()
+  await expect(pendingSheet(page).locator('[data-pending-item]')).toHaveCount(2)
+
+  const confirmed = expectSyncCommand(
+    page,
+    (command) =>
+      command.action === 'update' &&
+      command.entityType === 'pendingMovement' &&
+      command.patch.status === 'confirmed',
+  )
+  await pendingSheet(page).getByRole('button', { name: 'Confirmar Alquiler' }).click()
+  await confirmed
+
+  await expect(pendingSheet(page).locator('[data-pending-item]')).toHaveCount(1)
+  await expect(page.locator('[data-pending-trigger]')).toHaveAccessibleName(
+    'Por confirmar, 1 pendiente',
+  )
+  await expect.poll(async () => amountOf(await left(page).innerText())).toBeCloseTo(before - 900, 2)
+
+  await tracker.reload()
+  const state = await readScenarioState(page)
+  const statusOf = (ruleId: string) =>
+    state.pendingMovements.find((item) => item.ruleId === ruleId)?.status
+  expect(statusOf('rent-rule')).toBe('confirmed')
+  expect(statusOf('gym-rule')).toBe('pending')
+})
+
+test('busca un movimiento desde la barra superior y llega a Movimientos filtrado', async ({
+  page,
+  tracker,
+}) => {
+  await page.getByRole('button', { name: 'Buscar movimientos' }).click()
+  const sheet = page.getByRole('dialog', { name: 'Buscar movimientos' })
+  await sheet.getByRole('searchbox', { name: 'Buscar movimientos' }).fill('Compra semanal')
+  await sheet.getByRole('searchbox', { name: 'Buscar movimientos' }).press('Enter')
+
+  await expect(page).toHaveURL(/\/movimientos$/)
+  // The search shows as an active filter chip that takes it off.
+  await expect(
+    tracker.transactionsSection
+      .getByRole('group', { name: 'Filtros activos' })
+      .getByRole('button', { name: 'Quitar filtro: «Compra semanal»' }),
+  ).toBeVisible()
+})
+
+test('todos los controles del dashboard miden al menos 44 px con puntero táctil', async ({
+  page,
+  tracker,
+}) => {
+  await addMonthlyRules(page, [
+    ['rent-rule', 'Alquiler', 900],
+    ['gym-rule', 'Gimnasio', 39.9],
+  ])
+  await tracker.reload()
+  expect(await page.evaluate(() => matchMedia('(pointer: coarse)').matches)).toBe(true)
+
+  const tooSmall = (selector: string, min = 44) =>
+    page.locator(selector).evaluateAll(
+      (controls, size) =>
+        controls
+          .filter((control) => control.getClientRects().length > 0)
+          .map((control) => {
+            const { width, height } = control.getBoundingClientRect()
+            const name = control.getAttribute('aria-label') || control.textContent?.trim()
+            return { name, width: Math.round(width), height: Math.round(height) }
+          })
+          .filter(({ width, height }) => width < size || height < size),
+      min,
+    )
+
+  // DESIGN.md: segments are compact (36 px minimum); every other control is 44 px.
+  const SEGMENT = '[role="tab"], [role="group"] > button[aria-pressed]'
+  const CONTROLS = 'button, a[href], input'
+  expect(
+    await tooSmall(
+      `#dashboard :is(${CONTROLS}):not(${SEGMENT}), [data-mobile-app-bar] button, [data-fab-apuntar]`,
+    ),
+  ).toEqual([])
+  expect(await tooSmall(`#dashboard :is(${SEGMENT})`, 36)).toEqual([])
+
+  await page.getByRole('button', { name: 'Buscar movimientos' }).click()
+  await expect(page.getByRole('dialog', { name: 'Buscar movimientos' })).toBeVisible()
+  expect(await tooSmall(`dialog[open] :is(${CONTROLS})`)).toEqual([])
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog', { name: 'Buscar movimientos' })).toBeHidden()
+
+  await dashboard(page)
+    .getByRole('button', { name: /por confirmar$/ })
+    .click()
+  await expect(pendingSheet(page)).toBeVisible()
+  expect(await tooSmall(`dialog[open] :is(${CONTROLS})`)).toEqual([])
+})

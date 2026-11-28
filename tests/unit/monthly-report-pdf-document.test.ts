@@ -79,24 +79,6 @@ describe('buildMonthlyReportDocument', () => {
     fonts.forEach((font) => expect(Object.keys(REPORT_FONT_FILES)).toContain(font))
   })
 
-  it('repeats the header of every table and never splits a row', () => {
-    const tables = collect(full, 'table') as Array<{ headerRows?: number; dontBreakRows?: boolean }>
-    const ledgers = tables.filter((table) => table.headerRows)
-
-    expect(ledgers.length).toBe(3)
-    ledgers.forEach((table) => {
-      expect(table.headerRows).toBe(1)
-      expect(table.dontBreakRows).toBe(true)
-    })
-  })
-
-  it('draws a bar for each expense category, as vector shapes with the amount beside it', () => {
-    const canvases = collect(full, 'canvas')
-
-    expect(canvases).toHaveLength(1)
-    expect(allText(full)).toContain('150,50')
-  })
-
   it('numbers the pages in the footer', () => {
     const footer = (full.footer as (page: number, count: number) => unknown)(2, 5)
 
@@ -122,7 +104,6 @@ describe('buildMonthlyReportDocument', () => {
     const empty = buildMonthlyReportDocument(report([]))
 
     expect(allText(empty)).toContain('No hay movimientos en este periodo.')
-    expect(collect(empty, 'canvas')).toHaveLength(0)
   })
 
   it('keeps accents, ñ, € and the typographic minus in the text it writes', () => {

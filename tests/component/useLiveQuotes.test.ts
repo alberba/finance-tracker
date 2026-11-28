@@ -144,35 +144,4 @@ describe('actualización automática de cotizaciones', () => {
     expect(state.instruments[0].symbol).toBe('VWCE.DE')
     expect(useMarketStore().quotes.vwce).toMatchObject({ price: 125, currency: 'EUR' })
   })
-
-  it('conserva el precio al guardar explícitamente el mismo par de Bitcoin que ya se consultaba', async () => {
-    const state = useFinancialStateStore()
-    state.commitState((draft) => {
-      draft.instruments[0].type = 'crypto'
-      draft.instruments[0].symbol = 'BTC'
-    })
-    vi.mocked(fetchMarketQuotes).mockReturnValue(
-      Effect.succeed({
-        vwce: {
-          instrumentId: 'vwce',
-          price: 73_000,
-          currency: 'EUR',
-          timestamp: new Date().toISOString(),
-          fetchedAt: new Date().toISOString(),
-          dataType: 'unknown',
-          source: 'yahoo',
-          status: 'fresh',
-          isStale: false,
-          previousClose: null,
-          changePercent: null,
-        },
-      }),
-    )
-    views.push(mount(QuoteView, { global: { plugins: [pinia] } }))
-    await vi.advanceTimersByTimeAsync(0)
-    useMarketStore().configureInstrumentSymbols('vwce', 'BTC', 'BTC-EUR')
-    await vi.advanceTimersByTimeAsync(0)
-    expect(fetchMarketQuotes).toHaveBeenCalledTimes(1)
-    expect(state.quotes.vwce?.price).toBe(73_000)
-  })
 })

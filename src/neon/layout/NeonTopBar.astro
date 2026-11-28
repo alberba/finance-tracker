@@ -1,0 +1,65 @@
+---
+import NeonDetailHeader from '../ui/NeonDetailHeader.vue'
+import NeonPendingMenu from './NeonPendingMenu.vue'
+import NeonSearchButton from './NeonSearchButton.vue'
+
+/**
+ * Top bar of the mobile frame (DESIGN.md, «Barra superior móvil»): the brand on
+ * the left, «Por confirmar» and search on the right, with a section's own
+ * button between them when it teleports one into `[data-bar-actions-slot]`. A section can put its
+ * title where the brand is (`NeonBarTitle` teleports it into
+ * `[data-bar-title-slot]`; while it is there the brand is hidden). A section can hand the
+ * bar its figure for when the page scrolls: it teleports it into
+ * `[data-bar-figure-slot]` marked `data-bar-figure="shown"`, and while it is
+ * shown the bar turns to the panel color and the brand gives way (see the
+ * dashboard). Below the frame breakpoint only; the desktop frame has the
+ * sidebar instead.
+ *
+ * Inside the detail of an element (an asset) the bar keeps only the arrow back
+ * and the symbol, «‹ VWCE» (DESIGN.md, «Cabecera de detalle»): pass `detail`,
+ * or, for a detail opened without a page load, teleport it into the title slot
+ * with `NeonBarDetail` (`[data-bar-detail]`), which hides the controls on the right.
+ */
+export interface Props {
+  detail?: { label: string; backHref: string; backLabel: string }
+}
+
+const { detail } = Astro.props
+---
+
+<header
+  class="group/bar bg-bg has-[[data-bar-figure=shown]]:bg-panel frame:hidden sticky inset-bs-0 z-30 flex motion-safe:transition-colors motion-safe:duration-200 motion-safe:ease-out min-h-[calc(64px+env(safe-area-inset-top,0px))] items-center justify-between gap-2 pe-2 ps-5 pbs-[env(safe-area-inset-top,0px)]"
+  data-mobile-app-bar
+>
+  {detail ? (
+    <NeonDetailHeader
+      label={detail.label}
+      backHref={detail.backHref}
+      backLabel={detail.backLabel}
+    />
+  ) : (
+    <>
+      <div class="relative flex min-w-0 flex-1 items-center self-stretch">
+        <p
+          class="font-display text-text text-[20px] leading-none font-extrabold tracking-brand group-has-[[data-bar-figure=shown]]/bar:-translate-y-1.5 group-has-[[data-bar-figure=shown]]/bar:opacity-0 group-has-[[data-bar-title]]/bar:hidden motion-safe:transition-[opacity,translate] motion-safe:duration-200 motion-safe:ease-out"
+          aria-label="finanzas"
+        >
+          finanzas
+          <span class="text-accent-text" aria-hidden="true">
+            .
+          </span>
+        </p>
+        <div
+          class="absolute inset-0 flex items-center group-has-[[data-bar-detail]]/bar:hidden"
+          data-bar-figure-slot
+        ></div>
+        <div class="flex min-w-0 items-center" data-bar-title-slot></div>
+      </div>
+      <div class="flex group-has-[[data-bar-detail]]/bar:hidden">
+        <NeonPendingMenu client:only="vue" />
+        <div class="flex" data-bar-actions-slot></div>
+        <NeonSearchButton client:only="vue" />
+      </div>
+    </>
+  )}
+</header>

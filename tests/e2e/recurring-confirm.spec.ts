@@ -1,6 +1,5 @@
 import { editScenarioState } from './seed-sync-v2'
 import { test, expect } from './fixtures'
-import { LiveMarketPage } from './pages/LiveMarketPage'
 import { blockSyncApi, expectSyncCommand } from './pages/sync'
 
 /**
@@ -17,7 +16,8 @@ const DUE_DATE = '2026-11-05'
 const STAMP = '2026-11-01T00:00:00.000Z'
 
 test.describe('confirmación recurrente tras recargar (#492)', () => {
-  test.use({ fixedTime: '2026-11-12T10:00:00Z' })
+  // «Por confirmar» sits in the mobile frame's app bar (the Dashboard card on desktop).
+  test.use({ fixedTime: '2026-11-12T10:00:00Z', viewport: { width: 393, height: 780 } })
 
   test('recupera la confirmación editada y crea un solo movimiento', async ({ page, tracker }) => {
     await editScenarioState(page, (state) => {
@@ -54,28 +54,23 @@ test.describe('confirmación recurrente tras recargar (#492)', () => {
         transactionId: null,
       })
     })
-
-    const liveMarket = new LiveMarketPage(page)
-    await tracker.openTransactions()
-    const pendingItem = liveMarket.pendingItems('e2e-confirm-pending')
-    await expect(pendingItem).toBeVisible()
+    await expect(tracker.pendingTrigger).toHaveAccessibleName('Por confirmar, 1 pendiente')
 
     // The sync API is unreachable from now on (`/api/session` stays reachable
     // so the shell can hydrate and reload); navigation still works.
     const reconnect = await blockSyncApi(page)
 
-    await pendingItem.getByRole('button', { name: 'Editar y confirmar Alquiler E2E' }).click()
-    const panel = liveMarket.pendingEditPanel
-    await expect(panel).toBeVisible()
-    await panel.getByLabel('Descripción').fill('Alquiler E2E editado')
-    await panel.getByLabel('Importe', { exact: true }).fill('925')
-    await panel.getByRole('button', { name: 'Guardar y confirmar' }).click()
-    await expect(panel).toBeHidden()
+    await tracker.openPendingEdit('Alquiler E2E')
+    const sheet = tracker.pendingEditSheet
+    await sheet.getByLabel('Descripción').fill('Alquiler E2E editado')
+    await sheet.getByRole('textbox', { name: 'Importe' }).fill('925')
+    await sheet.getByRole('button', { name: 'Guardar y confirmar' }).click()
+    await expect(sheet).toBeHidden()
 
     // The optimistic confirmation is shown, backed by the durable reservation:
     // the pending is no longer open and the status does not claim the server
     // confirmed it.
-    await expect(pendingItem).toHaveCount(0)
+    await expect(tracker.pendingTrigger).toHaveAccessibleName('Por confirmar')
     await expect(tracker.syncStatus).toContainText('pendiente')
     await expect(tracker.syncStatus).not.toContainText('Sincronizado')
 
@@ -83,16 +78,14 @@ test.describe('confirmación recurrente tras recargar (#492)', () => {
     // must be recovered from the queue, without a second movement.
     await tracker.reload()
     await tracker.openTransactions()
-    await tracker.filterTransactionsMonth('NOVIEMBRE')
     const rows = tracker.transactionRows.filter({ hasText: 'Alquiler E2E editado' })
     await expect(rows).toHaveCount(1)
     await expect(rows.first()).toContainText('925,00')
-    await expect(liveMarket.pendingPanel).toHaveCount(0)
+    await expect(tracker.pendingTrigger).toHaveAccessibleName('Por confirmar')
 
     // Reconnect: the movement is resent with the same command; the pending link
-    // is completed after the movement is acknowledged.
-    // The listener exists before the route is lifted, so a fast response
-    // cannot arrive first.
+    // is completed after the movement is acknowledged. The listener exists
+    // before the route is lifted, so a fast response cannot arrive first.
     const movementSent = expectSyncCommand(
       page,
       (command) =>
@@ -106,8 +99,7 @@ test.describe('confirmación recurrente tras recargar (#492)', () => {
 
     await tracker.reload()
     await tracker.openTransactions()
-    await tracker.filterTransactionsMonth('NOVIEMBRE')
     await expect(tracker.transactionRows.filter({ hasText: 'Alquiler E2E editado' })).toHaveCount(1)
-    await expect(liveMarket.pendingPanel).toHaveCount(0)
+    await expect(tracker.pendingTrigger).toHaveAccessibleName('Por confirmar')
   })
 })

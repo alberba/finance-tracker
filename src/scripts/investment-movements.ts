@@ -62,16 +62,6 @@ export function buildInvestmentDescription(
   return `${action} ${formatUnits(units)} ${symbol}`.trim()
 }
 
-export function parseTransactionYear(value: unknown): number | null {
-  const date = String(value || '').trim()
-  const match = date.match(/^(\d{4})-\d{2}-\d{2}$/)
-  if (!match) {
-    return null
-  }
-  const year = Number(match[1])
-  return Number.isInteger(year) ? year : null
-}
-
 function normalizeNonNegative(value: unknown, decimals: number): number {
   const parsed = roundWithPrecision(parseFloatSafe(value, 0), decimals)
   if (!Number.isFinite(parsed) || parsed < 0) {

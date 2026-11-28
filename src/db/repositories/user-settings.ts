@@ -1,5 +1,7 @@
 /** `user_settings` repository (WP6) — one row per user, currency/locale/theme prefs. */
 
+import type { DashboardLayoutPreference } from '../../lib/dashboard-layout'
+
 import { and, eq } from 'drizzle-orm'
 import { lift } from '../database'
 import { userSettings } from '../schema'
@@ -11,11 +13,13 @@ export interface CreateUserSettingsInput {
   currency?: string
   locale?: string | null
   theme?: string | null
+  dashboardLayout?: DashboardLayoutPreference | null
   onboardingPresented?: boolean
   onboardingDismissed?: boolean
-  onboardingAccountCompleted?: boolean
-  onboardingMovementCompleted?: boolean
   onboardingCompleted?: boolean
+  onboardingStep?: number
+  tourDesktopSeen?: boolean
+  tourMobileSeen?: boolean
   stockeventsEnabled?: boolean
   stockeventsTradesToCash?: boolean
 }
@@ -24,11 +28,13 @@ export interface UpdateUserSettingsInput {
   currency?: string
   locale?: string | null
   theme?: string | null
+  dashboardLayout?: DashboardLayoutPreference | null
   onboardingPresented?: boolean
   onboardingDismissed?: boolean
-  onboardingAccountCompleted?: boolean
-  onboardingMovementCompleted?: boolean
   onboardingCompleted?: boolean
+  onboardingStep?: number
+  tourDesktopSeen?: boolean
+  tourMobileSeen?: boolean
   stockeventsEnabled?: boolean
   stockeventsTradesToCash?: boolean
 }
@@ -51,11 +57,13 @@ async function createSql(
       currency: input.currency ?? 'EUR',
       locale: input.locale ?? null,
       theme: input.theme ?? null,
+      dashboardLayout: input.dashboardLayout ?? null,
       onboardingPresented: input.onboardingPresented ? 1 : 0,
       onboardingDismissed: input.onboardingDismissed ? 1 : 0,
-      onboardingAccountCompleted: input.onboardingAccountCompleted ? 1 : 0,
-      onboardingMovementCompleted: input.onboardingMovementCompleted ? 1 : 0,
       onboardingCompleted: input.onboardingCompleted ? 1 : 0,
+      onboardingStep: input.onboardingStep ?? 0,
+      tourDesktopSeen: input.tourDesktopSeen ? 1 : 0,
+      tourMobileSeen: input.tourMobileSeen ? 1 : 0,
       stockeventsEnabled: input.stockeventsEnabled ? 1 : 0,
       stockeventsTradesToCash: input.stockeventsTradesToCash ? 1 : 0,
       createdAt: now,
@@ -81,6 +89,8 @@ async function updateSql(
       currency: input.currency ?? existing.currency,
       locale: input.locale === undefined ? existing.locale : input.locale,
       theme: input.theme === undefined ? existing.theme : input.theme,
+      dashboardLayout:
+        input.dashboardLayout === undefined ? existing.dashboardLayout : input.dashboardLayout,
       stockeventsEnabled:
         input.stockeventsEnabled === undefined
           ? existing.stockeventsEnabled
@@ -105,22 +115,23 @@ async function updateSql(
           : input.onboardingDismissed
             ? 1
             : 0,
-      onboardingAccountCompleted:
-        input.onboardingAccountCompleted === undefined
-          ? existing.onboardingAccountCompleted
-          : input.onboardingAccountCompleted
-            ? 1
-            : 0,
-      onboardingMovementCompleted:
-        input.onboardingMovementCompleted === undefined
-          ? existing.onboardingMovementCompleted
-          : input.onboardingMovementCompleted
-            ? 1
-            : 0,
       onboardingCompleted:
         input.onboardingCompleted === undefined
           ? existing.onboardingCompleted
           : input.onboardingCompleted
+            ? 1
+            : 0,
+      onboardingStep: input.onboardingStep ?? existing.onboardingStep,
+      tourDesktopSeen:
+        input.tourDesktopSeen === undefined
+          ? existing.tourDesktopSeen
+          : input.tourDesktopSeen
+            ? 1
+            : 0,
+      tourMobileSeen:
+        input.tourMobileSeen === undefined
+          ? existing.tourMobileSeen
+          : input.tourMobileSeen
             ? 1
             : 0,
       updatedAt: nowIso(),

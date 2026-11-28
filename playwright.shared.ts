@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 import { unstable_getVarsForDev, unstable_readConfig } from 'wrangler'
-import { browserConnectionOptions, snapshotPathTemplate } from './playwright.browser'
+import { browserConnectionOptions } from './playwright.browser'
 
 type PlaywrightRuntimeOptions = {
   port: number
@@ -92,21 +92,19 @@ export function createPlaywrightRuntime({
   const serverPort = isCI ? port : port + worktreeOffset()
   const localBaseURL = `http://127.0.0.1:${serverPort}`
   const externalBaseURL = process.env.PLAYWRIGHT_BASE_URL
+  const baseURL = externalBaseURL ?? localBaseURL
   // D1 is disposable per invocation; Linux tmpfs avoids fsync for every fixture row.
   const persistPath = resolve(
     process.env.PLAYWRIGHT_STORAGE_DIR ??
       (process.platform === 'linux' && existsSync('/dev/shm') ? '/dev/shm' : tmpdir()),
     `finance-e2e-${workerConfigId}-${port}`,
   )
-  if (!externalBaseURL) process.env.PLAYWRIGHT_PERSIST_PATH = persistPath
   const workerConfigPath = externalBaseURL ? undefined : localWorkerConfig(serverPort, localBaseURL)
-  if (workerConfigPath) process.env.PLAYWRIGHT_WRANGLER_CONFIG = workerConfigPath
   const serverCommand = `node scripts/e2e-server.mjs ${serverPort}`
 
   return {
     tag,
     testDir: './tests/e2e',
-    snapshotPathTemplate,
     outputDir: `test-results-${port}`,
     fullyParallel: false,
     globalSetup: './scripts/check-installed-dependencies.mjs',
@@ -120,7 +118,7 @@ export function createPlaywrightRuntime({
       : [['list'], ['html', { open: 'never', outputFolder: htmlOutputFolder }]],
     use: {
       connectOptions: browserConnectionOptions,
-      baseURL: externalBaseURL ?? localBaseURL,
+      baseURL,
       locale: 'en-US',
       timezoneId: 'UTC',
       extraHTTPHeaders: {

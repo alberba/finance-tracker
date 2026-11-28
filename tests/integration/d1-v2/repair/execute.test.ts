@@ -2,10 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   applyRepairPlan,
   buildRepairPlan,
-  formatRepairPlan,
   loadRepairBackup,
   repairPlanSql,
-  writeRemoteRepairSql,
   type RepairExecutionReport,
   type RepairPlan,
 } from '../../../../scripts/lib/repair-plan'
@@ -47,12 +45,6 @@ describe('v2 repair execution', () => {
         ],
       }),
     ).toThrow(/export de respaldo/i)
-  })
-
-  it('loads backup from direct RepairBackup structure', () => {
-    const direct = loadRepairBackup(REPAIR_FIXTURE_BACKUP)
-    expect(direct.budgetCells).toHaveLength(2)
-    expect(direct.snapshots).toHaveLength(2)
   })
 
   it('loads backup from v1 State export format and preserves zero amounts', () => {
@@ -126,28 +118,6 @@ describe('v2 repair execution', () => {
         ],
       },
     ])
-  })
-
-  it('formats simulation plan as human-readable text without writing to database', async () => {
-    const { sqlite } = testDb
-    const plan = await buildRepairPlan(testDb.db, fixture.userId, REPAIR_FIXTURE_BACKUP)
-    const formatted = formatRepairPlan(plan, { simulation: true })
-
-    expect(formatted).toContain('SIMULACIÓN')
-    expect(formatted).toContain('Comida')
-    expect(formatted).toContain('Cuenta principal')
-    expect(formatted).toContain('2025')
-    expect(formatted).toContain('2026')
-
-    // Database remains untouched
-    expect(
-      sqlite
-        .prepare('SELECT COUNT(*) AS count FROM categories WHERE user_id = ?')
-        .get(fixture.userId),
-    ).toEqual({ count: 2 })
-    expect(sqlite.prepare('SELECT kind FROM accounts WHERE id = ?').get(fixture.accountId)).toEqual(
-      { kind: 'checking' },
-    )
   })
 
   it('merges duplicate categories into canonical category preserving references', async () => {
@@ -447,21 +417,6 @@ describe('v2 repair execution', () => {
     expect(plan.budgetRestorations.some((cell) => cell.action === 'update')).toBe(true)
 
     await expectSqlMatchesApply(plan)
-  })
-
-  it('writes the emitted statements to the --remote-sql-out file', async () => {
-    const { mkdirSync, readFileSync } = await import('node:fs')
-    const { resolve } = await import('node:path')
-
-    const plan = await buildRepairPlan(testDb.db, fixture.userId, REPAIR_FIXTURE_BACKUP)
-    mkdirSync('.scratch', { recursive: true })
-    const outPath = resolve('.scratch/test-repair-remote.sql')
-    const count = writeRemoteRepairSql(fixture.userId, plan, outPath)
-
-    const lines = readFileSync(outPath, 'utf8')
-      .split('\n')
-      .filter((line) => line && !line.startsWith('--'))
-    expect(lines).toHaveLength(count)
   })
 
   it('is idempotent: re-evaluating repair plan on repaired database produces an empty plan', async () => {

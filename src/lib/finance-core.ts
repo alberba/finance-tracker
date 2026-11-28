@@ -15,6 +15,8 @@ export interface Transaction {
   category: string;
   description?: string;
   amount: number;
+  /** Explicit link to an instrument; wins over `category` for asset matching. */
+  instrumentId?: string;
 }
 
 export interface Entity {
@@ -62,66 +64,6 @@ export function slug(value: string): string {
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "") || "item"
   );
-}
-
-export function getMonthTotals(
-  transactions: Transaction[],
-  month: Month,
-): {
-  income: number;
-  expense: number;
-  saving: number;
-  investment: number;
-} {
-  return transactions
-    .filter((item) => Number(item.month) === month)
-    .reduce(
-      (acc, item) => {
-        const amount = Number(item.amount || 0);
-        if (item.type === "income") {
-          acc.income += amount;
-        }
-        if (item.type === "expense") {
-          acc.expense += amount;
-        }
-        if (item.type === "saving") {
-          acc.saving += amount;
-        }
-        if (item.type === "investment") {
-          acc.investment += amount;
-        }
-        return acc;
-      },
-      { income: 0, expense: 0, saving: 0, investment: 0 },
-    );
-}
-
-export function getCategoryActuals(
-  transactions: Transaction[],
-  type: TxType,
-  month: Month,
-  categories: string[],
-): Record<string, number> {
-  const map: Record<string, number> = {};
-
-  categories.forEach((category) => {
-    map[category] = 0;
-  });
-
-  transactions
-    .filter((item) => Number(item.month) === month && item.type === type)
-    .forEach((item) => {
-      if (!map[item.category]) {
-        map[item.category] = 0;
-      }
-      map[item.category] += Number(item.amount || 0);
-    });
-
-  Object.keys(map).forEach((key) => {
-    map[key] = round2(map[key]);
-  });
-
-  return map;
 }
 
 export function getSnapshotValue(
@@ -206,9 +148,28 @@ export function computeAccountBalance(
   return round2(balance);
 }
 
-export function matchesInvestmentAsset(category: string, asset: Entity): boolean {
+type InstrumentAssetLink = { id: string; investmentAssetId: string };
+
+/**
+ * Whether a movement belongs to an investment asset. An explicit
+ * `instrumentId` wins over the category: the category is a label the user can
+ * rename, while the instrument carries the real asset link. Category matching
+ * stays as the fallback for legacy movements without an instrument.
+ */
+export function matchesInvestmentAsset(
+  category: string,
+  asset: Entity,
+  instrumentId?: string,
+  instruments?: InstrumentAssetLink[],
+): boolean {
   if (!category || !asset) {
     return false;
+  }
+  if (instrumentId && instruments) {
+    const instrument = instruments.find((item) => item.id === instrumentId);
+    if (instrument) {
+      return instrument.investmentAssetId === asset.id;
+    }
   }
   const categorySlug = slug(category);
   return (
@@ -223,6 +184,7 @@ export function computeInvestmentValue(
   assets: Entity[],
   transactions: Transaction[],
   snapshots: Record<string, Snapshot>,
+  instruments?: InstrumentAssetLink[],
 ): number {
   const asset = assets.find((item) => item.id === assetId);
   if (!asset) {
@@ -251,7 +213,7 @@ export function computeInvestmentValue(
     if (txMonth <= startMonth || txMonth > month) {
       return;
     }
-    if (!matchesInvestmentAsset(item.category, asset)) {
+    if (!matchesInvestmentAsset(item.category, asset, item.instrumentId, instruments)) {
       return;
     }
     value += Number(item.amount || 0);
@@ -291,6 +253,7 @@ export function getWealthByMonth(
   liabilities: Entity[],
   transactions: Transaction[],
   snapshots: Record<string, Snapshot>,
+  instruments?: InstrumentAssetLink[],
 ): WealthSnapshot {
   const liquidity = accounts.reduce(
     (sum, item) =>
@@ -307,6 +270,7 @@ export function getWealthByMonth(
         investmentAssets,
         transactions,
         snapshots,
+        instruments,
       ),
     0,
   );

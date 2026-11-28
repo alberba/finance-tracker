@@ -1,3 +1,4 @@
+import { parseDashboardLayout } from '../lib/dashboard-layout'
 import { remoteOperationSchema } from '../lib/bitvavo-types'
 import { asMonth } from '../lib/month'
 import { FINANCE_TRACKER_SEED } from '../data/seed'
@@ -50,9 +51,12 @@ export const EMPTY_STATE_SEED = {
   year: new Date().getFullYear(),
   onboardingPresented: false,
   onboardingDismissed: false,
-  onboardingAccountCompleted: false,
-  onboardingMovementCompleted: false,
   onboardingCompleted: false,
+  onboardingStep: 0,
+  tourDesktopSeen: false,
+  tourMobileSeen: false,
+  theme: null,
+  dashboardLayout: null,
   currency: 'EUR',
   twrLiquidityAccountIds: [],
   accounts: [],
@@ -125,7 +129,9 @@ export function persistState(state: State): string {
   }
 
   state.meta.savedAt = new Date().toISOString()
-  localStorage.setItem(storageKey(STORAGE_KEY), JSON.stringify(state))
+  // The StockEvents API key is a secret: never write it to localStorage.
+  const persisted = { ...state, stockEvents: { ...state.stockEvents, apiKey: '' } }
+  localStorage.setItem(storageKey(STORAGE_KEY), JSON.stringify(persisted))
   return state.meta.savedAt
 }
 
@@ -156,9 +162,12 @@ export function normalizeState(candidate: unknown): State {
       .slice(0, 3),
     onboardingPresented: input?.onboardingPresented === true,
     onboardingDismissed: input?.onboardingDismissed === true,
-    onboardingAccountCompleted: input?.onboardingAccountCompleted === true,
-    onboardingMovementCompleted: input?.onboardingMovementCompleted === true,
     onboardingCompleted: input?.onboardingCompleted === true,
+    onboardingStep: normalizeOnboardingStep(input?.onboardingStep),
+    tourDesktopSeen: input?.tourDesktopSeen === true,
+    tourMobileSeen: input?.tourMobileSeen === true,
+    theme: typeof input?.theme === 'string' && input.theme ? input.theme : null,
+    dashboardLayout: parseDashboardLayout(input?.dashboardLayout),
     twrLiquidityAccountIds,
     accounts,
     investmentAssets: normalizeEntities(input?.investmentAssets || base.investmentAssets || []),
@@ -175,6 +184,15 @@ export function normalizeState(candidate: unknown): State {
     transactions: normalizeTransactions(input?.transactions || base.transactions || []),
     subscriptions: normalizeSubscriptions(input?.subscriptions || base.subscriptions || []),
     snapshots: normalizeSnapshots(input?.snapshots || base.snapshots || {}),
+    ...(input.historicalSnapshots
+      ? {
+          historicalSnapshots: Object.fromEntries(
+            Object.entries(asRecord(input.historicalSnapshots))
+              .filter(([key]) => /^[1-9][0-9]{3}$/.test(key) && Number(key) !== year)
+              .map(([key, snapshots]) => [key, normalizeSnapshots(snapshots)]),
+          ),
+        }
+      : {}),
     budget: normalizeBudget(input?.budget || base.budget || {}),
     goals: normalizeGoals(input?.goals || base.goals || {}, year),
     savingGoals: normalizeSavingGoals(input?.savingGoals || base.savingGoals || []),
@@ -197,6 +215,11 @@ export function normalizeState(candidate: unknown): State {
   sortContributionsInState(safe)
 
   return safe
+}
+
+/** A step index of the setup wizard; anything else starts it from the beginning. */
+function normalizeOnboardingStep(value: unknown): number {
+  return Number.isInteger(value) && (value as number) >= 0 ? (value as number) : 0
 }
 
 function normalizeTwrLiquidityAccountIds(input: unknown, accounts: State['accounts']): string[] {
@@ -742,9 +765,32 @@ function normalizeSavingGoals(list: unknown): SavingGoal[] {
         name,
         targetAmount: round2(Math.max(parseFloatSafe(raw.targetAmount, 0), 0)),
         category,
+        ...normalizeSavingGoalPlan(raw),
       },
     ]
   })
+}
+
+/** A deadline needs both a year and a month (1-12); a monthly amount, a non-negative number. */
+function normalizeSavingGoalPlan(
+  raw: Record<string, unknown>,
+): Pick<SavingGoal, 'targetYear' | 'targetMonth' | 'monthlyAmount'> {
+  const year = Number(raw.targetYear)
+  const month = Number(raw.targetMonth)
+  const amount = Number(raw.monthlyAmount)
+  const hasDeadline =
+    raw.targetYear != null &&
+    raw.targetMonth != null &&
+    Number.isInteger(year) &&
+    Number.isInteger(month) &&
+    month >= 1 &&
+    month <= 12
+  return {
+    ...(hasDeadline && { targetYear: year, targetMonth: month }),
+    ...(raw.monthlyAmount != null &&
+      Number.isFinite(amount) &&
+      amount >= 0 && { monthlyAmount: round2(amount) }),
+  }
 }
 
 function normalizeGoals(goals: unknown, year: number): Record<GoalKey, Goal> {

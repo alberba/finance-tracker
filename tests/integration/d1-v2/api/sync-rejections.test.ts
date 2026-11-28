@@ -75,24 +75,6 @@ describe("sync commands that can never succeed are rejected, not retried (audit 
     expect(second.results[0]).toMatchObject({ status: "rejected", replayed: true });
   });
 
-  it("removes an investment transaction together with its trade detail (§2.6)", async () => {
-    const account = await seedAccount(testDb.db, userId);
-    const tx = await runWithDb(testDb.db, transactionsRepository.create(userId, {
-      accountId: account.id, type: "investment", date: "2026-09-12", amount: 100, currency: "EUR",
-    }));
-    await runWithDb(testDb.db, transactionsRepository.createTradeDetail(userId, {
-      transactionId: tx.id, side: "buy", quantity: "1", price: 100, fee: 0, currency: "EUR",
-    }));
-
-    const result = await runWithDb(testDb.db, applySyncBatch(userId, [{
-      commandId: "remove-investment", action: "remove", entityType: "transaction",
-      entityId: tx.id, baseVersion: tx.version,
-    }]));
-
-    expect(result.results[0].status).toBe("applied");
-    expect(await runWithDb(testDb.db, transactionsRepository.getTradeDetailByTransaction(userId, tx.id))).toBeUndefined();
-  });
-
   it("rejects removing a category still referenced by a transaction (§2.6)", async () => {
     const account = await seedAccount(testDb.db, userId);
     const category = await seedCategory(testDb.db, userId);

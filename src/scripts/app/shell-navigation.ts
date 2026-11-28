@@ -6,7 +6,6 @@ import {
   normalizeSectionId,
 } from './dashboard-section-routing'
 import { pinia } from '../../stores/pinia'
-import type { Month } from '../../lib/month'
 import { useUiStore } from '../../stores/ui'
 
 const MOBILE_PRIMARY_SECTIONS: SectionId[] = ['dashboard', 'transactions', 'budget', 'investment']
@@ -22,7 +21,6 @@ const SECTIONS_THAT_RETURN_TO_START_ON_NAV: readonly SectionId[] = ['transaction
 
 interface DashboardNavigationUi {
   activeSection: SectionId
-  month: Month
 }
 
 interface DashboardNavigationElements {
@@ -96,9 +94,10 @@ export function setupShellNavigation(deps: DashboardNavigationDeps) {
 
     const mobileMoreTrigger = el.navTabs.querySelector<HTMLElement>('[data-mobile-more-trigger]')
     if (mobileMoreTrigger) {
-      mobileMoreTrigger.dataset.active = String(
-        !MOBILE_PRIMARY_SECTIONS.includes(normalizedSectionId),
-      )
+      // A frame whose bar shows other sections says which in the trigger.
+      const barSections =
+        mobileMoreTrigger.dataset.primarySections?.split(',') ?? MOBILE_PRIMARY_SECTIONS
+      mobileMoreTrigger.dataset.active = String(!barSections.includes(normalizedSectionId))
     }
 
     if (updateHistory) {

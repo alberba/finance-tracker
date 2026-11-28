@@ -3,12 +3,15 @@
  * caller can re-seed (`POST /api/state/reset`) or restore a backup
  * (`POST /api/data/import?mode=replace`) inside the same transaction.
  *
- * `integration_credentials` and the Bitvavo connection are left untouched:
- * wiping data should not silently revoke a configured integration.
+ * `integration_credentials` is left untouched: wiping data should not
+ * silently revoke a configured integration. The Bitvavo connection is the
+ * exception: its `account_id` points at an account this function deletes, so
+ * it (and its transient previews) must go first or the FK rejects the wipe.
  */
 
 import { Effect } from 'effect'
 import * as accountsRepository from '../../db/repositories/accounts'
+import * as bitvavoRepository from '../../db/repositories/bitvavo'
 import * as transactionsRepository from '../../db/repositories/transactions'
 import * as subscriptionsRepository from '../../db/repositories/subscriptions'
 import * as recurringRulesRepository from '../../db/repositories/recurring-rules'
@@ -112,6 +115,9 @@ export function wipeUserData(userId: string): Effect.Effect<void, DatabaseError,
     for (const twrAccount of twrLiquidityAccounts) {
       yield* accountsRepository.removeTwrLiquidityAccount(userId, twrAccount.id)
     }
+    // Must run before the accounts: `bitvavo_connections.account_id` has no
+    // ON DELETE, so the raw FK would abort the whole wipe.
+    yield* bitvavoRepository.removeConnection(userId)
     for (const account of accounts) {
       yield* accountsRepository.remove(userId, account.id)
     }

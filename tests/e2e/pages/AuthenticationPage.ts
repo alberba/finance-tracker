@@ -46,12 +46,23 @@ export class AuthenticationPage {
   }
   async openSecurity() {
     await new FinanceTrackerPage(this.page).open('settings')
-    await this.page.getByRole('tab', { name: 'Preferencias', exact: true }).click()
+    // Desktop scrolls to it from the side index; the mobile frame opens it
+    // on its own screen from the «Ajustes» list.
+    const settings = this.page.locator('#settings')
+    await settings
+      .getByRole('navigation', { name: 'Índice de configuración' })
+      .getByRole('link', { name: 'Acceso y seguridad', exact: true })
+      .or(
+        settings
+          .getByRole('navigation', { name: 'Ajustes' })
+          .getByRole('button', { name: /^Acceso y seguridad / }),
+      )
+      .click()
   }
   async ready() {
     await expect(this.page.locator('html[data-finance-ready="true"]')).toBeAttached()
     if (new URL(this.page.url()).pathname !== '/login') {
-      await new FinanceTrackerPage(this.page).dismissWelcomeIfNeeded()
+      await new FinanceTrackerPage(this.page).dismissIntroIfNeeded()
     }
   }
 }

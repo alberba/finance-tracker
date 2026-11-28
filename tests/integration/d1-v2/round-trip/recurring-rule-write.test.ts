@@ -203,7 +203,7 @@ describe('regla recurrente durable (#493)', () => {
     expect(await trip.pending()).toEqual([])
   })
 
-  it('edita, pausa y refresca sin conexión sin perder ni duplicar ocurrencias', async () => {
+  it('pausa, reactiva y refresca sin conexión sin perder ni duplicar ocurrencias', async () => {
     setToday('2026-04-15')
     const recurring = useRecurringStore()
     expect(
@@ -225,20 +225,8 @@ describe('regla recurrente durable (#493)', () => {
     expect(generated).toHaveLength(2)
 
     trip.setOffline(true)
-    expect(
-      await useRecurringStore().updateRule(ruleId, {
-        type: 'expense',
-        accountId: seeded.accountId,
-        category: 'Vivienda',
-        description: 'Alquiler ajustado',
-        amount: 925,
-        frequency: 'monthly',
-        interval: 1,
-        startDate: '2026-03-01',
-      }),
-    ).toBe(true)
     await useRecurringStore().toggleRule(ruleId, false)
-    expect(useRecurringStore().rules[0]).toMatchObject({ active: false, amount: 925 })
+    expect(useRecurringStore().rules[0]).toMatchObject({ active: false })
 
     // A paused rule generates nothing; reactivating and refreshing adds only
     // the new occurrence, never a second copy of the existing ones.
@@ -253,8 +241,6 @@ describe('regla recurrente durable (#493)', () => {
     expect(offline.recurringRules).toHaveLength(1)
     expect(offline.recurringRules[0]).toMatchObject({
       id: ruleId,
-      description: 'Alquiler ajustado',
-      amount: 925,
       active: true,
     })
     expect(offline.pendingMovements).toHaveLength(3)
@@ -271,8 +257,6 @@ describe('regla recurrente durable (#493)', () => {
     const synced = await trip.reload()
     expect(synced.recurringRules).toHaveLength(1)
     expect(synced.recurringRules[0]).toMatchObject({
-      amount: 925,
-      description: 'Alquiler ajustado',
       active: true,
       nextOccurrenceDate: '2026-06-01',
     })

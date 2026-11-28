@@ -3,7 +3,6 @@ import { watch } from 'vue'
 import { type State } from './types'
 import { setupShellNavigation } from './app/shell-navigation'
 import { isReportsPath } from './app/dashboard-section-routing'
-import { getEventElement } from './app/dom-helpers'
 import { getAppElements } from './app/elements'
 import { type UiState } from './app/ui-state'
 import { clone, todayISO } from './utils'
@@ -96,49 +95,5 @@ import { registerFinanceTools, type FinanceModelContext } from '../lib/client/we
 
   function bindEvents() {
     shellNavigation.bindNavigationEvents()
-    bindChartTooltipEvents()
-  }
-
-  function bindChartTooltipEvents() {
-    const hideTooltip = () => {
-      delete el.chartTooltip.dataset.visible
-      el.chartTooltip.setAttribute('aria-hidden', 'true')
-    }
-
-    const showTooltip = (message: string, x: number, y: number) => {
-      el.chartTooltip.textContent = message
-      el.chartTooltip.dataset.visible = ''
-      el.chartTooltip.setAttribute('aria-hidden', 'false')
-
-      const offset = 14
-      const maxLeft = window.innerWidth - el.chartTooltip.offsetWidth - 8
-      const maxTop = window.innerHeight - el.chartTooltip.offsetHeight - 8
-      const left = Math.min(Math.max(8, x + offset), Math.max(8, maxLeft))
-      const top = Math.min(Math.max(8, y + offset), Math.max(8, maxTop))
-      el.chartTooltip.style.left = `${left}px`
-      el.chartTooltip.style.top = `${top}px`
-    }
-
-    document.addEventListener('pointermove', (event) => {
-      const target = getEventElement(event.target)
-      const withTooltip = target?.closest<SVGElement>('[data-chart-tooltip]')
-      if (!withTooltip) {
-        const insideChart = target?.closest('svg') || target?.closest('canvas')
-        if (insideChart) {
-          return
-        }
-        hideTooltip()
-        return
-      }
-      const message = withTooltip.getAttribute('data-chart-tooltip')
-      if (!message) {
-        hideTooltip()
-        return
-      }
-      showTooltip(message, event.clientX, event.clientY)
-    })
-
-    document.addEventListener('pointerdown', hideTooltip)
-    window.addEventListener('blur', hideTooltip)
   }
 })()

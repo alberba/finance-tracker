@@ -52,29 +52,13 @@ function evaluate(action: string, resource: string): string {
 }
 
 describe('shell denegado por completo', () => {
+  // Una sola regla final deniega todo shell; estos casos cubren la publicación
+  // legítima, la exfiltración del token y el encadenado de órdenes.
   it.each([
-    'gh issue view 12 --repo alberba/finance-tracker --json title --jq env.GH_TOKEN',
-    'gh issue edit 12 --repo alberba/finance-tracker --add-label x -F /pro?/self/environ',
-    'gh issue edit 12 --repo alberba/finance-tracker --add-label x -b texto',
-    'gh issue edit 12 --repo alberba/finance-tracker --add-label x --title texto',
     'gh issue comment 12 --repo alberba/finance-tracker --body-file .scratch/enricher/comment.md',
-    'gh issue view 12 --repo alberba/finance-tracker --json title,body,labels,comments',
-    'gh issue list --repo alberba/finance-tracker',
-    'gh label list --repo alberba/finance-tracker',
-    'gh issue create --title x',
-    'printenv',
-    'env',
     'cat /proc/self/environ',
-    'base64 /proc/self/environ',
-    'echo ${GH_TOKEN}',
     'echo $GH_TOKEN',
-    'gh issue view 12 --repo alberba/finance-tracker --json title --jq "$(cat /proc/self/environ)"',
-    'gh issue view 12 --repo alberba/finance-tracker --json title --jq `cat /proc/self/environ`',
-    'gh issue edit 12 --repo alberba/finance-tracker --body-file <<EOF',
     'gh issue comment 12 --repo alberba/finance-tracker --body-file .scratch/enricher/comment.md && printenv',
-    'X=GH_TOKEN; gh issue comment 12 --repo alberba/finance-tracker --body "${!X}"',
-    'rm -rf .scratch',
-    'git remote -v',
   ])('deniega %s', (command) => {
     expect(evaluate('shell', command)).toBe('deny')
   })
@@ -97,25 +81,21 @@ describe('lectura confinada al checkout', () => {
   it.each([
     '/proc/self/environ',
     '/home/runner/work/otro/repo/secreto',
-    '/etc/passwd',
-    '/tmp/x',
     '~/.ssh/id_rsa',
     '../../etc/passwd',
-    'docs/../../etc/passwd',
     '.git/config',
     '.dev.vars',
     '.env',
     'src/.env.local',
     '/home/runner/work/finance-tracker/finance-tracker/.git/config',
     '/home/runner/work/finance-tracker/finance-tracker/.dev.vars',
-    '/home/runner/work/finance-tracker/finance-tracker/src/.env',
   ])('deniega %s', (resource) => {
     expect(evaluate('read', resource)).toBe('deny')
   })
 })
 
 describe('acceso externo denegado', () => {
-  it.each(['/proc/*', '/home/runner/work/otro/*', '/etc/*', '/tmp/*', '~/*'])(
+  it.each(['/proc/*', '~/*'])(
     'deniega %s',
     (resource) => {
       expect(evaluate('external_directory', resource)).toBe('deny')

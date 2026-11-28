@@ -8,6 +8,7 @@
  */
 
 import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core'
+import type { DashboardLayoutPreference } from '../../lib/dashboard-layout'
 import { idColumn, createdAtColumn, updatedAtColumn, versionColumn } from './_helpers'
 
 /** A financial account holder. */
@@ -53,13 +54,17 @@ export const userSettings = sqliteTable(
     currency: text('currency').notNull().default('EUR'),
     locale: text('locale'),
     theme: text('theme'),
+    dashboardLayout: text('dashboard_layout', { mode: 'json' }).$type<DashboardLayoutPreference>(),
     stockeventsEnabled: integer('stockevents_enabled').notNull().default(0),
     stockeventsTradesToCash: integer('stockevents_trades_to_cash').notNull().default(0),
     onboardingPresented: integer('onboarding_presented').notNull().default(0),
     onboardingDismissed: integer('onboarding_dismissed').notNull().default(0),
-    onboardingAccountCompleted: integer('onboarding_account_completed').notNull().default(0),
-    onboardingMovementCompleted: integer('onboarding_movement_completed').notNull().default(0),
     onboardingCompleted: integer('onboarding_completed').notNull().default(0),
+    /** The setup wizard's step to resume at (0 «Cómo empiezas» … 6 «Listo»). */
+    onboardingStep: integer('onboarding_step').notNull().default(0),
+    /** The guided tour (#527), seen or skipped, one flag per frame. */
+    tourDesktopSeen: integer('tour_desktop_seen').notNull().default(0),
+    tourMobileSeen: integer('tour_mobile_seen').notNull().default(0),
     createdAt: createdAtColumn(),
     updatedAt: updatedAtColumn(),
     version: versionColumn(),

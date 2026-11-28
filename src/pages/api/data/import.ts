@@ -30,6 +30,7 @@ import * as recurringRulesRepository from '../../../db/repositories/recurring-ru
 import * as pendingMovementsRepository from '../../../db/repositories/pending-movements'
 import * as budgetEntriesRepository from '../../../db/repositories/budget-entries'
 import * as goalsRepository from '../../../db/repositories/goals'
+import { parseDashboardLayout } from '../../../lib/dashboard-layout'
 import { runServer } from '../../../lib/server/runtime'
 import type { Db } from '../../../db/repositories/shared'
 import * as wealthRepository from '../../../db/repositories/wealth'
@@ -109,15 +110,18 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
         onboardingDismissed: previousSettings
           ? previousSettings.onboardingDismissed === 1
           : optionalFlag((body.settings as Row | undefined)?.onboardingDismissed),
-        onboardingAccountCompleted: previousSettings
-          ? previousSettings.onboardingAccountCompleted === 1
-          : optionalFlag((body.settings as Row | undefined)?.onboardingAccountCompleted),
-        onboardingMovementCompleted: previousSettings
-          ? previousSettings.onboardingMovementCompleted === 1
-          : optionalFlag((body.settings as Row | undefined)?.onboardingMovementCompleted),
         onboardingCompleted: previousSettings
           ? previousSettings.onboardingCompleted === 1
           : optionalFlag((body.settings as Row | undefined)?.onboardingCompleted),
+        onboardingStep: previousSettings
+          ? previousSettings.onboardingStep
+          : optionalStep((body.settings as Row | undefined)?.onboardingStep),
+        tourDesktopSeen: previousSettings
+          ? previousSettings.tourDesktopSeen === 1
+          : optionalFlag((body.settings as Row | undefined)?.tourDesktopSeen),
+        tourMobileSeen: previousSettings
+          ? previousSettings.tourMobileSeen === 1
+          : optionalFlag((body.settings as Row | undefined)?.tourMobileSeen),
       }
       if (replace) {
         await runServer(tx, wipeUserData(userId))
@@ -379,6 +383,8 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
             categoryId: categoryId ?? null,
             name: String(row.name ?? ''),
             targetYear: typeof row.targetYear === 'number' ? row.targetYear : null,
+            targetMonth: typeof row.targetMonth === 'number' ? row.targetMonth : null,
+            monthlyAmount: typeof row.monthlyAmount === 'number' ? row.monthlyAmount : null,
             targetAmount: typeof row.targetAmount === 'number' ? row.targetAmount : 0,
             currency: String(row.currency ?? 'EUR'),
           }),
@@ -557,6 +563,10 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
         const existing = await runServer(tx, userSettingsRepository.get(userId))
         const patch = {
           ...onboarding,
+          dashboardLayout:
+            settingsRow.dashboardLayout === undefined
+              ? undefined
+              : parseDashboardLayout(settingsRow.dashboardLayout),
           currency: typeof settingsRow.currency === 'string' ? settingsRow.currency : undefined,
           locale: typeof settingsRow.locale === 'string' ? settingsRow.locale : undefined,
           theme: typeof settingsRow.theme === 'string' ? settingsRow.theme : undefined,
@@ -611,6 +621,10 @@ function optionalNumber(value: unknown): number | null {
 }
 
 /** Settings flags travel as `0`/`1` from D1 or as booleans; anything else leaves the stored value. */
+function optionalStep(value: unknown): number | undefined {
+  return Number.isInteger(value) && (value as number) >= 0 ? (value as number) : undefined
+}
+
 function optionalFlag(value: unknown): boolean | undefined {
   if (value === 1 || value === true) return true
   if (value === 0 || value === false) return false

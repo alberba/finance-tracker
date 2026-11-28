@@ -53,9 +53,6 @@
  *   server acknowledgement. Recurrence enqueues rule creates before their
  *   pending movements. A pending movement whose recurring-rule reference
  *   remains unresolved is not enqueued and returns failure.
- * - `investment.ts`'s `saveContribution` syncs the `contribution` row with
- *   its flow allocations nested under `data.allocations`; the snapshot
- *   balances touched by the workflow are synced through `wealth-snapshot.ts`.
  * - `settings.ts`'s TWR liquidity toggle sends the whole selection through
  *   `syncTwrLiquidityAccounts` (a `settingsUpdate`), resolved to server
  *   `account` ids.
@@ -77,6 +74,7 @@
  *   intentionally not routed through the sync command outbox.
  */
 
+import type { DashboardLayoutPreference } from '../dashboard-layout'
 import type { Month } from '../month'
 import { useSyncStore } from '../../stores/sync'
 import type { SyncEntityType } from '../server/sync/command-schemas'
@@ -312,15 +310,17 @@ export async function syncRemoveByKey(
  * the server reads as "create it".
  */
 export async function syncSettingsUpdate(patch: {
+  dashboardLayout?: DashboardLayoutPreference | null
   currency?: string
   locale?: string | null
   theme?: string | null
   twrLiquidityAccountIds?: string[]
   onboardingPresented?: boolean
   onboardingDismissed?: boolean
-  onboardingAccountCompleted?: boolean
-  onboardingMovementCompleted?: boolean
   onboardingCompleted?: boolean
+  onboardingStep?: number
+  tourDesktopSeen?: boolean
+  tourMobileSeen?: boolean
   stockeventsEnabled?: boolean
   stockeventsTradesToCash?: boolean
   stockeventsCashMappings?: Array<{ accountId: string | null; watchlistId: string }>
@@ -530,11 +530,6 @@ export async function syncCategoryRemove(kind: CategoryKind, name: string): Prom
   await syncRemoveByKey('category', categoryMatches(kind, name), name)
 }
 
-/** Create-if-absent / update-otherwise for a goal, addressed by its key. */
-export async function syncGoalUpsert(key: string, data: JsonRecord): Promise<void> {
-  await syncUpsertByKey('goal', (goal) => goal.key === key, data)
-}
-
 /**
  * Upserts one budget cell, addressed by the natural key that identifies it in
  * `budget_entries`: its category, year and month (ADR 0001). Its identity
@@ -623,65 +618,4 @@ export async function syncListDiff<T extends { id: string }>(
     }
   }
   return true
-}
-
-/**
- * Matches a synced Stock Events symbol row by the local symbol: rows
- * migrated from v1 carry it as `legacyId`, rows created from now on carry
- * the client-minted id but the same `legacyId` (ADR 0001).
- */
-function stockeventsMappingMatches(symbol: string): EntityMatch {
-  return (entity) =>
-    entity.legacyId === symbol || (entity.legacyId == null && entity.stockeventsSymbol === symbol)
-}
-
-/** Create-if-absent / update-otherwise for one Stock Events symbol mapping. */
-export async function syncStockeventsMappingUpsert(
-  symbol: string,
-  data: { stockeventsSymbol: string; sync: boolean; watchlistId: string | null; hidden: boolean },
-): Promise<void> {
-  await syncUpsertByKey(
-    'stockeventsMapping',
-    stockeventsMappingMatches(symbol),
-    { legacyId: symbol, categoryId: null, ...data },
-    { ...data },
-  )
-}
-
-/** Removes a Stock Events symbol mapping addressed by its local symbol. */
-export async function syncStockeventsMappingRemove(symbol: string): Promise<void> {
-  await syncRemoveByKey('stockeventsMapping', stockeventsMappingMatches(symbol), symbol)
-}
-
-/**
- * Matches a synced contribution-cash entry by its natural key
- * (`contributionDate`, server `accountId`, `watchlistId`).
- */
-function stockeventsCashEntryMatches(
-  contributionDate: string,
-  accountId: string | null,
-  watchlistId: string,
-): EntityMatch {
-  return (entity) =>
-    entity.contributionDate === contributionDate &&
-    (entity.accountId ?? null) === (accountId ?? null) &&
-    entity.watchlistId === watchlistId
-}
-
-/** Create-if-absent / update-otherwise for one contribution-cash sync entry. */
-export async function syncStockeventsCashEntryUpsert(
-  contributionDate: string,
-  accountId: string | null,
-  watchlistId: string,
-  syncedAmount: number,
-  currency: string,
-): Promise<void> {
-  const matches = stockeventsCashEntryMatches(contributionDate, accountId, watchlistId)
-  await syncUpsertByKey('stockeventsCashEntry', matches, {
-    contributionDate,
-    accountId,
-    watchlistId,
-    syncedAmount,
-    currency,
-  })
 }

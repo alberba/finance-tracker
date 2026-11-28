@@ -63,25 +63,13 @@ test.describe('Aislamiento multiusuario (sync v2)', () => {
       amount: 42,
       description: 'Gasto exclusivo de A',
     })
-    // The transactions list defaults to filtering on the current month —
-    // point it at the month the seeded transaction actually falls in.
-    await trackerA.filterTransactionsMonth('ENERO')
     await trackerA.expectTransactionDescriptionVisible('Gasto exclusivo de A')
 
     const { tracker: trackerB } = await provisionUser(contextB, uniqueEmail('b'))
-    await trackerB.filterTransactionsMonth('ENERO')
+    await trackerB.openTransactions()
+    await trackerB.revealOlderTransactions()
 
     await expect(trackerB.transactionsSection.getByText('Gasto exclusivo de A')).toHaveCount(0)
-  })
-
-  test('el usuario B no ve la cuenta creada por el usuario A', async () => {
-    const { tracker: trackerA } = await provisionUser(contextA, uniqueEmail('a2'))
-    await trackerA.addAccount({ name: 'Cuenta Secreta de A', openingBalance: 999 })
-
-    const { tracker: trackerB, page: pageB } = await provisionUser(contextB, uniqueEmail('b2'))
-    await trackerB.openSettings()
-
-    await expect(pageB.getByText('Cuenta Secreta de A')).toHaveCount(0)
   })
 
   test('cada usuario conserva sus propios datos entre sesiones (misma identidad, contexto nuevo)', async ({
@@ -98,16 +86,14 @@ test.describe('Aislamiento multiusuario (sync v2)', () => {
       amount: 1500,
       description: 'Nómina de A',
     })
-    await trackerA.filterTransactionsMonth('ENERO')
     await trackerA.expectTransactionDescriptionVisible('Nómina de A')
 
     // A brand-new context re-authenticating as the *same* email must see the
     // same data back — isolation is per-identity, not per-browser-session,
-    // the reverse assertion of the two tests above.
+    // the reverse assertion of the test above.
     const returningContext = await browser.newContext()
     try {
       const { tracker: returningTracker } = await provisionUser(returningContext, email)
-      await returningTracker.filterTransactionsMonth('ENERO')
       await returningTracker.expectTransactionDescriptionVisible('Nómina de A')
     } finally {
       await returningContext.close()

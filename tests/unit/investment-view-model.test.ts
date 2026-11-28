@@ -66,6 +66,40 @@ describe('buildInvestmentDashboardViewModel · posiciones', () => {
     expect(oro.weight).toBeCloseTo((200 / 2400) * 100)
   })
 
+  it('atribuye el movimiento por instrumentId aunque la categoría no coincida', () => {
+    const state = portfolio({
+      investmentAssets: [{ id: 'acciones', name: 'Acciones', openingBalance: 0 }],
+      instruments: [
+        {
+          id: 'inst-aapl',
+          investmentAssetId: 'acciones',
+          type: 'stock',
+          symbol: 'AAPL',
+          market: 'NASDAQ',
+          currency: 'USD',
+          provider: 'yahoo',
+          active: true,
+        },
+      ],
+      transactions: [
+        {
+          ...buy('t-aapl', 'AAPL', '2026-01-10', 1, 100, 'AAPL'),
+          instrumentId: 'inst-aapl',
+        },
+      ],
+    })
+
+    const vm = buildInvestmentDashboardViewModel(state, 2, 'simple')
+    expect(vm.positions).toHaveLength(1)
+    expect(vm.positions[0]).toMatchObject({
+      id: 'acciones',
+      value: 100,
+      invested: 100,
+      units: 1,
+      symbol: 'AAPL',
+    })
+  })
+
   it('omite los activos sin valor en el mes', () => {
     const vm = buildInvestmentDashboardViewModel(portfolio(), 1, 'simple')
 
@@ -75,7 +109,11 @@ describe('buildInvestmentDashboardViewModel · posiciones', () => {
 
   it('calcula resultado y rentabilidad con el valor del snapshot', () => {
     const vm = buildInvestmentDashboardViewModel(
-      portfolio({ snapshots: { '3': { month: 3, accounts: {}, investments: { fondos: 2420 }, liabilities: {} } } }),
+      portfolio({
+        snapshots: {
+          '3': { month: 3, accounts: {}, investments: { fondos: 2420 }, liabilities: {} },
+        },
+      }),
       3,
       'simple',
     )
@@ -164,15 +202,6 @@ describe('buildInvestmentDashboardViewModel · posiciones', () => {
       lastMovementDate: null,
     })
   })
-
-  it('asigna a cada posición un color de la paleta de series', () => {
-    const vm = buildInvestmentDashboardViewModel(portfolio(), 3, 'simple')
-
-    expect(vm.positions.map((position) => position.color)).toEqual([
-      'var(--chart-series-1)',
-      'var(--chart-series-2)',
-    ])
-  })
 })
 
 describe('buildInvestmentDashboardViewModel · series', () => {
@@ -192,14 +221,6 @@ describe('buildInvestmentDashboardViewModel · series', () => {
     expect(vm.valueSeries[1]).toMatchObject({ values: [0, 1000, 2400, 2400], dashed: true })
   })
 
-  it('en % da una sola serie de rentabilidad acumulada', () => {
-    const vm = buildInvestmentDashboardViewModel(portfolio(), 3, 'simple')
-
-    expect(vm.percentSeries).toHaveLength(1)
-    expect(vm.percentSeries[0].name).toBe('Cartera Total')
-    expect(vm.percentSeries[0].values).toHaveLength(4)
-  })
-
   it('cada posición trae su serie de rentabilidad con los mismos puntos', () => {
     const vm = buildInvestmentDashboardViewModel(portfolio(), 3, 'simple')
 
@@ -208,5 +229,21 @@ describe('buildInvestmentDashboardViewModel · series', () => {
 
   it('fecha el valor de la cartera al cierre del mes de análisis', () => {
     expect(buildInvestmentDashboardViewModel(portfolio(), 2, 'simple').asOf).toBe('2026-02-28')
+  })
+})
+
+describe('buildInvestmentDashboardViewModel · TWR', () => {
+  it('en TWR el valor de cartera suma la liquidez de las cuentas elegidas, y solo de esas', () => {
+    const state = portfolio({
+      accounts: [
+        { id: 'broker', name: 'Broker', openingBalance: 0 },
+        { id: 'cash', name: 'Liquidez', openingBalance: 500 },
+        { id: 'otra', name: 'Otra', openingBalance: 900 },
+      ],
+      twrLiquidityAccountIds: ['cash'],
+    })
+    const simple = buildInvestmentDashboardViewModel(state, 3, 'simple').portfolioValue
+    const twr = buildInvestmentDashboardViewModel(state, 3, 'twr').portfolioValue
+    expect(twr - simple).toBeCloseTo(500, 2)
   })
 })

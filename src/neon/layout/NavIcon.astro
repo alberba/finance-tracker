@@ -1,0 +1,71 @@
+---
+import type { SectionId } from '../../scripts/types'
+
+/** Line icons of the sections (DESIGN.md, Iconografía): 24px grid, stroke 2, round. */
+export interface Props {
+  sectionId: SectionId
+}
+
+const { sectionId } = Astro.props
+---
+
+<svg
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+  aria-hidden="true"
+>
+  {sectionId === 'dashboard' && (
+    <>
+      <rect x="3" y="3" width="7" height="7" rx="1.5" />
+      <rect x="14" y="3" width="7" height="7" rx="1.5" />
+      <rect x="3" y="14" width="7" height="7" rx="1.5" />
+      <rect x="14" y="14" width="7" height="7" rx="1.5" />
+    </>
+  )}
+  {sectionId === 'transactions' && (
+    <path d="M8 4v16M8 20l-4-4M8 20l4-4M16 20V4M16 4l-4 4M16 4l4 4" />
+  )}
+  {sectionId === 'budget' && (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 3v9h9" />
+    </>
+  )}
+  {sectionId === 'wealth' && (
+    <>
+      <path d="M3 11 12 4l9 7" />
+      <rect x="5" y="11" width="14" height="9" rx="1.5" />
+      <path d="M10 20v-5h4v5" />
+    </>
+  )}
+  {sectionId === 'investment' && (
+    <>
+      <path d="M3 17l6-6 4 4 8-8" />
+      <path d="M16 7h5v5" />
+    </>
+  )}
+  {sectionId === 'goals' && (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="12" r="4.5" />
+      <path d="M12 12h.01" />
+    </>
+  )}
+  {sectionId === 'settings' && (
+    <>
+      <path d="M4 7h10M18 7h2M4 17h2M10 17h10" />
+      <circle cx="16" cy="7" r="2" />
+      <circle cx="8" cy="17" r="2" />
+    </>
+  )}
+  {sectionId === 'data' && (
+    <>
+      <ellipse cx="12" cy="6" rx="8" ry="3" />
+      <path d="M4 6v6c0 1.66 3.58 3 8 3s8-1.34 8-3V6M4 12v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6" />
+    </>
+  )}
+</svg>

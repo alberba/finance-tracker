@@ -87,9 +87,9 @@ export function applyPendingCommands(
         if (
           key === 'onboardingPresented' ||
           key === 'onboardingDismissed' ||
-          key === 'onboardingAccountCompleted' ||
-          key === 'onboardingMovementCompleted' ||
           key === 'onboardingCompleted' ||
+          key === 'tourDesktopSeen' ||
+          key === 'tourMobileSeen' ||
           key === 'stockeventsEnabled' ||
           key === 'stockeventsTradesToCash'
         ) {

@@ -79,7 +79,12 @@ export const useBudgetStore = defineStore('budget', () => {
   }
 
   /** The twelve months of a category at once: one commit, a sync per month that changed. */
-  function saveBudgetPlan(type: BudgetType, category: string, plan: readonly number[]): void {
+  function saveBudgetPlan(
+    type: BudgetType,
+    category: string,
+    plan: readonly number[],
+    { notify = true }: { notify?: boolean } = {},
+  ): void {
     const changed = new Map<Month, number>()
     financialStateStore.commitState((draft) => {
       const row = ensureRow(draft, type, category)
@@ -91,7 +96,7 @@ export const useBudgetStore = defineStore('budget', () => {
       }
     })
     syncMonths(type, category, changed)
-    showToast(`Plan de ${category} guardado.`)
+    if (notify) showToast(`Plan de ${category} guardado.`)
   }
 
   return {

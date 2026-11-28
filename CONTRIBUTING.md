@@ -21,6 +21,8 @@ una sola vez: `pnpm test:e2e:install`.
 Con varios worktrees a la vez, usa `pnpm dev:worktree` en lugar de `pnpm dev`: elige un puerto propio
 del worktree (4321 en el checkout principal) y ajusta `BETTER_AUTH_URL` en `.dev.vars` para que el
 login de Better Auth coincida con él. Se para con `pnpm exec astro dev stop`.
+Para entrar con tu cuenta y tus datos (export JSON): `pnpm dev:account <correo> [export.json]`,
+detallado en [self-hosting](docs/operations/self-hosting.md#desarrollo-diario-pnpm-devworktree).
 
 Sesiones y proveedores de login: [autenticación](docs/operations/authentication.md).
 Node/SQLite, Docker y arranque o archivado de worktrees en Orca:
@@ -53,23 +55,19 @@ pnpm gate                   # dependencias + lint + tipos + unit/component/integ
 pnpm test:e2e:smoke          # recorridos críticos
 ```
 
-El CI de cada PR ejecuta lint, tipos y `pnpm test`, comprueba que las migraciones D1
-locales v2 aplican limpias y ejecuta `pnpm build`. No calcula cobertura. Un único job de navegador
-comprueba los recorridos `@smoke` de la app y de autenticación, automáticamente y sin labels.
+El CI de cada PR ejecuta lint, tipos (`astro check` + `vue-tsc`), `pnpm test`, comprueba que las
+migraciones D1 locales v2 aplican limpias y ejecuta `pnpm build`. Un único job de navegador comprueba los recorridos
+`@smoke` de la app, de autenticación y de sync, automáticamente y sin labels.
 Al empujar a `main`, un job breve busca el CI verde de la PR que produjo el merge y compara
 el árbol Git del push con el árbol que realmente se probó. Si coinciden, reutiliza la validación
 sin repetir checks. Si difieren, es un push directo o no se puede verificar la evidencia, ejecuta
 lint/tipos, Vitest y migraciones D1. El build de CI solo corre en PR y ejecuciones manuales:
 el despliegue construye la imagen Docker del commit mezclado. La evidencia caduca a los siete días;
 su ausencia siempre activa los checks de respaldo.
-La suite completa (Vitest, auth, funcional, visual y sync-v2) se ejecuta con `pnpm test:all`.
+La suite completa (Vitest, auth, funcional y sync-v2) se ejecuta con `pnpm test:all`.
 **Browser regression** comprueba las mismas capas en CI:
 se ejecuta los lunes a las 05:00 UTC o a mano sobre la rama elegida. No bloquea entregas ni dispara
 despliegues. Para una PR de riesgo, ejecútala manualmente antes de mezclar.
-
-`pnpm test:e2e:visual` compara píxeles y es inestable por naturaleza: un diff de snapshot es una
-pregunta que hay que mirar, no necesariamente un fallo. Si el cambio visual es el esperado,
-actualiza los snapshots explícitamente.
 
 Antes de escribir, modificar o borrar un test, lee [TESTING_STANDARDS.md](./TESTING_STANDARDS.md):
 allí viven el criterio de entrada, el rojo antes de verde, la poda y las reglas de E2E. Dónde van

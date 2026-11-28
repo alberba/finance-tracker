@@ -3,7 +3,6 @@ import { spawnSync } from 'node:child_process'
 import { resolve } from 'node:path'
 import { FinanceTrackerPage } from './pages/FinanceTrackerPage'
 import { AuthenticationPage } from './pages/AuthenticationPage'
-import { expectSelfHostedFonts } from './pages/fonts'
 
 function authenticationHeaders(info: TestInfo) {
   let hash = 0
@@ -49,30 +48,25 @@ function executeSql(sql: string) {
 test('private pages and financial APIs require a Better Auth session @smoke', async ({ page }) => {
   await page.goto('/')
   await expect(page).toHaveURL(/\/login$/)
-  await expect(page.getByRole('button', { name: 'Verificar mi correo', exact: true })).toHaveCount(
-    0,
-  )
+  // The form must have hydrated before the page counts as loaded.
+  await new AuthenticationPage(page).ready()
   await expect(page.getByLabel('Contraseña', { exact: true })).toBeVisible()
-  await expect(page.getByLabel('Código de seis cifras')).toHaveCount(0)
-  await page.getByRole('button', { name: 'Código por correo', exact: true }).click()
-  await expect(page.getByLabel('Código de seis cifras')).toBeDisabled()
-  await page.getByRole('button', { name: 'Acceder con contraseña', exact: true }).click()
-  await expect(page.getByLabel('Contraseña', { exact: true })).toBeVisible()
-  await expect(page.getByLabel('Código de seis cifras')).toHaveCount(0)
   expect((await page.request.get('/api/bootstrap')).status()).toBe(401)
 })
 
-test('la página de acceso sirve las fuentes desde el propio dominio @smoke', async ({ page }) => {
-  const externalFontRequests: string[] = []
-  page.on('request', (request) => {
-    if (/^https:\/\/fonts\.(googleapis|gstatic)\.com\//.test(request.url())) {
-      externalFontRequests.push(request.url())
-    }
-  })
-
-  await page.goto('/login')
-  await expectSelfHostedFonts(page)
-  expect(externalFontRequests).toEqual([])
+test('the login shows the error for wrong credentials and stays on /login @smoke', async ({
+  page,
+}) => {
+  const email = `admin-${crypto.randomUUID()}@example.test`
+  seedAdministrator(email)
+  const access = new AuthenticationPage(page)
+  await access.goto()
+  await page.getByLabel('Correo electrónico').fill(email)
+  await page.getByLabel('Contraseña', { exact: true }).fill('not-the-password')
+  await page.getByRole('button', { name: 'Entrar en Finanzas', exact: true }).click()
+  await expect(page.getByRole('alert')).toHaveText('El correo o la contraseña no son correctos.')
+  await expect(page).toHaveURL(/\/login$/)
+  expect((await page.request.get('/api/session')).status()).toBe(401)
 })
 
 async function admittedAdministrator(page: import('@playwright/test').Page) {
@@ -137,7 +131,7 @@ test('passkey registration and login use a verified virtual authenticator', asyn
     },
   })
   await page.getByRole('button', { name: 'Añadir passkey' }).click()
-  await expect(page.getByRole('button', { name: 'Eliminar passkey' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Eliminar la passkey/ })).toBeVisible()
   await access.goto()
   await page.getByRole('button', { name: 'Entrar con passkey' }).click()
   await expect(page).toHaveURL(/\/$/)
@@ -167,7 +161,7 @@ test('cancelled passkey registration leaves no credential', async ({ page, conte
   await new AuthenticationPage(page).ready()
   await new AuthenticationPage(page).openSecurity()
   await expect(page.getByRole('button', { name: 'Añadir passkey' })).toBeEnabled()
-  await expect(page.getByRole('button', { name: 'Eliminar passkey' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /^Eliminar la passkey/ })).toHaveCount(0)
 })
 
 for (const kind of ['selected', 'others'] as const) {
@@ -234,9 +228,9 @@ for (const provider of ['google', 'github']) {
     await new AuthenticationPage(page).openSecurity()
     await expect(
       page
-        .getByRole('region', { name: 'Métodos de acceso' })
-        .getByRole('listitem')
-        .filter({ hasText: provider }),
+        .locator('[data-settings-methods] > div')
+        .filter({ hasText: new RegExp(provider, 'i') })
+        .filter({ hasText: /Vinculado/ }),
     ).toBeVisible()
   })
 }

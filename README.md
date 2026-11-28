@@ -23,7 +23,7 @@ Tracker financiero web para presupuestos, patrimonio, inversiones y objetivos.
 - `src/lib/finance-core.ts`: lógica financiera tipada (TypeScript)
 - `src/data/seed.json`: datos semilla sintéticos y neutros
 - `src/data/seed.ts`: wrapper TypeScript para importar el seed desde cliente y servidor
-- `src/styles/global.css`: tokens de tema (claro y oscuro), `@theme` de Tailwind, reset y tipografía base; la única hoja de estilos
+- `src/styles/`: `global.css` (entrada) y `common.css` (fuentes, reset); los tokens, en `src/neon/styles/neon.css`
 - `scripts/extract_excel_seed.py`: script para regenerar el seed desde un `.xlsx`
 
 ## Ejecutar en OrbStack (Docker)
@@ -36,7 +36,7 @@ pnpm local:up
 `local:up` usa Astro en desarrollo con hot reload; `pnpm local:up:prod` prueba la compilación de producción.
 Abre la URL que muestra `local:up` y usa el correo y la contraseña de `.env.selfhost`.
 Cada worktree usa su propio puerto y volumen; el checkout principal usa el puerto 4321.
-SQLite se guarda en un volumen persistente. Es la misma imagen que corre en producción (Oracle).
+SQLite se guarda en un volumen persistente. `local:up` usa el target `development`; `local:up:prod` usa la imagen de producción (Oracle).
 Consulta [la guía de ejecución local y self-hosting](docs/operations/self-hosting.md).
 
 ## Ejecutar en local (Astro)
@@ -119,7 +119,7 @@ peticiones y no existe un selector de protocolo de persistencia.
 
 ```bash
 pnpm build
-pnpm astro check
+pnpm check
 ```
 
 ## Sentry
@@ -166,9 +166,6 @@ pnpm test:unit
 pnpm test:component
 pnpm test:integration
 
-# Coverage conjunto
-pnpm test:coverage
-
 # Instalar navegador E2E (una vez)
 pnpm test:e2e:install
 
@@ -178,8 +175,7 @@ pnpm test:e2e
 # Smoke rápido durante desarrollo
 pnpm test:e2e:smoke
 
-# Regresión visual y sincronización v2
-pnpm test:e2e:visual
+# Sincronización v2
 pnpm test:e2e:sync-v2
 ```
 
@@ -190,7 +186,7 @@ Estructura de tests:
 - `tests/component/`: contratos y estados visibles de componentes Vue
 - `tests/integration/`: repositorios, migraciones y SQLite real
 - `tests/e2e/pages/FinanceTrackerPage.ts`: Page Object Model
-- `tests/e2e/finance-tracker.spec.ts`: flujos E2E principales
+- `tests/e2e/`: recorridos E2E de cada sección (`neon-*.spec.ts`, escritorio y móvil)
 - `playwright.config.ts`: configuración de E2E y `webServer`
 
 La estrategia de Vitest y sus comandos están documentados en

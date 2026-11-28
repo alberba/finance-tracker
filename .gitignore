@@ -1,4 +1,5 @@
 node_modules
+.pnpm-store
 dist
 .astro
 .DS_Store
@@ -22,8 +23,6 @@ package-lock.json
 /playwright-report-sync-v2/
 /playwright/.cache/
 /playwright/.auth/
-# Local-only visual snapshots (CI generates the canonical -linux baselines)
-tests/e2e/**/*-darwin.png
 backup.sql
 # Local Pi runtime state
 .atl/

@@ -39,7 +39,7 @@ describe('round trip: inversión', () => {
     delete (window as Window & { __FINANCE_TODAY__?: string }).__FINANCE_TODAY__
   })
 
-  it('keeps symbol, units, unit price and side of a movement (§4.3)', async () => {
+  it('keeps symbol, units, unit price, side and declared flag of a movement (§4.3)', async () => {
     const { useInvestmentStore } = await import('../../../../src/stores/investment')
     expect(
       useInvestmentStore().addMovement({
@@ -53,15 +53,15 @@ describe('round trip: inversión', () => {
         fee: '1.20',
         movementCurrency: 'EUR',
         accountId,
-        declared: false,
+        declared: true,
       }),
     ).toBe(true)
 
     const reloaded = await trip.reload()
 
     const movement = reloaded.transactions.find((tx) => tx.type === 'investment')
-    expect(movement).toBeDefined()
     expect(movement).toMatchObject({
+      declared: true,
       symbol: 'VWCE',
       side: 'buy',
       units: 10,
@@ -297,44 +297,6 @@ describe('round trip: inversión', () => {
     expect(await trip.pending()).toEqual([])
   })
 
-  // A future start date means `refreshPending` generates nothing and the
-  // calendar does not move — which, per audit §3.2a, is precisely when the
-  // edit has nothing to piggyback on and is lost.
-  it('persists an edit to a recurring rule whose calendar has not moved (§3.2a)', async () => {
-    const { useRecurringStore } = await import('../../../../src/stores/recurring')
-    const recurring = useRecurringStore()
-    await recurring.addRule({
-      type: 'expense',
-      accountId,
-      category: 'Ocio',
-      description: 'Gimnasio',
-      amount: 30,
-      frequency: 'monthly',
-      interval: 1,
-      startDate: '2027-01-01',
-    })
-    const first = await trip.reload()
-    const ruleId = first.recurringRules[0].id
-
-    await useRecurringStore().updateRule(ruleId, {
-      type: 'expense',
-      accountId,
-      category: 'Ocio',
-      description: 'Gimnasio Premium',
-      amount: 45,
-      frequency: 'monthly',
-      interval: 1,
-      startDate: '2027-01-01',
-    })
-
-    const reloaded = await trip.reload()
-
-    expect(reloaded.recurringRules[0]).toMatchObject({
-      description: 'Gimnasio Premium',
-      amount: 45,
-    })
-  })
-
   it("keeps a pending movement's type instead of calling it a gasto (§3.2c)", async () => {
     const { useRecurringStore } = await import('../../../../src/stores/recurring')
     await useRecurringStore().addRule({
@@ -410,62 +372,6 @@ describe('round trip: inversión', () => {
       unitPrice: 125,
       fee: 1,
       time: '15:00',
-    })
-  })
-
-  it('keeps the declared flag (§4.3)', async () => {
-    const { useInvestmentStore } = await import('../../../../src/stores/investment')
-    const investment = useInvestmentStore()
-    investment.addMovement({
-      date: '2026-09-12',
-      time: '10:30',
-      side: 'buy',
-      symbol: 'VWCE',
-      category: 'Acciones',
-      unitPrice: '120.50',
-      units: '10',
-      fee: '1.20',
-      movementCurrency: 'EUR',
-      accountId,
-      declared: false,
-    })
-    const first = await trip.reload()
-    const movementId = first.transactions.find((tx) => tx.type === 'investment')!.id
-
-    useInvestmentStore().toggleDeclared(movementId)
-
-    const reloaded = await trip.reload()
-
-    expect(reloaded.transactions.find((tx) => tx.id === movementId)?.declared).toBe(true)
-  })
-
-  it("keeps how a contribution's flow was split across accounts (§5)", async () => {
-    const { useInvestmentStore } = await import('../../../../src/stores/investment')
-    const { useSettingsStore } = await import('../../../../src/stores/settings')
-    const { useFinancialStateStore } = await import('../../../../src/stores/financial-state')
-    useSettingsStore().addEntity('investmentAssets', 'Indexa', '0')
-    await trip.reload()
-    const investmentAccountId = useFinancialStateStore().investmentAssets[0].id
-    const saved = useInvestmentStore().saveContribution(
-      '2026-03-31',
-      2,
-      [{ kind: 'investments', id: investmentAccountId, value: '1000' }],
-      [{ accountId, amount: 200 }],
-      [],
-    )
-    expect(saved).toBe(true)
-
-    const reloaded = await trip.reload()
-
-    const contribution = reloaded.contributions.find((item) => item.date === '2026-03-31')
-    expect(contribution?.flowAllocations).toEqual([{ accountId, amount: 200 }])
-
-    useInvestmentStore().setContributionFlow('2026-03-31', 0)
-    const edited = await trip.reload()
-    expect(edited.contributions.find((item) => item.date === '2026-03-31')).toMatchObject({
-      amount: 0,
-      flow: 0,
-      flowAllocations: [],
     })
   })
 })

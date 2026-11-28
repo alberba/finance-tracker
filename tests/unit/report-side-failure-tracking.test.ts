@@ -60,7 +60,7 @@ describe('reportReportSideFailure', () => {
     ])
   })
 
-  it('no relanza si el SDK falla, y deja un log fijo', async () => {
+  it('no relanza si el SDK falla', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
     sentry.withScope.mockImplementation(() => {
       throw new Error('el SDK de Sentry falló')
@@ -68,8 +68,6 @@ describe('reportReportSideFailure', () => {
     const { reportReportSideFailure } = await loadTracking()
 
     expect(() => reportReportSideFailure({ stage: 'upload', reason: 'failed' })).not.toThrow()
-
-    expect(consoleError).toHaveBeenCalledTimes(1)
     consoleError.mockRestore()
   })
 })

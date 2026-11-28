@@ -3,10 +3,11 @@ import { describe, expect, it } from 'vitest'
 import {
   accountingYear,
   buildMonthGroups,
-  categoryBreakdown,
+  foldMonthGroups,
   hasTypeRestriction,
   monthTotals,
   registryYears,
+  type MonthGroup,
   type RegistryFilters,
 } from '../../src/domain/transactions/registry'
 import type { Month } from '../../src/lib/month'
@@ -133,13 +134,6 @@ describe('buildMonthGroups', () => {
     const noFilter = buildMonthGroups(transactions, 2026, NO_FILTERS, NEWEST_FIRST)
 
     expect(everyType).toEqual(noFilter)
-    expect(everyType.flatMap((group) => group.rows.map((row) => row.type))).toEqual([
-      'expense',
-      'investment',
-      'income',
-      'income',
-      'expense',
-    ])
   })
 
   it('sorts the movements of each month by amount when asked', () => {
@@ -149,6 +143,56 @@ describe('buildMonthGroups', () => {
     })
 
     expect(groups[0].rows.map((row) => row.id)).toEqual(['nomina-sep', 'vwce', 'mercadona'])
+  })
+})
+
+function monthGroups(...months: Month[]): MonthGroup[] {
+  return buildMonthGroups(
+    months.map((month) =>
+      tx(`tx-${month}`, `2026-${String(month).padStart(2, '0')}-01`, 'expense', 10),
+    ),
+    2026,
+    NO_FILTERS,
+    NEWEST_FIRST,
+  )
+}
+
+describe('foldMonthGroups', () => {
+  it('has nothing to show or fold when the year has no movements', () => {
+    expect(foldMonthGroups([], 10)).toEqual({ shown: [], hidden: [] })
+  })
+
+  it('folds the months older than the selected one', () => {
+    const [october, september, august] = monthGroups(10, 9, 8)
+
+    expect(foldMonthGroups([october, september, august], 10)).toEqual({
+      shown: [october],
+      hidden: [september, august],
+    })
+  })
+
+  it('opens the latest month with movements when the selected month is empty', () => {
+    const [september, august] = monthGroups(9, 8)
+
+    expect(foldMonthGroups([september, august], 10)).toEqual({
+      shown: [september],
+      hidden: [august],
+    })
+  })
+
+  it('shows every month once asked to reveal the older ones', () => {
+    const groups = monthGroups(10, 9, 8)
+
+    expect(foldMonthGroups(groups, 10, true)).toEqual({ shown: groups, hidden: [] })
+  })
+
+  it('keeps the newer months in view when the selected month goes back', () => {
+    const [october, september, august, july] = monthGroups(10, 9, 8, 7)
+
+    expect(foldMonthGroups([october, september, august, july], 8)).toEqual({
+      shown: [october, september, august],
+      hidden: [july],
+    })
   })
 })
 
@@ -173,22 +217,5 @@ describe('hasTypeRestriction', () => {
   it('is true when the chosen types leave any type out', () => {
     expect(hasTypeRestriction(['expense'])).toBe(true)
     expect(hasTypeRestriction(['expense', 'investment'])).toBe(true)
-  })
-})
-
-describe('categoryBreakdown', () => {
-  it('adds one type of the month by category, largest first, with its share', () => {
-    const transactions = [
-      tx('alquiler', '2026-09-01', 'expense', 850, { category: 'Hogar' }),
-      tx('luz', '2026-09-15', 'expense', 50, { category: 'Hogar' }),
-      tx('super', '2026-09-27', 'expense', 100, { category: 'Supermercado' }),
-      tx('nomina', '2026-09-01', 'income', 2450, { category: 'Nómina' }),
-      tx('agosto', '2026-08-02', 'expense', 70, { category: 'Supermercado' }),
-    ]
-
-    expect(categoryBreakdown(transactions, 2026, 9, 'expense')).toEqual([
-      { category: 'Hogar', amount: 900, share: 90 },
-      { category: 'Supermercado', amount: 100, share: 10 },
-    ])
   })
 })

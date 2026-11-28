@@ -60,266 +60,350 @@ function comparable(exported: Row): Row {
 
 /** One row in every collection the export carries, with the optional fields filled in. */
 async function seedFullDataset(db: TestDatabase['db'], userId: string): Promise<void> {
-  const account = await runWithDb(db, accountsRepository.create(userId, {
-    name: 'Broker',
-    kind: 'investment',
-    currency: 'EUR',
-    openingBalance: 100,
-    isArchived: true,
-  }))
-  const category = await runWithDb(db, accountsRepository.createCategory(userId, {
-    name: 'Ocio',
-    kind: 'expense',
-    sortOrder: 3,
-    emoji: '🎬',
-  }))
-  await runWithDb(db, accountsRepository.createTwrLiquidityAccount(userId, {
-    accountId: account.id,
-    name: 'Liquidez',
-  }))
-  const instrument = await runWithDb(db, marketRepository.createInstrument({
-    symbol: 'VWCE',
-    normalizedSymbol: 'VWCE',
-    provider: 'test',
-    currency: 'EUR',
-  }))
-  await runWithDb(db, marketRepository.createUserInstrument(userId, {
-    instrumentId: instrument.id,
-    categoryId: category.id,
-    alias: account.id,
-    quoteConfig: {
+  const account = await runWithDb(
+    db,
+    accountsRepository.create(userId, {
+      name: 'Broker',
+      kind: 'investment',
+      currency: 'EUR',
+      openingBalance: 100,
+      isArchived: true,
+    }),
+  )
+  const category = await runWithDb(
+    db,
+    accountsRepository.createCategory(userId, {
+      name: 'Ocio',
+      kind: 'expense',
+      sortOrder: 3,
+      emoji: '🎬',
+    }),
+  )
+  await runWithDb(
+    db,
+    accountsRepository.createTwrLiquidityAccount(userId, {
+      accountId: account.id,
+      name: 'Liquidez',
+    }),
+  )
+  const instrument = await runWithDb(
+    db,
+    marketRepository.createInstrument({
       symbol: 'VWCE',
-      quoteSymbol: 'VWCE.DE',
-      type: 'etf',
+      normalizedSymbol: 'VWCE',
       provider: 'test',
       currency: 'EUR',
-      market: 'XETRA',
-      active: true,
-      holdingUnits: 2.5,
-      holdingsSource: 'manual',
-      holdingsAsOf: '2026-04-01',
-      holdingsUpdatedAt: '2026-04-01T10:00:00Z',
-    },
-  }))
-  await runWithDb(db, transactionsRepository.create(userId, {
-    legacyId: 'tx-1',
-    accountId: account.id,
-    categoryId: category.id,
-    type: 'investment',
-    date: '2026-03-02',
-    description: 'Compra',
-    amount: -250.5,
-    currency: 'EUR',
-    time: '09:30',
-    declared: true,
-    accountingMonth: 4,
-    operation: {
+    }),
+  )
+  await runWithDb(
+    db,
+    marketRepository.createUserInstrument(userId, {
       instrumentId: instrument.id,
-      symbol: 'VWCE',
-      side: 'buy',
-      units: 2.5,
-      unitPrice: 100,
-      fee: 0.5,
-    },
-    externalId: 'bitvavo-1',
-    remoteOperation: {
-      provider: 'bitvavo',
-      externalId: 'bitvavo-1',
-      executedAt: '2026-03-02T08:30:00Z',
-      timeZone: 'Europe/Madrid',
+      categoryId: category.id,
+      alias: account.id,
+      quoteConfig: {
+        symbol: 'VWCE',
+        quoteSymbol: 'VWCE.DE',
+        type: 'etf',
+        provider: 'test',
+        currency: 'EUR',
+        market: 'XETRA',
+        active: true,
+        holdingUnits: 2.5,
+        holdingsSource: 'manual',
+        holdingsAsOf: '2026-04-01',
+        holdingsUpdatedAt: '2026-04-01T10:00:00Z',
+      },
+    }),
+  )
+  await runWithDb(
+    db,
+    transactionsRepository.create(userId, {
+      legacyId: 'tx-1',
+      accountId: account.id,
+      categoryId: category.id,
+      type: 'investment',
       date: '2026-03-02',
+      description: 'Compra',
+      amount: -250.5,
+      currency: 'EUR',
       time: '09:30',
-      side: 'buy',
+      declared: true,
+      accountingMonth: 4,
+      operation: {
+        instrumentId: instrument.id,
+        symbol: 'VWCE',
+        side: 'buy',
+        units: 2.5,
+        unitPrice: 100,
+        fee: 0.5,
+      },
+      externalId: 'bitvavo-1',
+      remoteOperation: {
+        provider: 'bitvavo',
+        externalId: 'bitvavo-1',
+        executedAt: '2026-03-02T08:30:00Z',
+        timeZone: 'Europe/Madrid',
+        date: '2026-03-02',
+        time: '09:30',
+        side: 'buy',
+        symbol: 'VWCE',
+        quantity: '2.5',
+        unitPrice: '100',
+      } as never,
+    }),
+  )
+  await runWithDb(
+    db,
+    subscriptionsRepository.create(userId, {
+      name: 'Cine',
+      accountId: account.id,
+      categoryId: category.id,
+      amount: 9.99,
+      currency: 'EUR',
+      startDate: '2026-01-01',
+      nextChargeDate: '2026-04-01',
+      frequency: 'monthly',
+      isActive: false,
+    }),
+  )
+  const rule = await runWithDb(
+    db,
+    recurringRulesRepository.create(userId, {
+      name: 'Aporte mensual',
+      type: 'investment',
+      accountId: account.id,
+      categoryId: category.id,
+      amount: 200,
+      currency: 'EUR',
+      frequency: 'monthly',
+      interval: 2,
+      startDate: '2026-01-05',
+      endDate: '2027-01-05',
+      lastExecutionDate: '2026-03-05',
+      nextRunDate: '2026-05-05',
       symbol: 'VWCE',
-      quantity: '2.5',
-      unitPrice: '100',
-    } as never,
-  }))
-  await runWithDb(db, subscriptionsRepository.create(userId, {
-    name: 'Cine',
-    accountId: account.id,
-    categoryId: category.id,
-    amount: 9.99,
-    currency: 'EUR',
-    startDate: '2026-01-01',
-    nextChargeDate: '2026-04-01',
-    frequency: 'monthly',
-    isActive: false,
-  }))
-  const rule = await runWithDb(db, recurringRulesRepository.create(userId, {
-    name: 'Aporte mensual',
-    type: 'investment',
-    accountId: account.id,
-    categoryId: category.id,
-    amount: 200,
-    currency: 'EUR',
-    frequency: 'monthly',
-    interval: 2,
-    startDate: '2026-01-05',
-    endDate: '2027-01-05',
-    lastExecutionDate: '2026-03-05',
-    nextRunDate: '2026-05-05',
-    symbol: 'VWCE',
-    side: 'buy',
-    units: 2,
-    unitPrice: 100,
-    fee: 1,
-    time: '10:00',
-    status: 'paused',
-  }))
-  await runWithDb(db, pendingMovementsRepository.create(userId, {
-    recurringRuleId: rule.id,
-    accountId: account.id,
-    categoryId: category.id,
-    amount: 200,
-    currency: 'EUR',
-    dueDate: '2026-05-05',
-    type: 'investment',
-    description: 'Aporte',
-    symbol: 'VWCE',
-    side: 'buy',
-    units: 2,
-    unitPrice: 100,
-    fee: 1,
-    time: '10:00',
-    transactionId: 'tx-1',
-    status: 'confirmed',
-  }))
-  await runWithDb(db, budgetEntriesRepository.create(userId, {
-    categoryId: category.id,
-    year: 2026,
-    month: 4,
-    amount: 50,
-    currency: 'EUR',
-  }))
-  const savingCategory = await runWithDb(db, accountsRepository.createCategory(userId, {
-    name: 'Fondo de emergencia',
-    kind: 'saving',
-  }))
-  const origin = await runWithDb(db, accountsRepository.create(userId, {
-    name: 'Corriente',
-    kind: 'cash',
-    currency: 'EUR',
-    openingBalance: 1000,
-  }))
-  const destination = await runWithDb(db, accountsRepository.create(userId, {
-    name: 'Hucha',
-    kind: 'cash',
-    currency: 'EUR',
-    openingBalance: 0,
-  }))
-  await runWithDb(db, transactionsRepository.create(userId, {
-    legacyId: 'tx-saving',
-    accountId: origin.id,
-    destinationAccountId: destination.id,
-    categoryId: savingCategory.id,
-    type: 'saving',
-    date: '2026-03-03',
-    description: 'Ahorro',
-    amount: 150,
-    currency: 'EUR',
-  }))
+      side: 'buy',
+      units: 2,
+      unitPrice: 100,
+      fee: 1,
+      time: '10:00',
+      status: 'paused',
+    }),
+  )
+  await runWithDb(
+    db,
+    pendingMovementsRepository.create(userId, {
+      recurringRuleId: rule.id,
+      accountId: account.id,
+      categoryId: category.id,
+      amount: 200,
+      currency: 'EUR',
+      dueDate: '2026-05-05',
+      type: 'investment',
+      description: 'Aporte',
+      symbol: 'VWCE',
+      side: 'buy',
+      units: 2,
+      unitPrice: 100,
+      fee: 1,
+      time: '10:00',
+      transactionId: 'tx-1',
+      status: 'confirmed',
+    }),
+  )
+  await runWithDb(
+    db,
+    budgetEntriesRepository.create(userId, {
+      categoryId: category.id,
+      year: 2026,
+      month: 4,
+      amount: 50,
+      currency: 'EUR',
+    }),
+  )
+  const savingCategory = await runWithDb(
+    db,
+    accountsRepository.createCategory(userId, {
+      name: 'Fondo de emergencia',
+      kind: 'saving',
+    }),
+  )
+  const origin = await runWithDb(
+    db,
+    accountsRepository.create(userId, {
+      name: 'Corriente',
+      kind: 'cash',
+      currency: 'EUR',
+      openingBalance: 1000,
+    }),
+  )
+  const destination = await runWithDb(
+    db,
+    accountsRepository.create(userId, {
+      name: 'Hucha',
+      kind: 'cash',
+      currency: 'EUR',
+      openingBalance: 0,
+    }),
+  )
+  await runWithDb(
+    db,
+    transactionsRepository.create(userId, {
+      legacyId: 'tx-saving',
+      accountId: origin.id,
+      destinationAccountId: destination.id,
+      categoryId: savingCategory.id,
+      type: 'saving',
+      date: '2026-03-03',
+      description: 'Ahorro',
+      amount: 150,
+      currency: 'EUR',
+    }),
+  )
   // A prior-year movement: the export is never year-filtered, so it must
   // survive export → import → export along with this year's rows.
-  await runWithDb(db, transactionsRepository.create(userId, {
-    legacyId: 'tx-2025',
-    accountId: account.id,
-    categoryId: category.id,
-    type: 'expense',
-    date: '2025-12-31',
-    amount: -7.5,
-    currency: 'EUR',
-  }))
-  const savingRule = await runWithDb(db, recurringRulesRepository.create(userId, {
-    name: 'Ahorro mensual',
-    type: 'saving',
-    accountId: origin.id,
-    destinationAccountId: destination.id,
-    categoryId: savingCategory.id,
-    amount: 100,
-    currency: 'EUR',
-    frequency: 'monthly',
-  }))
-  await runWithDb(db, pendingMovementsRepository.create(userId, {
-    recurringRuleId: savingRule.id,
-    accountId: origin.id,
-    destinationAccountId: destination.id,
-    categoryId: savingCategory.id,
-    amount: 100,
-    currency: 'EUR',
-    dueDate: '2026-05-05',
-    type: 'saving',
-    description: 'Ahorro',
-  }))
-  await runWithDb(db, goalsRepository.create(userId, {
-    key: 'saving:emergencia',
-    categoryId: savingCategory.id,
-    name: 'Colchón',
-    targetAmount: 3000,
-    currency: 'EUR',
-  }))
-  await runWithDb(db, goalsRepository.create(userId, {
-    key: 'fire',
-    name: 'Independencia',
-    targetYear: 2040,
-    targetAmount: 500000,
-    currency: 'EUR',
-  }))
-  const snapshot = await runWithDb(db, wealthRepository.create(userId, {
-    snapshotDate: '2026-03-31',
-    year: 2026,
-    month: 3,
-  }))
-  await runWithDb(db, wealthRepository.createBalance(userId, {
-    snapshotId: snapshot.id,
-    accountId: account.id,
-    balance: 1234.56,
-    currency: 'EUR',
-  }))
-  const contribution = await runWithDb(db, contributionsRepository.create(userId, {
-    date: '2026-03-10',
-    amount: 300,
-    currency: 'EUR',
-    portfolioDate: '2026-03-09',
-    portfolioValue: 10000,
-    flow: 300,
-  }))
-  await runWithDb(db, contributionsRepository.createAllocation(userId, {
-    contributionId: contribution.id,
-    accountId: account.id,
-    amount: 300,
-    currency: 'EUR',
-  }))
-  await runWithDb(db, stockeventsSymbolMappingsRepository.create(userId, {
-    categoryId: category.id,
-    stockeventsSymbol: 'VWCE.DE',
-    sync: true,
-    watchlistId: 'wl-1',
-    hidden: true,
-  }))
-  await runWithDb(db, stockeventsCashMappingsRepository.upsertMapping(userId, {
-    accountId: account.id,
-    watchlistId: 'wl-1',
-  }))
-  await runWithDb(db, stockeventsCashMappingsRepository.upsertSyncEntry(userId, {
-    contributionDate: '2026-03-10',
-    accountId: account.id,
-    watchlistId: 'wl-1',
-    syncedAmount: 300,
-    currency: 'EUR',
-  }))
-  await runWithDb(db, userSettingsRepository.create(userId, {
-    onboardingPresented: true,
-    onboardingDismissed: true,
-    onboardingAccountCompleted: true,
-    onboardingMovementCompleted: true,
-    onboardingCompleted: true,
-    currency: 'EUR',
-    locale: 'es-ES',
-    theme: 'dark',
-    stockeventsEnabled: true,
-    stockeventsTradesToCash: false,
-  }))
+  await runWithDb(
+    db,
+    transactionsRepository.create(userId, {
+      legacyId: 'tx-2025',
+      accountId: account.id,
+      categoryId: category.id,
+      type: 'expense',
+      date: '2025-12-31',
+      amount: -7.5,
+      currency: 'EUR',
+    }),
+  )
+  const savingRule = await runWithDb(
+    db,
+    recurringRulesRepository.create(userId, {
+      name: 'Ahorro mensual',
+      type: 'saving',
+      accountId: origin.id,
+      destinationAccountId: destination.id,
+      categoryId: savingCategory.id,
+      amount: 100,
+      currency: 'EUR',
+      frequency: 'monthly',
+    }),
+  )
+  await runWithDb(
+    db,
+    pendingMovementsRepository.create(userId, {
+      recurringRuleId: savingRule.id,
+      accountId: origin.id,
+      destinationAccountId: destination.id,
+      categoryId: savingCategory.id,
+      amount: 100,
+      currency: 'EUR',
+      dueDate: '2026-05-05',
+      type: 'saving',
+      description: 'Ahorro',
+    }),
+  )
+  await runWithDb(
+    db,
+    goalsRepository.create(userId, {
+      key: 'saving:emergencia',
+      categoryId: savingCategory.id,
+      name: 'Colchón',
+      targetAmount: 3000,
+      targetYear: 2027,
+      targetMonth: 6,
+      monthlyAmount: 125.5,
+      currency: 'EUR',
+    }),
+  )
+  await runWithDb(
+    db,
+    goalsRepository.create(userId, {
+      key: 'fire',
+      name: 'Independencia',
+      targetYear: 2040,
+      targetAmount: 500000,
+      currency: 'EUR',
+    }),
+  )
+  const snapshot = await runWithDb(
+    db,
+    wealthRepository.create(userId, {
+      snapshotDate: '2026-03-31',
+      year: 2026,
+      month: 3,
+    }),
+  )
+  await runWithDb(
+    db,
+    wealthRepository.createBalance(userId, {
+      snapshotId: snapshot.id,
+      accountId: account.id,
+      balance: 1234.56,
+      currency: 'EUR',
+    }),
+  )
+  const contribution = await runWithDb(
+    db,
+    contributionsRepository.create(userId, {
+      date: '2026-03-10',
+      amount: 300,
+      currency: 'EUR',
+      portfolioDate: '2026-03-09',
+      portfolioValue: 10000,
+      flow: 300,
+    }),
+  )
+  await runWithDb(
+    db,
+    contributionsRepository.createAllocation(userId, {
+      contributionId: contribution.id,
+      accountId: account.id,
+      amount: 300,
+      currency: 'EUR',
+    }),
+  )
+  await runWithDb(
+    db,
+    stockeventsSymbolMappingsRepository.create(userId, {
+      categoryId: category.id,
+      stockeventsSymbol: 'VWCE.DE',
+      sync: true,
+      watchlistId: 'wl-1',
+      hidden: true,
+    }),
+  )
+  await runWithDb(
+    db,
+    stockeventsCashMappingsRepository.upsertMapping(userId, {
+      accountId: account.id,
+      watchlistId: 'wl-1',
+    }),
+  )
+  await runWithDb(
+    db,
+    stockeventsCashMappingsRepository.upsertSyncEntry(userId, {
+      contributionDate: '2026-03-10',
+      accountId: account.id,
+      watchlistId: 'wl-1',
+      syncedAmount: 300,
+      currency: 'EUR',
+    }),
+  )
+  await runWithDb(
+    db,
+    userSettingsRepository.create(userId, {
+      onboardingPresented: true,
+      onboardingDismissed: true,
+      onboardingCompleted: true,
+      onboardingStep: 6,
+      currency: 'EUR',
+      locale: 'es-ES',
+      theme: 'dark',
+      dashboardLayout: { version: 1, items: [{ id: 'goals', col: 0, row: 0, w: 2, h: 3 }] },
+      stockeventsEnabled: true,
+      stockeventsTradesToCash: false,
+    }),
+  )
 }
 
 function postJson(url: string, body: unknown): Request {
@@ -359,9 +443,14 @@ describe('GET /api/data/export + POST /api/data/import', () => {
 
   it('never includes integration_credentials, even when the user has one configured', async () => {
     const testEnv = { DATA_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64') }
-    await runWithDb(testDb.db, integrationCredentialsRepository.create(principal.userId,
-      { provider: 'stockevents', secret: 'super-secret-plaintext-key' },
-      testEnv,))
+    await runWithDb(
+      testDb.db,
+      integrationCredentialsRepository.create(
+        principal.userId,
+        { provider: 'stockevents', secret: 'super-secret-plaintext-key' },
+        testEnv,
+      ),
+    )
 
     const { GET } = await import('../../../../src/pages/api/data/export')
     const response = await GET({ locals: { principal } } as never)
@@ -371,64 +460,12 @@ describe('GET /api/data/export + POST /api/data/import', () => {
     expect(bodyText).not.toContain('integration_credentials')
   })
 
-  it('round-trips accounts/transactions through export → import with FK ids remapped', async () => {
-    const account = await runWithDb(testDb.db, accountsRepository.create(principal.userId, {
-      name: 'Cuenta origen',
-      kind: 'cash',
-      currency: 'EUR',
-      openingBalance: 10,
-    }))
-    await runWithDb(testDb.db, transactionsRepository.create(principal.userId, {
-      accountId: account.id,
-      type: 'expense',
-      date: '2024-01-01',
-      amount: -5,
-      currency: 'EUR',
-    }))
-
-    const { GET: exportGET } = await import('../../../../src/pages/api/data/export')
-    const exportResponse = await exportGET({ locals: { principal } } as never)
-    const exported = await exportResponse.json()
-    expect(exported.accounts).toHaveLength(1)
-    expect(exported.transactions).toHaveLength(1)
-
-    // Import into a brand-new (empty) user — the account/transaction ids in
-    // the export payload must not be reused verbatim; the importer remaps
-    // old->new ids as it recreates the dependency chain.
-    const otherUser = await seedUser(testDb.db, 'import-target@example.com')
-    const otherPrincipal: AuthPrincipal = {
-      userId: otherUser.id,
-      email: otherUser.email,
-      provider: 'better-auth',
-      subject: 'sub-2',
-    }
-
-    const { POST: importPOST } = await import('../../../../src/pages/api/data/import')
-    const importResponse = await importPOST({
-      request: postJson('https://example.test/api/data/import', exported),
-      locals: { principal: otherPrincipal },
-    } as never)
-    expect(importResponse.status).toBe(200)
-    const importBody = await importResponse.json()
-    expect(importBody.imported.accounts).toBe(1)
-    expect(importBody.imported.transactions).toBe(1)
-    expect(importBody.skipped.transactions ?? 0).toBe(0)
-
-    const importedAccounts = await runWithDb(testDb.db, accountsRepository.listByUser(otherUser.id))
-    expect(importedAccounts).toHaveLength(1)
-    expect(importedAccounts[0].id).not.toBe(account.id)
-
-    const importedTransactions = await runWithDb(testDb.db, transactionsRepository.listByUser(otherUser.id))
-    expect(importedTransactions).toHaveLength(1)
-    expect(importedTransactions[0].accountId).toBe(importedAccounts[0].id)
-    expect(importedTransactions[0].amount).toBe(-5)
-  })
-
   it.each(['append', 'replace'])(
     'advances the sync cursor and requests a full refresh after %s import',
     async (mode) => {
       await runWithDb(testDb.db, syncRepository.ensureRevision(principal.userId))
-      for (let i = 0; i < 3; i++) await runWithDb(testDb.db, syncRepository.bumpRevision(principal.userId))
+      for (let i = 0; i < 3; i++)
+        await runWithDb(testDb.db, syncRepository.bumpRevision(principal.userId))
       const { POST } = await import('../../../../src/pages/api/data/import')
       const url = new URL(`https://example.test/api/data/import?mode=${mode}`)
       const response = await POST({
@@ -437,25 +474,30 @@ describe('GET /api/data/export + POST /api/data/import', () => {
         url,
       } as never)
       expect(response.status).toBe(200)
-      expect(await runWithDb(testDb.db, syncRepository.getRevision(principal.userId))).toMatchObject({
+      expect(
+        await runWithDb(testDb.db, syncRepository.getRevision(principal.userId)),
+      ).toMatchObject({
         revision: 4,
       })
-      expect(await runWithDb(testDb.db, syncRepository.listChangesSince(principal.userId, 3))).toMatchObject([
-        { revision: 4, entityType: 'reset' },
-      ])
+      expect(
+        await runWithDb(testDb.db, syncRepository.listChangesSince(principal.userId, 3)),
+      ).toMatchObject([{ revision: 4, entityType: 'reset' }])
     },
   )
 
   it.each(['append', 'replace'])(
     'preserves receiving user onboarding during %s import',
     async (mode) => {
-      await runWithDb(testDb.db, userSettingsRepository.create(principal.userId, {
-        onboardingPresented: true,
-        onboardingDismissed: false,
-        onboardingAccountCompleted: true,
-        onboardingMovementCompleted: true,
-        onboardingCompleted: true,
-      }))
+      await runWithDb(
+        testDb.db,
+        userSettingsRepository.create(principal.userId, {
+          onboardingPresented: true,
+          onboardingDismissed: false,
+          onboardingCompleted: true,
+          onboardingStep: 6,
+          tourDesktopSeen: true,
+        }),
+      )
       const { POST } = await import('../../../../src/pages/api/data/import')
       const url = new URL(`https://example.test/api/data/import?mode=${mode}`)
       const response = await POST({
@@ -464,28 +506,35 @@ describe('GET /api/data/export + POST /api/data/import', () => {
             currency: 'USD',
             onboardingPresented: 0,
             onboardingDismissed: 1,
-            onboardingAccountCompleted: 0,
-            onboardingMovementCompleted: 0,
             onboardingCompleted: 0,
+            onboardingStep: 1,
+            tourDesktopSeen: 0,
+            tourMobileSeen: 1,
           },
         }),
         locals: { principal },
         url,
       } as never)
       expect(response.status).toBe(200)
-      expect(await runWithDb(testDb.db, userSettingsRepository.get(principal.userId))).toMatchObject({
+      expect(
+        await runWithDb(testDb.db, userSettingsRepository.get(principal.userId)),
+      ).toMatchObject({
         currency: 'USD',
         onboardingPresented: 1,
         onboardingDismissed: 0,
-        onboardingAccountCompleted: 1,
-        onboardingMovementCompleted: 1,
         onboardingCompleted: 1,
+        onboardingStep: 6,
+        tourDesktopSeen: 1,
+        tourMobileSeen: 0,
       })
     },
   )
 
   it('preserves completed onboarding when replacement has no settings', async () => {
-    await runWithDb(testDb.db, userSettingsRepository.create(principal.userId, { onboardingCompleted: true }))
+    await runWithDb(
+      testDb.db,
+      userSettingsRepository.create(principal.userId, { onboardingCompleted: true }),
+    )
     const { POST } = await import('../../../../src/pages/api/data/import')
     const url = new URL('https://example.test/api/data/import?mode=replace')
     const response = await POST({
@@ -495,7 +544,8 @@ describe('GET /api/data/export + POST /api/data/import', () => {
     } as never)
     expect(response.status).toBe(200)
     expect(
-      (await runWithDb(testDb.db, userSettingsRepository.get(principal.userId)))?.onboardingCompleted,
+      (await runWithDb(testDb.db, userSettingsRepository.get(principal.userId)))
+        ?.onboardingCompleted,
     ).toBe(1)
   })
 
@@ -555,19 +605,25 @@ describe('GET /api/data/export + POST /api/data/import', () => {
     // The target already has data of its own, which the restore must remove.
     const target = await seedUser(testDb.db, 'restore-target@example.com')
     const targetPrincipal: AuthPrincipal = { ...principal, userId: target.id, email: target.email }
-    const stale = await runWithDb(testDb.db, accountsRepository.create(target.id, {
-      name: 'Cuenta vieja',
-      kind: 'cash',
-      currency: 'EUR',
-      openingBalance: 0,
-    }))
-    await runWithDb(testDb.db, transactionsRepository.create(target.id, {
-      accountId: stale.id,
-      type: 'expense',
-      date: '2025-01-01',
-      amount: -1,
-      currency: 'EUR',
-    }))
+    const stale = await runWithDb(
+      testDb.db,
+      accountsRepository.create(target.id, {
+        name: 'Cuenta vieja',
+        kind: 'cash',
+        currency: 'EUR',
+        openingBalance: 0,
+      }),
+    )
+    await runWithDb(
+      testDb.db,
+      transactionsRepository.create(target.id, {
+        accountId: stale.id,
+        type: 'expense',
+        date: '2025-01-01',
+        amount: -1,
+        currency: 'EUR',
+      }),
+    )
 
     const { POST: importPOST } = await import('../../../../src/pages/api/data/import')
     const importResponse = await importPOST({
@@ -586,12 +642,15 @@ describe('GET /api/data/export + POST /api/data/import', () => {
   })
 
   it('without ?mode=replace the import adds to the existing rows', async () => {
-    await runWithDb(testDb.db, accountsRepository.create(principal.userId, {
-      name: 'Existente',
-      kind: 'cash',
-      currency: 'EUR',
-      openingBalance: 0,
-    }))
+    await runWithDb(
+      testDb.db,
+      accountsRepository.create(principal.userId, {
+        name: 'Existente',
+        kind: 'cash',
+        currency: 'EUR',
+        openingBalance: 0,
+      }),
+    )
     const { POST: importPOST } = await import('../../../../src/pages/api/data/import')
     const response = await importPOST({
       request: postJson('https://example.test/api/data/import', {
@@ -601,6 +660,8 @@ describe('GET /api/data/export + POST /api/data/import', () => {
       url: new URL('https://example.test/api/data/import'),
     } as never)
     expect(response.status).toBe(200)
-    expect(await runWithDb(testDb.db, accountsRepository.listByUser(principal.userId))).toHaveLength(2)
+    expect(
+      await runWithDb(testDb.db, accountsRepository.listByUser(principal.userId)),
+    ).toHaveLength(2)
   })
 })

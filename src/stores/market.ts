@@ -2,21 +2,17 @@ import { defineStore } from 'pinia'
 import { computed, shallowRef } from 'vue'
 
 import { buildPortfolioValuation, type PortfolioValuation } from '../domain/investment/valuation'
-import {
-  isUnlinkedMovementForInstrument,
-  quoteSourceKey,
-} from '../domain/investment/symbol-matching'
+import { quoteSourceKey } from '../domain/investment/symbol-matching'
 import { fetchMarketQuotes } from '../services/market-api'
 import { runClientHttp } from '../lib/client/runtime'
 import type { Instrument, InstrumentType } from '../scripts/types'
-import { todayISO } from '../scripts/utils'
 import { newId } from '../lib/client/ids'
 import { resolveEntityId, syncCreate, syncUpdate, syncRemove } from '../lib/client/command-mapping'
+import { isReadOnlyDemoActive } from '../lib/client/demo-source'
 import {
   linkInstrumentMovements,
   type InstrumentLinkAcceptance,
 } from '../lib/client/instrument-link'
-import { isReadOnlyDemoActive } from '../lib/client/demo-source'
 import { useFinancialStateStore } from './financial-state'
 import { useSyncStore } from './sync'
 
@@ -43,25 +39,19 @@ export const useMarketStore = defineStore('market', () => {
   const valuation = computed<PortfolioValuation>(() =>
     buildPortfolioValuation(financialStateStore.state, { now: now.value }),
   )
-  const isLoading = shallowRef(false)
   const errorMessage = shallowRef<string | null>(null)
   const lastRefreshAt = shallowRef<string | null>(null)
   let refreshPromise: Promise<boolean> | null = null
   let refreshAgainRequested = false
   let configurationWrites = Promise.resolve()
 
-  /**
-   * Queues the private quote configuration. Resolves `false` (and shows the
-   * error) when it could not be written; the instrument link awaits it before
-   * moving on, while the other mutations ignore the result.
-   */
-  function persistConfiguration(instrument: Instrument, create = false): Promise<boolean> {
+  function persistConfiguration(instrument: Instrument, create = false): void {
     const ownerId = syncStore.userId
-    if (isReadOnlyDemoActive() || !ownerId) return Promise.resolve(true)
+    if (isReadOnlyDemoActive() || !ownerId) return
     const snapshot = structuredClone(instrument)
-    const write = configurationWrites
+    configurationWrites = configurationWrites
       .then(async () => {
-        if (syncStore.userId !== ownerId) return false
+        if (syncStore.userId !== ownerId) return
         const alias = await resolveEntityId('account', snapshot.investmentAssetId)
         if (!alias) throw new Error('No se pudo guardar la agrupación del símbolo.')
         const { id } = snapshot
@@ -69,19 +59,16 @@ export const useMarketStore = defineStore('market', () => {
         delete quoteConfig.id
         delete quoteConfig.investmentAssetId
         const trackingId = (await syncStore.getUserInstrumentId(id)) ?? id
-        if (syncStore.userId !== ownerId) return false
+        if (syncStore.userId !== ownerId) return
         const saved = create
           ? await syncCreate('userInstrument', id, { instrumentId: id, alias, quoteConfig })
           : await syncUpdate('userInstrument', trackingId, { alias, quoteConfig })
-        return saved !== false
+        if (saved === false) throw new Error('No se pudo guardar la cotización.')
       })
       .catch((error) => {
         errorMessage.value =
           error instanceof Error ? error.message : 'No se pudo guardar la cotización.'
-        return false
       })
-    configurationWrites = write.then(() => undefined)
-    return write
   }
 
   function addInstrument(input: NewInstrumentInput): boolean {
@@ -113,23 +100,8 @@ export const useMarketStore = defineStore('market', () => {
       })
     })
     const added = instruments.value.find((instrument) => instrument.id === id)
-    if (added) void persistConfiguration(added, true)
+    if (added) persistConfiguration(added, true)
     return true
-  }
-
-  function updateCurrentUnits(id: string, value: string | number): void {
-    const currentUnits = normalizeUnits(value)
-    financialStateStore.commitState((draft) => {
-      const instrument = draft.instruments.find((item) => item.id === id)
-      if (instrument) {
-        instrument.holdingUnits = currentUnits
-        instrument.holdingsAsOf = todayISO()
-        instrument.holdingsUpdatedAt = new Date().toISOString()
-        instrument.holdingsSource = 'manual'
-      }
-    })
-    const updated = instruments.value.find((instrument) => instrument.id === id)
-    if (updated) void persistConfiguration(updated)
   }
 
   function removeInstrument(id: string): void {
@@ -148,77 +120,6 @@ export const useMarketStore = defineStore('market', () => {
       .catch((error) => {
         errorMessage.value = String(error)
       })
-  }
-
-  function setInstrumentProvider(id: string, provider: string): void {
-    const normalizedProvider = provider.trim().toLowerCase()
-    if (!normalizedProvider) return
-    financialStateStore.commitState((draft) => {
-      const instrument = draft.instruments.find((item) => item.id === id)
-      if (instrument) instrument.provider = normalizedProvider
-    })
-    const updated = instruments.value.find((instrument) => instrument.id === id)
-    if (updated) void persistConfiguration(updated)
-  }
-
-  function updateInstrumentSymbol(id: string, symbol: string): boolean {
-    const instrument = instruments.value.find((item) => item.id === id)
-    return configureInstrumentSymbols(id, symbol, instrument?.quoteSymbol || '')
-  }
-
-  function configureInstrumentSymbols(id: string, symbol: string, quoteSymbol: string): boolean {
-    const normalizedSymbol = symbol.trim().toUpperCase()
-    const normalizedQuoteSymbol = quoteSymbol.trim().toUpperCase()
-    if (!normalizedSymbol) return false
-    let updated = false
-    financialStateStore.commitState((draft) => {
-      const instrument = draft.instruments.find((item) => item.id === id)
-      if (instrument) {
-        if (
-          quoteSourceKey(instrument) !==
-          quoteSourceKey({
-            ...instrument,
-            symbol: normalizedSymbol,
-            quoteSymbol: normalizedQuoteSymbol || undefined,
-          })
-        )
-          delete draft.quotes[id]
-        instrument.symbol = normalizedSymbol
-        if (normalizedQuoteSymbol) instrument.quoteSymbol = normalizedQuoteSymbol
-        else delete instrument.quoteSymbol
-        updated = true
-      }
-    })
-    const instrument = instruments.value.find((item) => item.id === id)
-    if (updated && instrument) void persistConfiguration(instrument)
-    return updated
-  }
-
-  function matchingMovementCount(instrumentId: string): number {
-    const instrument = instruments.value.find((item) => item.id === instrumentId)
-    if (!instrument) return 0
-    const assetName = financialStateStore.investmentAssets.find(
-      (asset) => asset.id === instrument.investmentAssetId,
-    )?.name
-    return financialStateStore.transactions.filter((transaction) =>
-      isUnlinkedMovementForInstrument(transaction, instrument, assetName),
-    ).length
-  }
-
-  function linkedMovementCount(instrumentId: string): number {
-    return financialStateStore.transactions.filter(
-      (transaction) =>
-        transaction.type === 'investment' && transaction.instrumentId === instrumentId,
-    ).length
-  }
-
-  function linkExistingMovements(instrumentId: string): Promise<InstrumentLinkAcceptance> {
-    return linkInstrumentMovements({
-      instrumentId,
-      onError: (message) => {
-        errorMessage.value = message
-      },
-    })
   }
 
   function tickClock(): void {
@@ -266,7 +167,6 @@ export const useMarketStore = defineStore('market', () => {
 
   async function executeRefresh(): Promise<boolean> {
     if (!instruments.value.length) return true
-    isLoading.value = true
     errorMessage.value = null
     try {
       const requested = instruments.value
@@ -294,34 +194,34 @@ export const useMarketStore = defineStore('market', () => {
       errorMessage.value =
         error instanceof Error ? error.message : 'No se pudieron cargar las cotizaciones'
       return false
-    } finally {
-      isLoading.value = false
     }
+  }
+
+  /**
+   * Links this instrument's unlinked movements as one durable intent (#487):
+   * accepted once it is stored on this device; its progress and any failure
+   * show in the sync status.
+   */
+  function linkExistingMovements(instrumentId: string): Promise<InstrumentLinkAcceptance> {
+    return linkInstrumentMovements({
+      instrumentId,
+      onError: (message) => {
+        errorMessage.value = message
+      },
+    })
   }
 
   return {
     instruments,
     quotes,
     valuation,
-    isLoading,
     errorMessage,
     lastRefreshAt,
     addInstrument,
     removeInstrument,
-    setInstrumentProvider,
-    updateInstrumentSymbol,
-    configureInstrumentSymbols,
-    updateCurrentUnits,
-    matchingMovementCount,
-    linkedMovementCount,
     linkExistingMovements,
     refreshQuotes,
     tickClock,
     startClock,
   }
 })
-
-function normalizeUnits(value: string | number): number {
-  const parsed = Number(value)
-  return Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed * 100_000_000) / 100_000_000 : 0
-}

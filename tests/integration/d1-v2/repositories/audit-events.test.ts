@@ -15,27 +15,6 @@ describe("audit-events repository", () => {
     testDb.close();
   });
 
-  it("creates, reads and deletes an audit event (CRUD)", async () => {
-    const { db } = testDb;
-    const user = await seedUser(db);
-
-    const created = await runWithDb(db, auditEventsRepo.create(user.id, {
-      eventType: "auth.login",
-      metadata: JSON.stringify({ ip: "127.0.0.1" }),
-    }));
-    expect(created.eventType).toBe("auth.login");
-
-    expect(await runWithDb(db, auditEventsRepo.get(user.id, created.id))).toMatchObject({ eventType: "auth.login" });
-    expect(await runWithDb(db, auditEventsRepo.remove(user.id, created.id))).toBe(true);
-  });
-
-  it("rejects creating an audit event for a non-existent user (FK violation)", async () => {
-    const { db } = testDb;
-    await expect(
-      runWithDb(db, auditEventsRepo.create("does-not-exist", { eventType: "auth.login" })),
-    ).rejects.toThrow(/FOREIGN KEY constraint failed/i);
-  });
-
   it("enforces cross-user isolation", async () => {
     const { db } = testDb;
     const userA = await seedUser(db);

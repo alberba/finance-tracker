@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useFinancialStateStore } from '../../../../src/stores/financial-state'
-import { useInvestmentStore } from '../../../../src/stores/investment'
 import { useMarketStore } from '../../../../src/stores/market'
 import { useMovementsStore } from '../../../../src/stores/movements'
 import { openStorage, wipeOutbox } from '../../../helpers/client-storage'
@@ -202,44 +201,6 @@ describe('vinculación durable y recuperable (#490)', () => {
     expect(after.steps.filter((step) => step.state === 'confirmed')).toHaveLength(1)
     expect(after.steps.filter((step) => step.state === 'cancelled')).toHaveLength(1)
     expect(await trip.pending()).toHaveLength(0)
-  })
-
-  it('respeta un desvínculo posterior tras recargar una intención pendiente', async () => {
-    // The configuration was not confirmed when the user asked to link; the
-    // intent now owns it as a waiting dependency (#491 replaces the former
-    // definitive catalog failure this test used to trigger).
-    const instrumentId = await addLinkInstrument()
-    trip.setOffline(true)
-    const acceptance = await useMarketStore().linkExistingMovements(instrumentId)
-    expect(acceptance).toEqual({ targets: 1, accepted: true })
-    await waitForIntent(trip, (view) =>
-      view.steps.some((step) => step.step === 'configuration' && step.state === 'queued'),
-    )
-
-    await trip.reloadOffline()
-    useInvestmentStore().saveEditedMovement(targetId, {
-      date: '2026-01-15',
-      time: '09:30',
-      side: 'buy',
-      symbol: 'OTHER',
-      category: 'Link Asset',
-      unitPrice: '100',
-      units: '2',
-      fee: '0',
-      movementCurrency: 'EUR',
-      accountId: CASH_ID,
-      declared: false,
-    })
-
-    trip.setOffline(false)
-    const state = await trip.reload()
-    const [view] = await trip.intents()
-    expect(view.intent.failure).toBeNull()
-    expect(view.steps.find((step) => step.step === targetId)?.state).toBe('cancelled')
-    expect(state.transactions.find((item) => item.id === targetId)).toMatchObject({
-      symbol: 'OTHER',
-    })
-    expect(state.transactions.find((item) => item.id === targetId)?.instrumentId).toBeUndefined()
   })
 
   it('no presenta como aceptada una vinculación cuyo registro durable falla', async () => {

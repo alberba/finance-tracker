@@ -33,6 +33,7 @@
  */
 
 import { Schema } from 'effect'
+import { dashboardLayoutSchema } from '../../dashboard-layout'
 
 import { validator, type Validator } from '../../schema'
 
@@ -247,6 +248,8 @@ const entityCreateFields = {
     categoryId: optionalText,
     name: nonEmpty,
     targetYear: Schema.optional(Schema.NullOr(int)),
+    targetMonth: Schema.optional(Schema.NullOr(int)),
+    monthlyAmount: Schema.optional(nullableFinite),
     targetAmount: finite,
     currency: nonEmpty,
   },
@@ -438,9 +441,13 @@ export const settingsUpdateCommandSchema = validator(
     patch: Schema.Struct({
       onboardingPresented: optionalBoolean,
       onboardingDismissed: optionalBoolean,
-      onboardingAccountCompleted: optionalBoolean,
-      onboardingMovementCompleted: optionalBoolean,
       onboardingCompleted: optionalBoolean,
+      /** The setup wizard's step to resume at. */
+      onboardingStep: Schema.optional(nonNegativeInt),
+      /** The guided tour, seen or skipped, on each frame. */
+      tourDesktopSeen: optionalBoolean,
+      tourMobileSeen: optionalBoolean,
+      dashboardLayout: Schema.optional(Schema.NullOr(dashboardLayoutSchema)),
       currency: Schema.optional(nonEmpty),
       locale: optionalText,
       theme: optionalText,

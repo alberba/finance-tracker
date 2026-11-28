@@ -1,6 +1,7 @@
 import { expect, type Page } from '@playwright/test'
 import { FinanceTrackerPage } from './FinanceTrackerPage'
 
+/** The Bitvavo panel of Configuración › Conexiones. */
 export class BitvavoPage {
   readonly tracker: FinanceTrackerPage
   constructor(readonly page: Page) {
@@ -9,36 +10,19 @@ export class BitvavoPage {
   get panel() {
     return this.page.getByRole('dialog', { name: 'Bitvavo', exact: true })
   }
-  get rows() {
-    return this.page.locator('[data-investment-tx-id]')
-  }
-  get details() {
-    return this.page.getByRole('dialog', { name: 'Detalle Bitvavo' })
-  }
-  async openDetails(side: 'Compra' | 'Venta') {
-    await this.rows
-      .filter({ hasText: side })
-      .getByRole('button', { name: 'Ver operación Bitvavo' })
-      .click()
-    await expect(this.details).toBeVisible()
-  }
-  async linkInstrument(id: string) {
-    await this.details.getByLabel('Instrumento', { exact: true }).selectOption(id)
-    await this.details.getByRole('button', { name: 'Vincular instrumento' }).click()
-    await expect(this.details).toBeHidden()
-  }
   async open() {
-    await this.tracker.openSettingsTab('Conexiones')
-    await expect(
-      this.page
-        .getByRole('region', { name: 'Conexiones', exact: true })
-        .getByRole('button', { name: 'Stock Events', exact: true }),
-    ).toBeVisible()
-    await this.page.getByRole('button', { name: 'Bitvavo', exact: true }).click()
+    await this.tracker.openSettings()
+    await this.page
+      .locator('#settings')
+      .getByRole('button', { name: 'Bitvavo', exact: true })
+      .click()
     await expect(this.panel).toBeVisible()
   }
   async connect(accountId: string) {
-    await this.panel.getByLabel('API key', { exact: true }).fill('test-key')
+    // Without a connection the form comes unfolded.
+    const apiKey = this.panel.getByLabel('API key', { exact: true })
+    if (!(await apiKey.isVisible())) await this.panel.getByText('Conectar cuenta').click()
+    await apiKey.fill('test-key')
     await this.panel.getByLabel('Secreto API').fill('test-secret')
     await this.panel.getByLabel('Cuenta de destino').selectOption(accountId)
     await this.panel.getByLabel('Fecha inicial').fill('2019-01-01')
@@ -56,5 +40,6 @@ export class BitvavoPage {
   }
   async close() {
     await this.panel.getByRole('button', { name: 'Cerrar', exact: true }).last().click()
+    await expect(this.panel).toBeHidden()
   }
 }

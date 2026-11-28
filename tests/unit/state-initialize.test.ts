@@ -31,25 +31,6 @@ describe("initializeFreshState (WP8 'empezar de cero')", () => {
     )
   })
 
-  it('reports alreadyInitialized:true idempotently on a repeat call (200)', async () => {
-    mockFetchOnce({ status: 200, body: { ok: true, alreadyInitialized: true } })
-
-    const result = await runClientHttp(initializeFreshState())
-
-    expect(result).toEqual({ ok: true, alreadyInitialized: true })
-  })
-
-  it('sends the requested currency in the body when provided', async () => {
-    mockFetchOnce({ status: 201, body: { ok: true } })
-
-    await runClientHttp(initializeFreshState('USD'))
-
-    expect(fetch).toHaveBeenCalledWith(
-      '/api/state/initialize',
-      expect.objectContaining({ body: JSON.stringify({ currency: 'USD' }) }),
-    )
-  })
-
   it('surfaces a 401 as ok:false with the server error message', async () => {
     mockFetchOnce({ status: 401, body: { error: 'Se requiere autenticación.' } })
 

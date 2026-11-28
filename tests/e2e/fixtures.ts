@@ -1,6 +1,5 @@
 import { test as base, expect } from '@playwright/test'
-import { createHash, randomUUID } from 'node:crypto'
-import { readFile } from 'node:fs/promises'
+import { randomUUID } from 'node:crypto'
 import { FinanceTrackerPage } from './pages/FinanceTrackerPage'
 import { seedSyncV2User, syncV2TestHeaders } from './seed-sync-v2'
 
@@ -14,54 +13,32 @@ type Fixtures = {
   testUserEmail: string
   tracker: FinanceTrackerPage
   // Freezes `Date` before the app loads. The selected year and month default to
-  // today, so a snapshot taken in one month differs from the next.
+  // today, so a figure asserted in one month differs from the next.
   fixedTime: string | undefined
-  snapshotTime: string | undefined
 }
 
 export const test = base.extend<Fixtures>({
-  testUserEmail: async ({ browserName }, use, testInfo) => {
-    await use(
-      testInfo.tags.includes('@snapshot')
-        ? // Playwright changes testId for --repeat-each; visible identities must stay stable.
-          `pw-${browserName}-${createHash('sha256')
-            .update(JSON.stringify([testInfo.project.name, testInfo.titlePath]))
-            .digest('hex')
-            .slice(0, 16)}@e2e.test`
-        : `pw-${randomUUID()}@e2e.test`,
-    )
+  // Playwright requires a destructured first argument, even when empty.
+  // eslint-disable-next-line no-empty-pattern
+  testUserEmail: async ({}, use) => {
+    await use(`pw-${randomUUID()}@e2e.test`)
   },
   extraHTTPHeaders: async ({ testUserEmail }, use) => {
     await use({ 'X-Test-User-Email': testUserEmail })
   },
+  // The demo keeps the guided tour's flags in the browser: seen, as for the
+  // fixture's user, so it does not cover the page in unrelated journeys.
+  context: async ({ context }, use) => {
+    await context.addInitScript(() => {
+      window.localStorage.setItem('finance-tour-desktop-seen', '1')
+      window.localStorage.setItem('finance-tour-mobile-seen', '1')
+    })
+    await use(context)
+  },
   fixedTime: [undefined, { option: true }],
-  snapshotTime: [undefined, { option: true }],
-  tracker: async ({ page, context, fixedTime, snapshotTime, testUserEmail }, use, testInfo) => {
-    const snapshot = testInfo.tags.includes('@snapshot')
-    const time = snapshot ? snapshotTime : fixedTime
-    if (time) {
-      await page.clock.setFixedTime(new Date(time))
-    }
-    if (snapshot) {
-      const css = await readFile('tests/e2e/screenshot-stable.css', 'utf8')
-      await page.addInitScript((styles) => {
-        const insert = () => {
-          const style = document.createElement('style')
-          style.dataset.snapshotFonts = ''
-          style.textContent = styles
-          document.documentElement.append(style)
-        }
-        if (document.documentElement) {
-          insert()
-        } else {
-          const observer = new MutationObserver(() => {
-            if (!document.documentElement) return
-            observer.disconnect()
-            insert()
-          })
-          observer.observe(document, { childList: true })
-        }
-      }, css)
+  tracker: async ({ page, context, fixedTime, testUserEmail }, use) => {
+    if (fixedTime) {
+      await page.clock.setFixedTime(new Date(fixedTime))
     }
 
     const email = testUserEmail
@@ -74,8 +51,9 @@ export const test = base.extend<Fixtures>({
       `No se pudo inicializar la identidad E2E (${initialization.status()})`,
     ).toBe(true)
     await seedSyncV2User(context.request, email)
-    // Unrelated journeys start after onboarding; the onboarding spec provisions
-    // untouched sync-v2 users and exercises the real first show.
+    // Unrelated journeys start after the setup wizard and the guided tour; the
+    // onboarding and tour specs provision untouched users and exercise the
+    // real first show.
     const completed = await context.request.post('/api/sync', {
       headers: await syncV2TestHeaders(context.request, email),
       data: {
@@ -83,7 +61,12 @@ export const test = base.extend<Fixtures>({
           {
             commandId: randomUUID(),
             action: 'settingsUpdate',
-            patch: { onboardingPresented: true, onboardingCompleted: true },
+            patch: {
+              onboardingPresented: true,
+              onboardingCompleted: true,
+              tourDesktopSeen: true,
+              tourMobileSeen: true,
+            },
           },
         ],
       },

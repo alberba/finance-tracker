@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { test, expect } from '@playwright/test'
 import { FinanceTrackerPage } from './pages/FinanceTrackerPage'
-import { syncV2TestHeaders } from './seed-sync-v2'
+import { readScenarioState, syncV2TestHeaders } from './seed-sync-v2'
 
 test('editing an investment from Movimientos preserves its data after sync and reload @smoke', async ({
   browser,
@@ -67,7 +67,6 @@ test('editing an investment from Movimientos preserves its data after sync and r
       fee: 1.2,
       movementCurrency: 'USD',
       brokerName: 'MyInvestor',
-      declared: true,
     })
     expect((await (await created).json()).results[0].status).toBe('applied')
 
@@ -87,19 +86,18 @@ test('editing an investment from Movimientos preserves its data after sync and r
     })
     expect((await (await edited).json()).results[0].status).toBe('applied')
     await tracker.reload()
-    await tracker.openInvestmentMovementsTab()
-    await tracker
-      .investmentMovementRow('VWCE')
-      .getByRole('button', { name: /^Editar / })
-      .click()
-    const panel = tracker.investmentMovementPanel()
-    await expect(panel.locator('#investment-movement-time')).toHaveValue('10:30')
-    await expect(panel.locator('#investment-movement-symbol')).toHaveValue('VWCE')
-    await expect(panel.locator('#investment-movement-units')).toHaveValue('10')
-    await expect(panel.locator('#investment-movement-unit-price')).toHaveValue('120.5')
-    await expect(panel.locator('#investment-movement-fee')).toHaveValue('1.2')
-    await expect(panel.locator('#investment-movement-currency')).toHaveValue('USD')
-    await expect(panel.getByRole('switch', { name: 'Ya está declarado' })).toBeChecked()
+    // The edit in Movimientos touches the description; the operation stays whole.
+    await tracker.expectTransactionDescriptionVisible('Compra revisada')
+    const [movement] = (await readScenarioState(page)).transactions
+    expect(movement).toMatchObject({
+      description: 'Compra revisada',
+      symbol: 'VWCE',
+      time: '10:30',
+      units: 10,
+      unitPrice: 120.5,
+      fee: 1.2,
+      movementCurrency: 'USD',
+    })
   } finally {
     await context.close()
   }
@@ -166,8 +164,9 @@ test('a movement counted in another month than its date keeps it after sync and 
     expect((await (await created).json()).results[0].status).toBe('applied')
 
     await tracker.reload()
-    // The ledger lists every month, so the row's own month is what must stay February (2).
-    await expect(tracker.transactionRow('Cena fin de enero')).toHaveAttribute('data-tx-month', '2')
+    await tracker.expectTransactionDescriptionVisible('Cena fin de enero')
+    const [movement] = (await readScenarioState(page)).transactions
+    expect(movement).toMatchObject({ date: '2026-01-31', month: 2 })
   } finally {
     await context.close()
   }

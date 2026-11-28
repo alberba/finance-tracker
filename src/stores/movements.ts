@@ -7,14 +7,7 @@ import { useToast } from '../composables/useToast'
 import { getOrderedCategoriesForType } from '../domain/transactions/categories'
 import { resolveCategoryId, resolveEntityId, syncListDiff } from '../lib/client/command-mapping'
 import { syncMovements } from '../lib/client/movement-commands'
-import {
-  accountingYear,
-  buildMonthGroups,
-  categoryBreakdown,
-  monthTotals,
-  registryYears,
-  signedAmount,
-} from '../domain/transactions/registry'
+import { accountingYear, buildMonthGroups, registryYears } from '../domain/transactions/registry'
 import {
   isTransactionType,
   type BudgetType,
@@ -22,7 +15,6 @@ import {
   type TransactionType,
   type Subscription,
   type SubscriptionFrequency,
-  type TxSortColumn,
 } from '../scripts/types'
 import { getFirstUpcomingChargeDate, materializeDueSubscriptions } from '../scripts/subscriptions'
 import { monthFromISO, parseFloatSafe, round2, todayISO, uid } from '../scripts/utils'
@@ -140,7 +132,6 @@ export const useMovementsStore = defineStore('movements', () => {
 
   const accounts = computed(() => financialStateStore.accounts)
   const subscriptions = computed(() => financialStateStore.subscriptions)
-  const categoryEmojis = computed(() => financialStateStore.state.categoryEmojis)
 
   const years = computed(() => registryYears(financialStateStore.transactions, currentYear()))
 
@@ -148,8 +139,6 @@ export const useMovementsStore = defineStore('movements', () => {
   const monthGroups = computed(() =>
     buildMonthGroups(financialStateStore.transactions, ui.txYear, ui.txFilters, ui.txSort),
   )
-
-  const visibleTransactions = computed(() => monthGroups.value.flatMap((group) => group.rows))
 
   /** Movements of the selected year, whatever the filters (the tab's count). */
   const yearCount = computed(() => {
@@ -160,11 +149,6 @@ export const useMovementsStore = defineStore('movements', () => {
     return count
   })
 
-  /** Totals of the month the ink band shows. */
-  const bandTotals = computed(() =>
-    monthTotals(financialStateStore.transactions, ui.txYear, ui.txFilterMonth),
-  )
-
   /** True while the band shows the current month, so it cannot move forward. */
   const isLatestMonth = computed(
     () =>
@@ -172,25 +156,10 @@ export const useMovementsStore = defineStore('movements', () => {
       (ui.txYear === currentYear() && ui.txFilterMonth >= todayMonth()),
   )
 
-  const selectedIdSet = computed(() => new Set(ui.txSelectedIds))
-  const selectedTransactions = computed(() =>
-    financialStateStore.transactions.filter((item) => selectedIdSet.value.has(item.id)),
-  )
-  const selectedVisibleCount = computed(() => {
-    let count = 0
-    visibleTransactions.value.forEach((item) => {
-      if (selectedIdSet.value.has(item.id)) count += 1
-    })
-    return count
+  const selectedTransactions = computed(() => {
+    const selected = new Set(ui.txSelectedIds)
+    return financialStateStore.transactions.filter((item) => selected.has(item.id))
   })
-  const selectedSum = computed(() =>
-    round2(selectedTransactions.value.reduce((sum, item) => sum + signedAmount(item), 0)),
-  )
-  const allVisibleSelected = computed(
-    () =>
-      visibleTransactions.value.length > 0 &&
-      selectedVisibleCount.value === visibleTransactions.value.length,
-  )
 
   // A selection only covers rows the user can see: changing the year or a
   // filter drops it, so a bulk delete never reaches hidden movements.
@@ -200,10 +169,6 @@ export const useMovementsStore = defineStore('movements', () => {
       ui.txSelectedIds = []
     },
   )
-
-  function breakdownFor(type: TransactionType) {
-    return categoryBreakdown(financialStateStore.transactions, ui.txYear, ui.txFilterMonth, type)
-  }
 
   /** One ordered list per type, rebuilt only when the financial state changes. */
   const orderedCategoriesByType = computed<Record<BudgetType, string[]>>(() => ({
@@ -246,15 +211,6 @@ export const useMovementsStore = defineStore('movements', () => {
     ui.txFilterMonth = months[0] ?? 12
   }
 
-  function toggleSort(column: TxSortColumn): void {
-    if (ui.txSort.column === column) {
-      ui.txSort.direction = ui.txSort.direction === 'asc' ? 'desc' : 'asc'
-    } else {
-      ui.txSort.column = column
-      ui.txSort.direction = 'desc'
-    }
-  }
-
   function setSelected(id: string, selected: boolean): void {
     const next = new Set(ui.txSelectedIds)
     if (selected) {
@@ -263,10 +219,6 @@ export const useMovementsStore = defineStore('movements', () => {
       next.delete(id)
     }
     ui.txSelectedIds = Array.from(next)
-  }
-
-  function setAllSelected(selected: boolean): void {
-    ui.txSelectedIds = selected ? visibleTransactions.value.map((item) => item.id) : []
   }
 
   function clearSelection(): void {
@@ -340,21 +292,40 @@ export const useMovementsStore = defineStore('movements', () => {
       tx.amount = round2(amount)
     })
     void syncMovements(before, financialStateStore.transactions, financialStateStore.currency)
-
-    ui.investmentTxEditingId = ''
     showToast('Movimiento actualizado.')
     return true
   }
 
-  function deleteTransaction(id: string): void {
-    if (financialStateStore.transactions.find((tx) => tx.id === id)?.remoteOperation) return
+  /**
+   * Deletes a movement. `notify: false` leaves the confirmation to the caller,
+   * as the undo notice does. Returns whether it was deleted.
+   */
+  function deleteTransaction(id: string, { notify = true }: { notify?: boolean } = {}): boolean {
+    const target = financialStateStore.transactions.find((tx) => tx.id === id)
+    if (!target || target.remoteOperation) return false
     const before = financialStateStore.transactions
     financialStateStore.commitState((draft) => {
       draft.transactions = draft.transactions.filter((item) => item.id !== id)
     })
     void syncMovements(before, financialStateStore.transactions, financialStateStore.currency)
     ui.txSelectedIds = ui.txSelectedIds.filter((itemId) => itemId !== id)
-    showToast('Movimiento eliminado.')
+    if (notify) showToast('Movimiento eliminado.')
+    return true
+  }
+
+  /**
+   * Puts back a movement deleted a moment ago (the undo of a delete), with all
+   * its data. It gets a new identity: the old one may already be deleted on the
+   * server, and a row is never created twice under the same id (ADR 0001).
+   */
+  function restoreTransaction(movement: Transaction): string {
+    const id = uid('tx')
+    const before = financialStateStore.transactions
+    financialStateStore.commitState((draft) => {
+      draft.transactions.push({ ...movement, id })
+    })
+    void syncMovements(before, financialStateStore.transactions, financialStateStore.currency)
+    return id
   }
 
   function applyBulkChanges(changes: BulkTransactionChanges): void {
@@ -562,30 +533,22 @@ export const useMovementsStore = defineStore('movements', () => {
   return {
     accounts,
     subscriptions,
-    categoryEmojis,
     years,
     monthGroups,
-    visibleTransactions,
     yearCount,
-    bandTotals,
     isLatestMonth,
     selectedTransactions,
-    selectedVisibleCount,
-    selectedSum,
-    allVisibleSelected,
-    breakdownFor,
     getAccountName,
     orderedCategories,
     setMonth,
     stepMonth,
     setYear,
-    toggleSort,
     setSelected,
-    setAllSelected,
     clearSelection,
     addTransaction,
     saveEdit,
     deleteTransaction,
+    restoreTransaction,
     applyBulkChanges,
     deleteSelected,
     refreshSubscriptions,

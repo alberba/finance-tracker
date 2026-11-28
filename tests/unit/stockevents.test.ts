@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import {
-  buildStockEventsCashTransactionPayload,
   buildStockEventsTransactionPayload,
   findSyncedMapping,
 } from '../../src/domain/stockevents/transaction-payload'
@@ -97,28 +96,6 @@ describe('payload de transacción para Stock Events', () => {
       buildStockEventsTransactionPayload({ ...buyMovement, symbol: undefined }, 'wl-1'),
     ).toBeNull()
     expect(buildStockEventsTransactionPayload(buyMovement, '')).toBeNull()
-  })
-
-  it('construye un aporte de efectivo con el formato CASH de Stock Events', () => {
-    expect(
-      buildStockEventsCashTransactionPayload({
-        watchlistId: 'wl-cash',
-        date: '2026-07-19',
-        amount: 125.499,
-        currency: 'eur',
-        accountName: 'MyInvestor',
-      }),
-    ).toEqual({
-      watchlistId: 'wl-cash',
-      symbol: 'CASH_EUR',
-      date: '2026-07-19T00:00:00Z',
-      change: 1,
-      price: 125.5,
-      priceCurrency: 'EUR',
-      toCash: true,
-      notes: 'Aporte desde finance-tracker · MyInvestor',
-      type: 'DEFAULT',
-    })
   })
 })
 
@@ -355,16 +332,5 @@ describe('creación de transacciones en Stock Events', () => {
       body: { symbol: 'CASH_EUR', price: 100, toCash: true },
     })
     expect(calls[0]?.url).toMatch(/\/transactions$/)
-  })
-
-  it('representa una corrección negativa de efectivo con change negativo', () => {
-    expect(
-      buildStockEventsCashTransactionPayload({
-        watchlistId: 'wl-1',
-        date: '2026-07-19',
-        amount: -25.5,
-        currency: 'EUR',
-      }),
-    ).toMatchObject({ change: -1, price: 25.5, toCash: true })
   })
 })

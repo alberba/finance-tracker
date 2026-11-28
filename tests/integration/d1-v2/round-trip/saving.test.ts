@@ -76,17 +76,6 @@ describe('round trip: ahorro', () => {
     })
   })
 
-  it('moves the balance from origin to destination without touching the total', async () => {
-    await addSaving(300)
-    const reloaded = await trip.reload()
-    const { computeAccountBalance } = await import('../../../../src/lib/finance-core')
-    const balance = (id: string) =>
-      computeAccountBalance(id, 9, reloaded.accounts, reloaded.transactions, {})
-
-    expect(balance(ids.origin)).toBe(700)
-    expect(balance(ids.destination)).toBe(300)
-  })
-
   it('rejects a saving to its own origin or to a non-cash account before queueing', async () => {
     const { useMovementsStore } = await import('../../../../src/stores/movements')
     const input = {
@@ -235,28 +224,7 @@ describe('round trip: ahorro', () => {
 
     await expect(
       runWithDb(trip.testDb.db as never, accountsRepository.remove(trip.userId, hucha.id)),
-    ).rejects.toThrow()
-  })
-
-  it('keeps a savings goal tied to its category and sums earlier savings', async () => {
-    const { useGoalsStore } = await import('../../../../src/stores/goals')
-    await addSaving(250)
-    await trip.reload()
-
-    expect(
-      useGoalsStore().addSavingGoal({
-        name: 'Colchón',
-        category: 'Fondo de emergencia',
-        targetAmount: 1000,
-      }),
-    ).toBe(true)
-
-    const reloaded = await trip.reload()
-    expect(reloaded.savingGoals).toMatchObject([
-      { name: 'Colchón', category: 'Fondo de emergencia', targetAmount: 1000 },
-    ])
-    const { buildSavingGoals } = await import('../../../../src/domain/goals/view-model')
-    expect(buildSavingGoals(reloaded)[0]).toMatchObject({ saved: 250, progress: 25 })
+    ).rejects.toThrow(/tiene movimientos/i)
   })
 
   it('does not mix savings goals into the fixed wealth goals', async () => {
@@ -341,6 +309,53 @@ describe('round trip: ahorro', () => {
     useGoalsStore().removeSavingGoal(id)
     const removed = await trip.reload()
     expect(removed.savingGoals).toHaveLength(0)
+  })
+
+  it('keeps the deadline and the monthly amount of a savings goal through sync', async () => {
+    const { useGoalsStore } = await import('../../../../src/stores/goals')
+    await createSavingCategory(trip, 'Fondo de emergencia')
+    useGoalsStore().addSavingGoal({
+      name: 'Viaje a Japón',
+      category: 'Fondo de emergencia',
+      targetAmount: 4500,
+      targetYear: 2027,
+      targetMonth: 3,
+      monthlyAmount: 250,
+    })
+    const created = await trip.reload()
+    expect(created.savingGoals).toMatchObject([
+      { name: 'Viaje a Japón', targetYear: 2027, targetMonth: 3, monthlyAmount: 250 },
+    ])
+    const id = created.savingGoals[0].id
+
+    useGoalsStore().setSavingGoalMonthlyAmounts({ [id]: 310.5 })
+    expect((await trip.reload()).savingGoals[0].monthlyAmount).toBe(310.5)
+
+    // An edit that does not carry the plan (an older client) keeps it.
+    useGoalsStore().updateSavingGoal(id, {
+      name: 'Japón',
+      category: 'Fondo de emergencia',
+      targetAmount: 5000,
+    })
+    expect((await trip.reload()).savingGoals).toMatchObject([
+      { name: 'Japón', targetAmount: 5000, targetYear: 2027, targetMonth: 3, monthlyAmount: 310.5 },
+    ])
+  })
+
+  it('creates a savings goal together with a saving category of its own', async () => {
+    const { useGoalsStore } = await import('../../../../src/stores/goals')
+    expect(
+      useGoalsStore().addSavingGoal(
+        { name: 'Viaje a Islandia', category: 'Viaje a Islandia', targetAmount: 3600 },
+        { newCategory: true },
+      ),
+    ).toBe(true)
+
+    const reloaded = await trip.reload()
+    expect(reloaded.savingCategories.filter((name) => name === 'Viaje a Islandia')).toHaveLength(1)
+    expect(reloaded.savingGoals).toMatchObject([
+      { name: 'Viaje a Islandia', category: 'Viaje a Islandia', targetAmount: 3600 },
+    ])
   })
 
   it('refuses a saving rule or pending without a destination on the server', async () => {

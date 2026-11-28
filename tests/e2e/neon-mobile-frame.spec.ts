@@ -1,0 +1,90 @@
+import type { Page } from '@playwright/test'
+import { test, expect } from './fixtures'
+import type { FinanceSectionId } from './pages/FinanceTrackerPage'
+
+/** Marco móvil (#425). */
+const bottomBar = (page: Page) => page.getByRole('navigation', { name: 'Navegación principal' })
+const moreTrigger = (page: Page) => page.getByRole('button', { name: 'Más secciones' })
+const moreSheet = (page: Page) => page.getByRole('dialog', { name: 'Más secciones' })
+const current = (page: Page) => page.locator('#nav-tabs [aria-current="page"]:visible')
+
+const BAR_SECTIONS: Array<[FinanceSectionId, string]> = [
+  ['dashboard', 'Dashboard'],
+  ['transactions', 'Movimientos'],
+  ['budget', 'Presupuesto'],
+]
+const MORE_SECTIONS: Array<[FinanceSectionId, string]> = [
+  ['wealth', 'Patrimonio'],
+  ['investment', 'Inversión'],
+  ['goals', 'Objetivos'],
+  ['settings', 'Configuración'],
+  ['data', 'Datos'],
+]
+
+test.describe('Marco móvil nuevo', () => {
+  test.beforeEach(async ({ tracker }) => {
+    await tracker.goto()
+  })
+
+  test('navega a cada sección desde la barra y desde «Más»', async ({ page, tracker }) => {
+    await expect(bottomBar(page)).toBeVisible()
+    await expect(page.getByRole('complementary')).toBeHidden()
+
+    for (const [id, label] of BAR_SECTIONS) {
+      await bottomBar(page).getByRole('button', { name: label }).click()
+      await expect(tracker.section(id)).toBeVisible()
+      await expect(current(page)).toHaveAttribute('data-section', id)
+      await expect(moreTrigger(page)).toHaveAttribute('data-active', 'false')
+    }
+
+    for (const [id, label] of MORE_SECTIONS) {
+      await moreTrigger(page).click()
+      await expect(moreSheet(page)).toBeVisible()
+      await moreSheet(page).getByRole('button', { name: label }).click()
+      await expect(moreSheet(page)).toBeHidden()
+      await expect(tracker.section(id)).toBeVisible()
+      await expect(moreTrigger(page)).toHaveAttribute('data-active', 'true')
+    }
+  })
+
+  test('todos los controles del marco miden al menos 44 px con puntero táctil', async ({
+    page,
+  }) => {
+    expect(await page.evaluate(() => matchMedia('(pointer: coarse)').matches)).toBe(true)
+    await moreTrigger(page).click()
+    await expect(moreSheet(page)).toBeVisible()
+
+    const small = await page
+      .locator(
+        'nav[aria-label="Navegación principal"] button, #mobile-more-menu button, [data-fab-apuntar], [data-pending-trigger]',
+      )
+      .evaluateAll((buttons) =>
+        buttons
+          .map((button) => {
+            const { width, height } = button.getBoundingClientRect()
+            return {
+              name: button.textContent?.trim() || button.getAttribute('aria-label'),
+              width,
+              height,
+            }
+          })
+          .filter(({ width, height }) => width < 44 || height < 44),
+      )
+    expect(small).toEqual([])
+  })
+})
+
+test.describe('Marco móvil nuevo en un escritorio estrecho', () => {
+  test.use({ hasTouch: false, isMobile: false })
+
+  test('el marco lo decide el ancho de ventana, no el puntero', async ({ page, tracker }) => {
+    await tracker.reload()
+    await page.setViewportSize({ width: 1200, height: 800 })
+    await expect(page.getByRole('complementary')).toBeVisible()
+    await expect(bottomBar(page)).toBeHidden()
+
+    await page.setViewportSize({ width: 900, height: 800 })
+    await expect(bottomBar(page)).toBeVisible()
+    await expect(page.getByRole('complementary')).toBeHidden()
+  })
+})
