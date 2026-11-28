@@ -162,9 +162,15 @@ const LABEL = 'text-muted grid min-w-0 gap-1.5 text-meta font-bold'
         <dt class="text-muted">Última sincronización correcta</dt>
         <dd class="font-display text-end">{{ bitvavoStamp(connection.lastSuccessAt) }}</dd>
       </dl>
+      <p
+        id="neon-bitvavo-last-run"
+        class="text-muted text-label tracking-label font-extrabold uppercase"
+      >
+        En la última sincronización
+      </p>
       <dl
         class="grid grid-cols-[repeat(auto-fit,minmax(110px,1fr))] gap-3"
-        aria-label="Resultado de la última sincronización correcta"
+        aria-labelledby="neon-bitvavo-last-run"
       >
         <div v-for="counter in counters" :key="counter.label" class="grid gap-0.5">
           <dt class="text-muted text-meta font-bold">{{ counter.label }}</dt>
@@ -189,7 +195,7 @@ const LABEL = 'text-muted grid min-w-0 gap-1.5 text-meta font-bold'
         class="grid gap-2"
         aria-label="Operaciones omitidas"
       >
-        <h4 class="text-[16px] font-bold">Omitidas ({{ connection.skipped.length }})</h4>
+        <h4 class="text-[16px] font-bold">Omitidas pendientes ({{ connection.skipped.length }})</h4>
         <ul class="grid gap-2">
           <li
             v-for="operation in connection.skipped"

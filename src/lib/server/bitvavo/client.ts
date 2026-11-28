@@ -171,6 +171,16 @@ export function localDateTime(instant: number, timeZone: string): { date: string
   }
 }
 
+/**
+ * Bitvavo serializes some amounts from binary floats (`9.969987463999999` for
+ * 0.0063208 × 1577.33 = 9.969987464). A relative difference below 1e-12 is that
+ * noise, far from any cent; anything larger is a real inconsistency.
+ */
+const FLOAT_NOISE = new Exact('1e-12')
+function matchesGross(gross: Decimal, expected: Decimal): boolean {
+  return gross.minus(expected).abs().lte(expected.abs().times(FLOAT_NOISE))
+}
+
 function readOperation(input: unknown, range: HistoryRange): RemoteOperation {
   const row = Schema.decodeUnknownSync(transaction)(input)
   if (row.priceCurrency !== 'EUR' || row.feesCurrency !== 'EUR')
@@ -186,7 +196,7 @@ function readOperation(input: unknown, range: HistoryRange): RemoteOperation {
   if (
     !new Exact(quantity).gt(0) ||
     !new Exact(row.priceAmount).gt(0) ||
-    !gross.eq(new Exact(quantity).times(row.priceAmount)) ||
+    !matchesGross(gross, new Exact(quantity).times(row.priceAmount)) ||
     (!buying && fee.gt(gross))
   )
     throw new ProviderError({
@@ -213,6 +223,23 @@ function readOperation(input: unknown, range: HistoryRange): RemoteOperation {
     cashAmount: (buying ? gross.plus(fee) : gross.minus(fee)).toFixed(),
     currency: 'EUR',
   }
+}
+
+const TYPE_NAMES: Record<string, string> = {
+  deposit: 'Depósito',
+  withdrawal: 'Retirada',
+  staking: 'Staking',
+  rebate: 'Reembolso',
+  affiliate: 'Afiliación',
+}
+
+/** «Depósito: solo se importan compras y ventas.» for a movement that is not a trade. */
+function unsupportedType(item: unknown): string | undefined {
+  const typed = Schema.decodeUnknownOption(Schema.Struct({ type: Schema.String }))(item)
+  if (typed._tag === 'None' || typed.value.type === 'buy' || typed.value.type === 'sell')
+    return undefined
+  const name = TYPE_NAMES[typed.value.type] ?? `Tipo «${typed.value.type.slice(0, 40)}»`
+  return `${name}: solo se importan compras y ventas.`
 }
 
 export function fetchBitvavoHistory(
@@ -290,7 +317,7 @@ export function fetchBitvavoHistory(
             reason:
               error instanceof NonEuroOperation || error instanceof ProviderError
                 ? error.message
-                : 'Tipo o datos de operación incompatibles.',
+                : (unsupportedType(item) ?? 'Tipo o datos de operación incompatibles.'),
           })
         }
       }

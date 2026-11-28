@@ -23,7 +23,10 @@ unitario se conservan como cadenas decimales, el flujo EUR es bruto y la comisi�
 Una compra consume bruto + comisión; una venta devuelve bruto − comisión. El signo del libro
 mayor es positivo para la compra y negativo para la venta. Comisión cero EUR sigue siendo el
 supuesto autorizado allí; otras divisas, tipos y contratos incoherentes aparecen como
-incompatibles. No se infieren precios ni tolerancias contables.
+incompatibles, con el tipo nombrado si no es compra o venta (depósito, retirada…). No se infieren
+precios. La única tolerancia es el ruido de coma flotante con que Bitvavo serializa algunos brutos
+(`9.969987463999999` por 9,969987464): diferencia relativa ≤ 10⁻¹² frente a cantidad × precio. Se
+conservan las cifras que envía Bitvavo.
 
 `transactions.remote_operation` conserva identidad, instante, zona, fecha/hora local, lado,
 símbolo, cantidad, precio, comisión e importe exactos. `external_id` es único por usuario. El

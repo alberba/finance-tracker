@@ -52,6 +52,58 @@ describe('Bitvavo account history', () => {
     expect(http).toHaveBeenCalledTimes(1)
   })
 
+  it('accepts the float noise Bitvavo serializes in a gross amount and keeps its exact figures', async () => {
+    // Real shape (anonymized): 0.0063208 × 1577.33 = 9.969987464, sent as …463999999.
+    const noisy = {
+      ...fixture.transactions[0],
+      transactionId: 'float-noise',
+      priceAmount: '1577.33',
+      sentAmount: '9.969987463999999',
+      receivedCurrency: 'ETH',
+      receivedAmount: '0.0063208',
+      feesAmount: '0.030012536',
+    }
+    const inconsistent = { ...noisy, transactionId: 'off-by-a-cent', sentAmount: '9.98' }
+    const http = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        Response.json({ items: [noisy, inconsistent], currentPage: 1, totalPages: 1 }),
+      )
+    const result = await history(credentials, range, http)
+    expect(result.operations).toEqual([
+      expect.objectContaining({
+        externalId: 'float-noise',
+        symbol: 'ETH',
+        quantity: '0.0063208',
+        unitPrice: '1577.33',
+        cashAmount: '9.999999999999999',
+      }),
+    ])
+    expect(result.incompatible.map((op) => op.externalId)).toEqual(['off-by-a-cent'])
+  })
+
+  it('names a deposit instead of a vague reason', async () => {
+    const deposit = {
+      transactionId: 'deposit-1',
+      executedAt: '2020-01-01T00:00:00.000Z',
+      type: 'deposit',
+      receivedCurrency: 'EUR',
+      receivedAmount: '220',
+      feesCurrency: 'EUR',
+      feesAmount: '0',
+    }
+    const http = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(Response.json({ items: [deposit], currentPage: 1, totalPages: 1 }))
+    expect((await history(credentials, range, http)).incompatible).toEqual([
+      {
+        externalId: 'deposit-1',
+        executedAt: deposit.executedAt,
+        reason: 'Depósito: solo se importan compras y ventas.',
+      },
+    ])
+  })
+
   it('asks for manual redirects, which workerd supports, and refuses to follow one', async () => {
     const http = vi
       .fn<typeof fetch>()
