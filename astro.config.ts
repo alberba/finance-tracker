@@ -10,7 +10,7 @@ import vue from '@astrojs/vue'
 
 import svgLoader from 'vite-svg-loader'
 
-import sentry from '@sentry/astro'
+import { sentryAstro as sentry } from '@sentry/astro/integration'
 
 const require = createRequire(import.meta.url)
 const selfHosted = process.env.DEPLOY_TARGET === 'node'

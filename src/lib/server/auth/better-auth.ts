@@ -1,4 +1,5 @@
 import { betterAuth, APIError } from 'better-auth'
+import { createAuthMiddleware } from 'better-auth/api'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { emailOTP } from 'better-auth/plugins'
 import { passkey } from '@better-auth/passkey'
@@ -82,6 +83,8 @@ export function createAuthentication(
       })
     }
   }
+  // Better Auth logs and swallows a failed sign-up verification email; the caller must see it.
+  const undeliveredSignUps = new Set<string>()
   return betterAuth({
     appName: 'Finanzas',
     baseURL: env.BETTER_AUTH_URL,
@@ -127,12 +130,19 @@ export function createAuthentication(
     emailVerification: {
       sendOnSignUp: true,
       autoSignInAfterVerification: true,
-      sendVerificationEmail: async ({ user, url }) =>
-        send({
-          email: user.email,
-          subject: 'Verifica tu correo de Finanzas',
-          text: `Verifica tu correo: ${url}`,
-        }),
+      sendVerificationEmail: async ({ user, url }, request) => {
+        try {
+          await send({
+            email: user.email,
+            subject: 'Verifica tu correo de Finanzas',
+            text: `Verifica tu correo: ${url}`,
+          })
+        } catch (error) {
+          if (request && new URL(request.url).pathname.endsWith('/sign-up/email'))
+            undeliveredSignUps.add(user.email)
+          throw error
+        }
+      },
     },
     socialProviders: {
       ...(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
@@ -173,6 +183,20 @@ export function createAuthentication(
             },
           },
         }),
+        hooks: {
+          after: [
+            {
+              matcher: (context) => context.path === '/sign-up/email',
+              handler: createAuthMiddleware(async (context) => {
+                const email = (context.body as { email?: string }).email?.trim().toLowerCase()
+                if (email && undeliveredSignUps.delete(email))
+                  throw new APIError('SERVICE_UNAVAILABLE', {
+                    message: 'No se pudo enviar el correo. Inténtalo de nuevo.',
+                  })
+              }),
+            },
+          ],
+        },
       },
       emailOTP({
         otpLength: 6,
