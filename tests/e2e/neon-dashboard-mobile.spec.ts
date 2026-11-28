@@ -75,7 +75,7 @@ test('confirma un pendiente desde la hoja «Por confirmar» de la cifra', async 
 
   await expect(pendingSheet(page).locator('[data-pending-item]')).toHaveCount(1)
   await expect(page.locator('[data-pending-trigger]')).toHaveAccessibleName(
-    'Por confirmar, 1 pendientes',
+    'Por confirmar, 1 pendiente',
   )
   await expect.poll(async () => amountOf(await left(page).innerText())).toBeCloseTo(before - 900, 2)
 

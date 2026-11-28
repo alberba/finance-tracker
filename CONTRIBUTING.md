@@ -69,10 +69,11 @@ La suite completa (Vitest, auth, funcional y sync-v2) se ejecuta con `pnpm test:
 se ejecuta los lunes a las 05:00 UTC o a mano sobre la rama elegida. No bloquea entregas ni dispara
 despliegues. Para una PR de riesgo, ejecútala manualmente antes de mezclar.
 
-Dónde van los tests: `tests/unit` (lógica pura), `tests/component` (un `<Nombre>.test.ts` por
-componente Vue), `tests/integration/d1-v2` (stores y repositorios contra SQLite) y `tests/e2e`
-(`<área>.spec.ts` con Page Objects en `tests/e2e/pages`). Lista el directorio antes de abrir un
-fichero por nombre.
+Antes de escribir, modificar o borrar un test, lee [TESTING_STANDARDS.md](./TESTING_STANDARDS.md):
+allí viven el criterio de entrada, el rojo antes de verde, la poda y las reglas de E2E. Dónde van
+los tests: `tests/unit` (lógica pura), `tests/component` (un `<Nombre>.test.ts` por componente Vue),
+`tests/integration/d1-v2` (stores y repositorios contra SQLite) y `tests/e2e` (`<área>.spec.ts` con
+Page Objects en `tests/e2e/pages`). Lista el directorio antes de abrir un fichero por nombre.
 
 ## Pull requests
 

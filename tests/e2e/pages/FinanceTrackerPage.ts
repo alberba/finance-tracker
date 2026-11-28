@@ -470,8 +470,68 @@ export class FinanceTrackerPage {
     }
   }
 
+  /**
+   * The shell's global sync state (in the user menu). It does not confirm one
+   * concrete operation: wait for the command's own response for that.
+   */
+  get syncStatus(): Locator {
+    return this.page.locator('#sidebar-sync-status')
+  }
+
+  /** «Por confirmar» in the app bar of whichever frame is showing. */
+  get pendingTrigger(): Locator {
+    return this.page.locator('[data-pending-trigger]:visible')
+  }
+
+  /** The Dashboard's «Por confirmar» card: where the desktop frame lists the pendings. */
+  get dashboardPendingCard(): Locator {
+    return this.dashboardSection.getByRole('region', { name: 'Por confirmar', exact: true })
+  }
+
+  /** The open pendings listed in «Por confirmar» (open it first). */
+  get pendingItems(): Locator {
+    return this.page.getByRole('dialog', { name: 'Por confirmar' }).locator('[data-pending-item]')
+  }
+
+  /** The sheet that edits a pending before confirming it. */
+  get pendingEditSheet(): Locator {
+    return this.page.getByRole('dialog', { name: 'Editar y confirmar' })
+  }
+
+  /** Opens «Por confirmar», reviews this pending and switches it to editing. */
+  async openPendingEdit(description: string) {
+    await this.pendingTrigger.click()
+    await this.pendingItems
+      .filter({ hasText: description })
+      .getByRole('button', { name: /^Revisar/ })
+      .click()
+    await this.page
+      .getByRole('dialog', { name: description })
+      .getByRole('button', { name: 'Editar' })
+      .click()
+    await expect(this.pendingEditSheet).toBeVisible()
+  }
+
+  /** The rules listed in Configuración → Recurrentes. */
+  get recurringRuleRows(): Locator {
+    return this.page.locator('#settings [data-settings-rule-id]')
+  }
+
+  /** Creates an expense rule from Configuración with the quick field and its panel. */
+  async addRecurringRule(params: { description: string; amount: number }) {
+    await this.openSettings()
+    const field = this.page.locator('#settings').getByLabel('Descripción de la nueva regla')
+    await field.fill(params.description)
+    await field.press('Enter')
+    const panel = this.page.getByRole('dialog', { name: 'Nueva regla' })
+    await expect(panel.getByLabel('Descripción')).toHaveValue(params.description)
+    await panel.getByLabel('Importe').fill(String(params.amount))
+    await panel.getByRole('button', { name: 'Crear regla' }).click()
+    await expect(panel).toBeHidden()
+  }
+
   async waitForSync() {
-    const status = this.page.locator('#sidebar-sync-status')
+    const status = this.syncStatus
     await expect(status).toContainText('Sincronizado', { timeout: 15000 })
     await this.page.waitForLoadState('networkidle')
     await expect(status).toContainText('Sincronizado', { timeout: 15000 })

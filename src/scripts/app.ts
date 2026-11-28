@@ -12,8 +12,7 @@ import { useFinancialStateStore } from '../stores/financial-state'
 import { pinia } from '../stores/pinia'
 import { useUiStore } from '../stores/ui'
 import { useRecurringStore } from '../stores/recurring'
-import { fetchSession } from '../lib/client/session'
-import { runClientHttp } from '../lib/client/runtime'
+import { loadSession } from '../lib/client/session'
 import { useSyncStore } from '../stores/sync'
 import { registerFinanceTools, type FinanceModelContext } from '../lib/client/webmcp'
 
@@ -75,11 +74,11 @@ import { registerFinanceTools, type FinanceModelContext } from '../lib/client/we
   /** Authenticated sessions hydrate from sync v2; only demo uses localStorage. */
   async function hydrateState() {
     if (!isDemoMode()) {
-      const session = await runClientHttp(fetchSession())
+      const session = await loadSession()
       if (!session.user?.id) throw new Error('La sesión no contiene una identidad válida.')
       await useSyncStore(pinia).init(session.user.id, { email: session.user.email ?? null })
       state = financialStateStore.state
-      recurringStore.refreshPending()
+      await recurringStore.refreshPending()
       return
     }
 
@@ -90,7 +89,7 @@ import { registerFinanceTools, type FinanceModelContext } from '../lib/client/we
     if (dueSubscriptions.advancedCount > 0) {
       sortTransactionsInState(state)
     }
-    recurringStore.refreshPending()
+    await recurringStore.refreshPending()
     persistState(state)
   }
 

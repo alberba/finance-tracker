@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test'
+import { expect, type Page, type Route } from '@playwright/test'
 import type { SyncCommandInput } from '../../../src/lib/server/sync/command-schemas'
 
 /** Register before submitting the UI action; completion means its own command was applied. */
@@ -14,7 +14,10 @@ export async function expectSyncCommand(
     const body = candidate.request().postDataJSON() as { commands: SyncCommandInput[] }
     const commands = body.commands.filter(matches)
     if (!commands.length) return false
-    expect(candidate.ok()).toBe(true)
+    // ADR 0003: a batch returns 409 when *any* command conflicts and halts.
+    // The matched command may still have been applied earlier in that batch;
+    // the assertion below is the one that proves its own outcome.
+    expect([200, 409]).toContain(candidate.status())
     const response = (await candidate.json()) as {
       results: Array<{ commandId: string; status: string }>
     }
@@ -28,4 +31,19 @@ export async function expectSyncCommand(
     }
     return applied.size >= count
   })
+}
+
+/**
+ * Makes the sync endpoints unreachable while the app shell keeps loading, so the
+ * durable queue is the only source of truth across a reload (`context.setOffline`
+ * cannot reload: there is no service worker). Returns the function that
+ * reconnects; register `expectSyncCommand` before calling it.
+ */
+export async function blockSyncApi(page: Page): Promise<() => Promise<void>> {
+  const block = (route: Route) => route.abort()
+  const endpoints = ['**/api/sync', '**/api/bootstrap', '**/api/changes*']
+  for (const endpoint of endpoints) await page.route(endpoint, block)
+  return async () => {
+    for (const endpoint of endpoints) await page.unroute(endpoint, block)
+  }
 }

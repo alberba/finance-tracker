@@ -32,7 +32,8 @@ const { openPendingEdit } = useEntrySheet()
 const pending = computed(() => recurringStore.openPendingMovements)
 const triggerLabel = computed(() => {
   const count = pending.value.length
-  return count === 0 ? 'Por confirmar' : `Por confirmar, ${count} pendientes`
+  if (count === 0) return 'Por confirmar'
+  return `Por confirmar, ${count} ${count === 1 ? 'pendiente' : 'pendientes'}`
 })
 
 const { open: listOpen } = usePendingSheet()

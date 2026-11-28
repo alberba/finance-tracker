@@ -60,16 +60,36 @@ const props = withDefaults(
  * navigation still awaits the same loader.
  */
 onMounted(() => {
+  // /reportes has its own lazy page and data; warming eight section chunks
+  // there only competes with the reports request. Data Saver users opt out of
+  // background downloads entirely.
+  if (props.page === 'reports') return
+  const connection = (
+    navigator as Navigator & { connection?: { saveData?: boolean } }
+  ).connection
+  if (connection?.saveData) return
+
   const prefetchSections = () => {
     for (const load of [...Object.values(sectionLoaders), reportsLoader]) {
       void load().catch(() => undefined)
     }
   }
 
-  if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-    window.requestIdleCallback(prefetchSections, { timeout: 3000 })
+  // Wait for the page load and the first idle window: hydration, the session
+  // lookup and the first dashboard paint must not share bandwidth with eight
+  // background chunks. Offline sections are still warmed a few seconds later.
+  const schedulePrefetch = () => {
+    if ('requestIdleCallback' in window) {
+      window.requestIdleCallback(prefetchSections, { timeout: 5000 })
+    } else {
+      setTimeout(prefetchSections, 2000)
+    }
+  }
+
+  if (document.readyState === 'complete') {
+    schedulePrefetch()
   } else {
-    setTimeout(prefetchSections, 1000)
+    window.addEventListener('load', schedulePrefetch, { once: true })
   }
 })
 
@@ -78,10 +98,6 @@ useUserTheme()
 const stockEventsStore = useStockEventsStore()
 uiStore.setActiveSection(props.activeSection)
 uiStore.setPage(props.page)
-
-onMounted(() => {
-  void stockEventsStore.initializeCredential()
-})
 
 const currentSection = computed(() => uiStore.ui.activeSection)
 const activeSectionComponent = computed(() => sectionComponents[currentSection.value])

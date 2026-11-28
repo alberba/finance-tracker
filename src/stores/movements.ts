@@ -7,7 +7,7 @@ import { useToast } from '../composables/useToast'
 import { getOrderedCategoriesForType } from '../domain/transactions/categories'
 import { resolveCategoryId, resolveEntityId, syncListDiff } from '../lib/client/command-mapping'
 import { syncMovements } from '../lib/client/movement-commands'
-import { buildMonthGroups, registryYears } from '../domain/transactions/registry'
+import { accountingYear, buildMonthGroups, registryYears } from '../domain/transactions/registry'
 import {
   isTransactionType,
   type BudgetType,
@@ -141,14 +141,13 @@ export const useMovementsStore = defineStore('movements', () => {
   )
 
   /** Movements of the selected year, whatever the filters (the tab's count). */
-  const yearCount = computed(() =>
-    buildMonthGroups(
-      financialStateStore.transactions,
-      ui.txYear,
-      { search: '', types: [], accountIds: [] },
-      ui.txSort,
-    ).reduce((sum, group) => sum + group.count, 0),
-  )
+  const yearCount = computed(() => {
+    let count = 0
+    financialStateStore.transactions.forEach((tx) => {
+      if (accountingYear(tx) === ui.txYear) count += 1
+    })
+    return count
+  })
 
   /** True while the band shows the current month, so it cannot move forward. */
   const isLatestMonth = computed(
@@ -171,8 +170,16 @@ export const useMovementsStore = defineStore('movements', () => {
     },
   )
 
+  /** One ordered list per type, rebuilt only when the financial state changes. */
+  const orderedCategoriesByType = computed<Record<BudgetType, string[]>>(() => ({
+    income: getOrderedCategoriesForType(financialStateStore.state, 'income'),
+    expense: getOrderedCategoriesForType(financialStateStore.state, 'expense'),
+    saving: getOrderedCategoriesForType(financialStateStore.state, 'saving'),
+    investment: getOrderedCategoriesForType(financialStateStore.state, 'investment'),
+  }))
+
   function orderedCategories(type: BudgetType): string[] {
-    return getOrderedCategoriesForType(financialStateStore.state, type)
+    return orderedCategoriesByType.value[type]
   }
 
   function setMonth(month: Month): void {

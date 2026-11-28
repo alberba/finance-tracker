@@ -21,7 +21,3 @@ export async function requireAuthenticationResult(result: {
 }): Promise<void> {
   if (result.error) throw new Error(result.error.message ?? 'No se pudo completar el acceso.')
 }
-
-export function markAuthenticationReady(): void {
-  document.documentElement.dataset.financeReady = 'true'
-}

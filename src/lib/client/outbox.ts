@@ -25,10 +25,43 @@ import {
   type SyncCommandInput,
   type SyncEntityType,
 } from '../server/sync/command-schemas'
+import { safeParse } from '../schema'
 import { ClientStorage, storageError, type ClientStorageError } from './storage'
 
-const DB_VERSION = 1
+export const OUTBOX_DB_VERSION = 3
 const STORE = 'commands'
+/**
+ * Persisted publication generation per movement (#489), in the same database
+ * as the queue so a command and the generation it advances commit in one
+ * IndexedDB transaction — the cross-tab exclusion that a page-local lock
+ * cannot provide.
+ */
+export const MOVEMENT_PUBLICATIONS_STORE = 'movementPublications'
+/**
+ * Durable intent headers and their per-step progress (#490). They live beside
+ * `commands` in the same per-user database so accepting an intent, publishing
+ * its commands and advancing its progress can commit in one IndexedDB
+ * transaction. `commands` stays byte-compatible with `/api/sync`: intent
+ * metadata only ever rides on the queue entry, never inside the command body.
+ */
+export const INTENTS_STORE = 'intents'
+export const INTENT_PROGRESS_STORE = 'intentProgress'
+export const COMMANDS_STORE = STORE
+
+/**
+ * Client-only provenance of a queued command. It never travels to the server:
+ * `POST /api/sync` sends `entry.command`, not the whole entry. The queue uses
+ * it to re-evaluate a link-owned command on conflict instead of rebasing a
+ * stale snapshot (ADR 0003 stays untouched for every other command).
+ */
+export interface OutboxPublication {
+  movementId: string
+  origin: 'instrumentLink'
+  /** Generation the command was published at. */
+  generation: number
+  /** Local instrument id the link targets. */
+  instrumentId: string
+}
 
 export interface OutboxEntry {
   seq: number
@@ -36,6 +69,19 @@ export interface OutboxEntry {
   enqueuedAt: string
   attempts: number
   lastError?: string
+  publication?: OutboxPublication
+  /**
+   * Client-only link from a queued command to the durable intent step that
+   * owns it (#490). `POST /api/sync` only ever sends `entry.command`, so the
+   * wire contract is untouched.
+   */
+  intent?: OutboxIntentRef
+}
+
+/** The intent step a queued command belongs to. */
+export interface OutboxIntentRef {
+  intentId: string
+  step: string
 }
 
 /**
@@ -60,30 +106,72 @@ export const openOutbox = (userId: string): Effect.Effect<IDBDatabase, ClientSto
   Effect.tryPromise({
     try: () =>
       new Promise<IDBDatabase>((resolve, reject) => {
-        const request = indexedDB.open(dbNameFor(userId), DB_VERSION)
+        const request = indexedDB.open(dbNameFor(userId), OUTBOX_DB_VERSION)
+        let settled = false
 
         request.onupgradeneeded = () => {
           const db = request.result
+          // Every upgrade only adds the stores a build introduced: it never
+          // touches `commands`, so a queue written by an older build survives.
           if (!db.objectStoreNames.contains(STORE)) {
             db.createObjectStore(STORE, { keyPath: 'seq', autoIncrement: true })
           }
+          // Version 2 added movement publications; version 3 added the durable
+          // intent header/progress records (#490).
+          if (!db.objectStoreNames.contains(MOVEMENT_PUBLICATIONS_STORE)) {
+            db.createObjectStore(MOVEMENT_PUBLICATIONS_STORE, { keyPath: 'id' })
+          }
+          if (!db.objectStoreNames.contains(INTENTS_STORE)) {
+            db.createObjectStore(INTENTS_STORE, { keyPath: 'id' })
+          }
+          if (!db.objectStoreNames.contains(INTENT_PROGRESS_STORE)) {
+            db.createObjectStore(INTENT_PROGRESS_STORE, { keyPath: 'id' })
+          }
         }
 
-        request.onsuccess = () => resolve(request.result)
-        request.onerror = () =>
+        // An older tab holding a lower-version connection would otherwise
+        // make this open hang forever. Fail visibly instead of silently.
+        request.onblocked = () => {
+          if (settled) return
+          settled = true
+          reject(
+            new Error(
+              'Otra pestaña mantiene abierto el almacenamiento local. Recarga o cierra las demás pestañas.',
+            ),
+          )
+        }
+        request.onsuccess = () => {
+          const db = request.result
+          if (settled) {
+            // The blocked upgrade eventually finished after we reported the
+            // error; do not leak that late connection.
+            db.close()
+            return
+          }
+          settled = true
+          // Yield the connection to a newer build instead of blocking it.
+          db.onversionchange = () => db.close()
+          resolve(db)
+        }
+        request.onerror = () => {
+          if (settled) return
+          settled = true
           reject(request.error ?? new Error('No se pudo abrir el outbox IndexedDB.'))
+        }
       }),
     catch: (cause) => storageError(cause, 'No se pudo abrir el outbox IndexedDB.'),
   })
 
-function requestToPromise<T>(request: IDBRequest<T>): Promise<T> {
+/** Resolves one IndexedDB request; shared with the movement publication transaction. */
+export function requestToPromise<T>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
     request.onsuccess = () => resolve(request.result)
     request.onerror = () => reject(request.error ?? new Error('Fallo en operación del outbox.'))
   })
 }
 
-function txDone(tx: IDBTransaction): Promise<void> {
+/** Resolves when an IndexedDB transaction commits; shared with the movement publication transaction. */
+export function txDone(tx: IDBTransaction): Promise<void> {
   return new Promise((resolve, reject) => {
     tx.oncomplete = () => resolve()
     tx.onerror = () => reject(tx.error ?? new Error('Fallo en transacción del outbox.'))
@@ -153,6 +241,71 @@ export function generateCommandId(): string {
 }
 
 /**
+ * Validates one command the same way `enqueue` does, returning the parsed
+ * command or throwing `InvalidCommandError`. Shared with the movement
+ * publication transaction so a command written there gets the identical
+ * guarantee without opening a second IndexedDB transaction.
+ */
+export function parseOutboxCommand(command: OutboxCommandInput): SyncCommandInput {
+  const withId = { ...command, commandId: command.commandId ?? generateCommandId() }
+  const parsed = syncCommandSchema.safeParse(withId)
+  if (!parsed.success) {
+    throw new InvalidCommandError(parsed.issues)
+  }
+
+  if (parsed.data.action === 'create') {
+    const entityCheck = entityCreatePayloadSchemas[parsed.data.entityType].safeParse(
+      parsed.data.data,
+    )
+    if (!entityCheck.success) {
+      throw new InvalidCommandError(entityCheck.issues)
+    }
+  } else if (parsed.data.action === 'update') {
+    const entityCheck = entityUpdateSchemas[parsed.data.entityType].safeParse(parsed.data.patch)
+    if (!entityCheck.success) {
+      throw new InvalidCommandError(entityCheck.issues)
+    }
+  }
+  return parsed.data
+}
+
+/** Structural equality of payloads, independent of key insertion order. */
+function equivalentPayload(a: unknown, b: unknown): boolean {
+  return stableJson(a) === stableJson(b)
+}
+
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>
+    return `{${Object.keys(record)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${stableJson(record[key])}`)
+      .join(',')}}`
+  }
+  return JSON.stringify(value) ?? 'undefined'
+}
+
+/**
+ * The subset of a create payload the entity's update schema accepts. Identity
+ * and grouping fields that only exist at creation (e.g. `userInstrument`'s
+ * `instrumentId`) are dropped instead of making the update invalid.
+ */
+function editablePatch(
+  entityType: SyncEntityType,
+  data: Record<string, unknown>,
+): Record<string, unknown> | null {
+  const rest = { ...data }
+  delete rest.id
+  const parsed = safeParse(entityUpdateSchemas[entityType].schema, rest, {
+    onExcessProperty: 'ignore',
+  })
+  if (!parsed.success) return null
+  const patch = parsed.data as Record<string, unknown>
+  return Object.keys(patch).length > 0 ? patch : null
+}
+
+/**
  * Validates and appends a command to the outbox. Adds `commandId` if the
  * caller didn't supply one. Fails with `InvalidCommandError` if the command
  * doesn't match the server's schema, or if its per-entity `data`/`patch`
@@ -170,39 +323,92 @@ export const enqueue = (
   command: OutboxCommandInput,
 ): Effect.Effect<OutboxEntry, InvalidCommandError | ClientStorageError, ClientStorage> =>
   Effect.gen(function* () {
-    const withId = { ...command, commandId: command.commandId ?? generateCommandId() }
-    const parsed = syncCommandSchema.safeParse(withId)
-    if (!parsed.success) {
-      return yield* Effect.fail(new InvalidCommandError(parsed.issues))
-    }
-
-    if (parsed.data.action === 'create') {
-      const entityCheck = entityCreatePayloadSchemas[parsed.data.entityType].safeParse(
-        parsed.data.data,
-      )
-      if (!entityCheck.success) {
-        return yield* Effect.fail(new InvalidCommandError(entityCheck.issues))
-      }
-    } else if (parsed.data.action === 'update') {
-      const entityCheck = entityUpdateSchemas[parsed.data.entityType].safeParse(parsed.data.patch)
-      if (!entityCheck.success) {
-        return yield* Effect.fail(new InvalidCommandError(entityCheck.issues))
-      }
-    }
+    const parsed = yield* Effect.try({
+      try: () => parseOutboxCommand(command),
+      catch: (cause) => {
+        if (cause instanceof InvalidCommandError) return cause
+        throw cause
+      },
+    })
 
     const entry: Omit<OutboxEntry, 'seq'> = {
-      command: parsed.data,
+      command: parsed,
       enqueuedAt: new Date().toISOString(),
       attempts: 0,
     }
 
-    const seq = yield* withOutbox('No se pudo encolar el comando.', async (db) => {
+    return yield* withOutbox('No se pudo encolar el comando.', async (db) => {
       const tx = db.transaction(STORE, 'readwrite')
-      const key = await requestToPromise(tx.objectStore(STORE).add(entry) as IDBRequest<number>)
+      const store = tx.objectStore(STORE)
+      if (parsed.action === 'create') {
+        // The client identity is the entity's own id (ADR 0001), so two
+        // `create`s for the same id are the same effect, never two rows. The
+        // queue reuses the existing entry only when its content is equivalent:
+        // silently dropping changed content would lose the user's edit.
+        const identity = (parsed.data as { id?: unknown }).id
+        if (typeof identity === 'string') {
+          const queued = (await requestToPromise(
+            store.getAll() as IDBRequest<OutboxEntry[]>,
+          )) as OutboxEntry[]
+          const existing = queued.find(
+            (candidate) =>
+              candidate.command.action === 'create' &&
+              candidate.command.entityType === parsed.entityType &&
+              (candidate.command.data as { id?: unknown }).id === identity,
+          )
+          if (existing && existing.command.action === 'create') {
+            if (equivalentPayload(existing.command.data, parsed.data)) {
+              await txDone(tx)
+              return existing
+            }
+            if (existing.attempts === 0) {
+              // Never sent: fold the accepted content into the still-queued
+              // create, the same rule `amendPendingCreate` applies.
+              const folded = {
+                ...existing,
+                command: { ...existing.command, data: parsed.data },
+              }
+              store.put(folded)
+              await txDone(tx)
+              return folded
+            }
+            // The create may already be on the wire with an uncertain
+            // outcome. Rewriting its content would break an idempotent resend,
+            // so the changed fields travel as a distinct command id addressed
+            // at the same client identity (ADR 0003 rebases its version).
+            const patch = editablePatch(parsed.entityType, parsed.data)
+            if (patch) {
+              const update = parseOutboxCommand({
+                action: 'update',
+                entityType: parsed.entityType,
+                entityId: identity,
+                baseVersion: 0,
+                patch,
+              })
+              const seq = await requestToPromise(
+                store.add({ ...entry, command: update }) as IDBRequest<number>,
+              )
+              await txDone(tx)
+              return { ...entry, command: update, seq }
+            }
+            // No editable field survives the patch schema: carry the whole
+            // payload as a new create with its own command id.
+            const fresh = parseOutboxCommand({
+              ...parsed,
+              commandId: generateCommandId(),
+            } as OutboxCommandInput)
+            const seq = await requestToPromise(
+              store.add({ ...entry, command: fresh }) as IDBRequest<number>,
+            )
+            await txDone(tx)
+            return { ...entry, command: fresh, seq }
+          }
+        }
+      }
+      const key = await requestToPromise(store.add(entry) as IDBRequest<number>)
       await txDone(tx)
-      return key
+      return { ...entry, seq: key }
     })
-    return { ...entry, seq }
   })
 
 /** Returns every queued entry, in FIFO order. */
@@ -260,11 +466,17 @@ export const recordFailure = (
     await txDone(tx)
   })
 
-/** Empties the whole outbox (used by "empezar de cero" / discard-local-edits flows). */
+/** Empties the whole queue (commands, intents and their progress). */
 export const clear = (): Effect.Effect<void, ClientStorageError, ClientStorage> =>
   withOutbox('No se pudo vaciar el outbox.', async (db) => {
-    const tx = db.transaction(STORE, 'readwrite')
+    const tx = db.transaction(
+      [STORE, MOVEMENT_PUBLICATIONS_STORE, INTENTS_STORE, INTENT_PROGRESS_STORE],
+      'readwrite',
+    )
     tx.objectStore(STORE).clear()
+    tx.objectStore(MOVEMENT_PUBLICATIONS_STORE).clear()
+    tx.objectStore(INTENTS_STORE).clear()
+    tx.objectStore(INTENT_PROGRESS_STORE).clear()
     await txDone(tx)
   })
 

@@ -2,7 +2,7 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 
 import { useAuthenticationForm, type AccessMode } from '../../composables/useAuthenticationForm'
-import { markAuthenticationReady } from '../../lib/client/authentication'
+import { markAuthenticationReady } from '../../lib/client/authentication-ready'
 import NeonButton from '../ui/NeonButton.vue'
 import NeonAccessField from './NeonAccessField.vue'
 import { accessErrorText } from './access-errors'

@@ -39,6 +39,7 @@ pnpm exec wrangler dev dist/_worker.js/index.js \
   --port 4322 \
   --compatibility-flags nodejs_compat
 pnpm benchmark:performance
+pnpm benchmark:pages
 ```
 
 ## Before and after
@@ -94,3 +95,62 @@ Additional targeted tests exposed three more existing test/product expectation m
 ## Remaining opportunities
 
 The next largest startup cost is the eager dashboard itself, especially charts and shared financial-state code. A future pass could measure lazy Chart.js initialization and route-aware CSS loading, but those changes should be evaluated separately because they can trade faster startup for delayed chart rendering.
+
+## Per-page pass (2026-11-17)
+
+This pass targeted every page, not only the dashboard. `pnpm benchmark:pages` was added to
+measure direct loads (`/movimientos`, `/presupuesto`, `/patrimonio`, `/inversion`,
+`/objetivos`, `/configuracion`, `/datos`, `/login`, `/reportes`) and first navigation to each
+section with the same throttling profile as the dashboard benchmark.
+
+### What changed
+
+- Chart.js now loads from an idle callback and only registers the line-chart pieces. The
+  204 kB (69 kB gzip) chunk left the startup path; the dashboard canvas is drawn a few
+  milliseconds later while the rest of the page is already interactive.
+- `/login` skips the Better Auth `getSession` query when there is no session cookie, and the
+  auth client loads on demand instead of during the first paint. The unit test that edited
+  the recipient during an in-flight request now waits for the request to start (the import
+  adds one microtask).
+- The workspace is the only startup session lookup; the shell mirrors `syncStore.email` and
+  resolves the session only when signing out. The auth client used for logout is dynamic, and
+  `loadSession` shares an in-flight lookup for any other caller.
+- Stock Events credential discovery moved from the global workspace mount to the Inversión
+  section, and the reports badge refresh waits for an idle window (and is skipped on
+  `/reportes`, which refreshes the list itself).
+- `Subscriptions`, the non-default Inversión/Configuración tabs and the report detail/panel
+  are separate chunks mounted on first use. Once visited they stay mounted, preserving
+  unsaved state.
+- Section prefetch starts after `load` and an idle window; it is skipped on `/reportes` and
+  for Data Saver users. The sync age label updates every 30 s instead of 1 s.
+- `buildMonthGroups` appends in place (O(n) instead of O(Σk²)), `yearCount` counts in one
+  pass, and selected transactions/categories use sets/memoized lists.
+
+### Before and after (clean A/B worktree, 5–9 runs each)
+
+| Page / metric | Before | After | Change |
+| --- | ---: | ---: | ---: |
+| Dashboard app-ready | 1,081.8 ms | 949.2 ms | **-12.3%** |
+| Dashboard startup JS decoded | 909.06 kB | 658.37 kB | **-27.6%** |
+| Dashboard startup JS transferred | 329.23 kB | 243.37 kB | **-26.1%** |
+| Dashboard scripting time | 234.49 ms | 205.46 ms | **-12.4%** |
+| Dashboard main-thread task time | 938.66 ms | 732.30 ms | **-22.0%** |
+| Dashboard long tasks | 499 ms | 335 ms | **-32.9%** |
+| `/login` app-ready | 415.3 ms | 391.7 ms | **-5.7%** |
+| `/login` JS decoded | 315.57 kB | 272.20 kB | **-13.7%** |
+| `/reportes` app-ready | 871.9 ms | 829.8 ms | **-4.8%** |
+| `/reportes` JS decoded | 1,128.14 kB | 672.62 kB | **-40.4%** |
+| `/reportes` JS requests | 65 | 49 | **-24.6%** |
+| `/inversion` direct app-ready | 1,188.1 ms | 970.2 ms | **-18.3%** |
+| `/configuracion` direct app-ready | 967.1 ms | 898.3 ms | **-7.1%** |
+| Direct sections JS decoded | 1,031–1,288 kB | 746–891 kB | **-27.7% to -38.1%** |
+| First navigation: Inversión | 231.2 ms | 181.6 ms | **-21.5%** |
+| First navigation: Configuración | 146.3 ms | 96.6 ms | **-34.0%** |
+
+First contentful paint stayed flat (376 ms) and the dashboard LCP moved from 588 ms to
+572 ms. Per-section navigation deltas of a few milliseconds are noise: the budget, wealth,
+goals and data medians move by less than 4%.
+
+The 204 kB Chart.js chunk still downloads when a chart first renders; only its position in the
+timeline changed. The remaining direct-load cost is the eager dashboard bundled inside
+`FinanceWorkspace`, which every `/[section]` route also imports.

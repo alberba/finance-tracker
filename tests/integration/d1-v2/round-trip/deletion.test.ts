@@ -177,7 +177,7 @@ describe("round trip: borrar avisa en vez de fallar", () => {
     const ruleId = withRule.recurringRules[0].id;
 
     const { useRecurringStore } = await import("../../../../src/stores/recurring");
-    useRecurringStore().removeRule(ruleId);
+    await useRecurringStore().removeRule(ruleId);
     await trip.syncStore.flush();
 
     const reloaded = await trip.reload();
