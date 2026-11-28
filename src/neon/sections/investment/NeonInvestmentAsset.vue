@@ -22,6 +22,7 @@ const props = defineProps<{ detail: AssetDetail }>()
 
 const emit = defineEmits<{
   back: []
+  openInstrument: [instrumentId: string]
   buy: [event: MouseEvent]
   sell: [event: MouseEvent]
 }>()
@@ -85,7 +86,11 @@ function onBack(event: MouseEvent): void {
           :class="CARD"
           class="motion-safe:animate-rise motion-safe:[animation-delay:50ms]"
         >
-          <NeonInvestmentAssetPositions :positions="detail.positions" :note="detail.unpricedNote" />
+          <NeonInvestmentAssetPositions
+            :positions="detail.positions"
+            :note="detail.unpricedNote"
+            @open="emit('openInstrument', $event)"
+          />
         </section>
 
         <section

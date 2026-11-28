@@ -103,4 +103,19 @@ describe('NeonInvestmentAssetPositions', () => {
     ).toEqual(['BTC', 'ETH'])
     expect(wrapper.get('[data-asset-position-line="BTC"]').text()).toContain('2 · media 2.000,00')
   })
+
+  it.each([false, true])(
+    'cada posición lleva al detalle de su instrumento (apilada: %s)',
+    async (stacked) => {
+      const { positions, unpricedNote } = cryptoDetail()
+      const wrapper = mount(NeonInvestmentAssetPositions, {
+        props: { positions, note: unpricedNote, stacked },
+      })
+
+      const link = wrapper.get('[data-asset-position-line="ETH"] a')
+      expect(link.attributes('href')).toBe('/inversion?instrumento=i-eth')
+      await link.trigger('click')
+      expect(wrapper.emitted('open')).toEqual([['i-eth']])
+    },
+  )
 })

@@ -237,3 +237,46 @@ export async function editScenarioState(page: Page, edit: (state: State) => void
   expect((await response.json()).skipped).toEqual({})
   await new FinanceTrackerPage(page).reload()
 }
+
+/**
+ * Gives Fondos Indexados a position: VWCE, 10 titles bought in January at 100 € and 5 more in
+ * February at 110 €. Opens the app on the cover of Inversión afterwards.
+ */
+export async function holdVwceInFondos(page: Page): Promise<void> {
+  await editScenarioState(page, (state) => {
+    state.instruments = [
+      {
+        id: 'e2e-vwce',
+        investmentAssetId: 'fondos-indexados',
+        type: 'etf',
+        symbol: 'VWCE',
+        market: 'XETRA',
+        currency: 'EUR',
+        provider: 'yahoo',
+        active: true,
+      },
+    ]
+    state.transactions.push(
+      ...(
+        [
+          ['e2e-buy-1', '2026-01-12', 1, 10, 100],
+          ['e2e-buy-2', '2026-02-12', 2, 5, 110],
+        ] as const
+      ).map(([id, date, month, units, unitPrice]) => ({
+        id,
+        date,
+        month,
+        type: 'investment' as const,
+        accountId: state.accounts[0].id,
+        category: 'Fondos Indexados',
+        description: `Compra ${units} VWCE`,
+        amount: units * unitPrice,
+        side: 'buy' as const,
+        units,
+        unitPrice,
+        symbol: 'VWCE',
+        instrumentId: 'e2e-vwce',
+      })),
+    )
+  })
+}

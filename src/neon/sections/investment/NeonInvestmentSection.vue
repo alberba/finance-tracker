@@ -30,10 +30,12 @@ import NeonButton from '../../ui/NeonButton.vue'
 import NeonEmptyState from '../../ui/NeonEmptyState.vue'
 import { FRAME_QUERY } from '../../ui/sheet-drag'
 import { assetDetail } from './asset-view-model'
+import { instrumentDetail } from './instrument-view-model'
 import { startPage, useAssetRoute } from './asset-route'
 import NeonInvestmentAsset from './NeonInvestmentAsset.vue'
 import NeonInvestmentAssetMobile from './NeonInvestmentAssetMobile.vue'
 import NeonInvestmentCards from './NeonInvestmentCards.vue'
+import NeonInvestmentInstrument from './NeonInvestmentInstrument.vue'
 import NeonInvestmentChart from './NeonInvestmentChart.vue'
 import NeonInvestmentMobile from './NeonInvestmentMobile.vue'
 import NeonInvestmentAccounts from './NeonInvestmentAccounts.vue'
@@ -68,7 +70,9 @@ import {
 //
 // A position opens its detail, a history entry of its own at
 // `/inversion?activo=<id>`: the arrow and the browser's back button both return
-// to the cover. On the desktop frame that is NeonInvestmentAsset (artboard
+// to the cover. From an account's positions, each instrument opens its own
+// detail at `/inversion?instrumento=<id>` (#561, NeonInvestmentInstrument, the
+// same on both frames): back returns to the account. On the desktop frame that is NeonInvestmentAsset (artboard
 // «Inversión · detalle de activo (VWCE) · 2560 px», #439); on the mobile frame,
 // NeonInvestmentAssetMobile (the same artboard, «móvil · Pixel 10», #440), from
 // the same view model, with its movements as a second entry.
@@ -266,9 +270,17 @@ const asset = computed(() =>
     : null,
 )
 
+const instrument = computed(() =>
+  route.instrument.value ? instrumentDetail(state.value, vm.value, route.instrument.value) : null,
+)
+
 // Opening or leaving the detail, or its movements, starts a new page.
 watch(
-  () => [asset.value?.id ?? null, route.movements.value && !desktopFrame.value],
+  () => [
+    asset.value?.id ?? null,
+    instrument.value?.id ?? null,
+    route.movements.value && !desktopFrame.value,
+  ],
   async () => {
     await nextTick()
     if (props.isActive) startPage('investment-title')
@@ -295,12 +307,19 @@ function sortBy(key: SortKey, direction: SortDirection): void {
     class="@container grid min-w-0 content-start gap-[26px]"
     aria-labelledby="investment-title"
   >
-    <NeonBarTitle v-if="isActive && !desktopFrame && !asset" title="Inversión" />
+    <NeonBarTitle v-if="isActive && !desktopFrame && !asset && !instrument" title="Inversión" />
+    <NeonInvestmentInstrument
+      v-if="instrument"
+      :detail="instrument"
+      :touch="!desktopFrame"
+      @back="route.closeInstrument"
+    />
     <NeonInvestmentAssetMobile
-      v-if="!desktopFrame && asset"
+      v-else-if="!desktopFrame && asset"
       :detail="asset"
       :movements="route.movements.value"
       @back="route.close"
+      @open-instrument="route.openInstrument"
       @open-movements="route.openMovements"
       @close-movements="route.closeMovements"
       @buy="openInvestmentEntry({ side: 'buy', ...asset.entry }, $event)"
@@ -327,6 +346,7 @@ function sortBy(key: SortKey, direction: SortDirection): void {
       v-else-if="asset"
       :detail="asset"
       @back="route.close"
+      @open-instrument="route.openInstrument"
       @buy="openInvestmentEntry({ side: 'buy', ...asset.entry }, $event)"
       @sell="openInvestmentEntry({ side: 'sell', ...asset.entry }, $event)"
     />
