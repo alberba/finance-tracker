@@ -26,6 +26,6 @@
 
 ## Execution
 
-Use `bun` (`bun install`, `bun run <script>`, `bunx`); discover commands in `package.json`. Never `bun test`: it is Bun's own runner, not the `test` script.
+Use `bun` (`bun install --frozen-lockfile`, `bun run <script>`, `bunx`); discover commands in `package.json`. Never `bun test`: it is Bun's own runner, not the `test` script.
 During `/implement`, run typecheck and targeted tests often; the final verification is in
 [TESTING_STANDARDS](TESTING_STANDARDS.md) › Ejecución.
