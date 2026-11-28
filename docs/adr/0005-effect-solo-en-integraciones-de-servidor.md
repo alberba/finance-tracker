@@ -15,7 +15,7 @@ módulo. La versión de `effect` se fija exacta, no con `^`. Mientras el repo si
 tests ejecutan el código con `Effect.runPromise` y una capa HTTP falsa, sin `@effect/vitest`.
 
 Quedan fuera el cliente (Pinia, componentes, `src/stores/sync.ts`), `src/domain/**`, los esquemas
-zod y Drizzle. El cliente solo entraría con una medición de `pnpm benchmark:performance` delante;
+zod y Drizzle. El cliente solo entraría con una medición de `bun run benchmark:performance` delante;
 el coste de bundle está medido en `docs/research/effect-ts-viabilidad.md`.
 
 Si al cerrar el piloto el código no es claramente mejor que su versión a mano, se para ahí: la
