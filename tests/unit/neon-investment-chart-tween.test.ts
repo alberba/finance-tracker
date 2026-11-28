@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { chartTween, pathTween, restFrame } from '../../src/neon/sections/investment/chart-tween'
+import { chartTween, pathTween } from '../../src/neon/sections/investment/chart-tween'
 import type { PortfolioChart } from '../../src/neon/sections/investment/view-model'
 
 const chart = (overrides: Partial<PortfolioChart> = {}): PortfolioChart => ({
@@ -61,9 +61,5 @@ describe('chartTween', () => {
 
   it('swaps between euros and TWR', () => {
     expect(chartTween(chart(), chart({ zero: 'M70 200 H1250' }))).toBeNull()
-  })
-
-  it('rests on the chart it is given', () => {
-    expect(restFrame(chart()).grid.every((tick) => tick.opacity === 1)).toBe(true)
   })
 })

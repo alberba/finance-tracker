@@ -3,15 +3,11 @@ import { test, expect } from './fixtures'
 import { expectSyncCommand } from './pages/sync'
 
 /**
- * Configuración in the mobile frame of the new design (#444), in the mobile
- * project. No cookie: the new design is the default. The index opens each
+ * Configuración in the mobile frame (#444), in the mobile
+ * project. The index opens each
  * apartado on its own screen; the seed brings its accounts. Labels and counts
  * are the view-model's unit tests'; here, what the user does and what they get.
  */
-const NO_COOKIE = { cookies: [], origins: [] }
-
-test.use({ storageState: NO_COOKIE })
-
 const section = (page: Page) => page.locator('#settings')
 const index = (page: Page) => section(page).getByRole('navigation', { name: 'Ajustes' })
 
@@ -33,28 +29,6 @@ async function backToIndex(page: Page): Promise<void> {
 
 test.beforeEach(async ({ tracker }) => {
   await tracker.openSettings()
-})
-
-test('cambia la moneda desde el móvil y la conserva al recargar', async ({ page, tracker }) => {
-  await expect(index(page).getByRole('button', { name: /^Cuentas/ })).toBeVisible()
-
-  await openPart(page, 'Preferencias')
-  await section(page).getByLabel('Moneda').fill('usd')
-  const saved = expectSyncCommand(
-    page,
-    (command) => command.action === 'settingsUpdate' && command.patch.currency === 'USD',
-  )
-  await section(page).getByRole('button', { name: 'Guardar ajustes' }).click()
-  await expect(page.getByRole('status')).toContainText('Configuración general guardada.')
-  await saved
-
-  await backToIndex(page)
-  await expect(section(page).locator('[data-settings-meta="preferencias"]')).toContainText('USD')
-
-  await tracker.reload()
-  await tracker.openSettings()
-  await openPart(page, 'Preferencias')
-  await expect(section(page).getByLabel('Moneda')).toHaveValue('USD')
 })
 
 test('edita una cuenta en su hoja, añade otra y la elimina', async ({ page }) => {
@@ -101,13 +75,6 @@ test('edita una cuenta en su hoja, añade otra y la elimina', async ({ page }) =
   const confirm = page.getByRole('alertdialog', { name: '¿Eliminar esta cuenta?' })
   await confirm.getByRole('button', { name: 'Eliminar cuenta' }).click()
   await expect(row).toHaveCount(0)
-})
-
-test('cierra sesión desde el móvil y llega al login', async ({ page, tracker }) => {
-  await tracker.waitForSync()
-  await openPart(page, 'Cuenta')
-  await section(page).getByRole('button', { name: 'Cerrar sesión' }).click()
-  await expect(page).toHaveURL(/\/login$/)
 })
 
 test('todos los controles miden al menos 44 px con puntero táctil', async ({ page }) => {

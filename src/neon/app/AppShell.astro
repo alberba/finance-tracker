@@ -1,0 +1,126 @@
+---
+import '../../styles/global.css'
+import NeonFontPreloads from '../layout/NeonFontPreloads.astro'
+import NeonFrame from '../layout/NeonFrame.astro'
+import AppWorkspace from './AppWorkspace.vue'
+import { getSectionFromPath } from '../../scripts/app/dashboard-section-routing'
+
+export interface Props {
+  page?: 'section' | 'reports'
+}
+
+const { page = 'section' } = Astro.props
+const canonicalUrl = new URL('/', Astro.url).toString()
+// «Mis reportes» no es una sección: ninguna entrada del menú queda activa.
+const activeSection = page === 'reports' ? null : getSectionFromPath(Astro.url.pathname)
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script is:inline>
+      // Theme before the first paint (src/lib/client/neon-theme.ts): a stored
+      // theme name wins, otherwise «oscuro suave», or «claro melocotón» if the
+      // system asks for light. Blocked storage still honours the system.
+      ;(function () {
+        const root = document.documentElement
+        try {
+          const prefersDark =
+            window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+          let stored = null
+          try {
+            stored = localStorage.getItem('neon-theme')
+          } catch {
+            /* Storage blocked: no stored choice. */
+          }
+          root.dataset.theme = [
+            'oscuro-suave',
+            'oscuro-fuerte',
+            'claro-hueso',
+            'claro-melocoton',
+          ].includes(stored)
+            ? stored
+            : prefersDark
+              ? 'oscuro-suave'
+              : 'claro-melocoton'
+        } catch {
+          root.dataset.theme = 'oscuro-suave'
+        }
+      })()
+    </script>
+    <script is:inline>
+      // Modo demo: `?demo=1` activa (persistente), `?demo=0` desactiva. Debe
+      // correr antes que los scripts de la app para fijar el namespace `demo`
+      // (datos sintéticos aislados) antes de la hidratación del estado.
+      ;(function () {
+        try {
+          const params = new URLSearchParams(window.location.search)
+          const flag = params.get('demo')
+          if (flag !== null) {
+            if (['1', 'on', 'true'].includes(flag.toLowerCase())) {
+              localStorage.setItem('finance-demo-mode', '1')
+              document.cookie =
+                'finance-demo-mode=1; Path=/; Max-Age=2592000; SameSite=Lax' +
+                (window.location.protocol === 'https:' ? '; Secure' : '')
+            } else {
+              localStorage.removeItem('finance-demo-mode')
+              document.cookie =
+                'finance-demo-mode=; Path=/; Max-Age=0; SameSite=Lax' +
+                (window.location.protocol === 'https:' ? '; Secure' : '')
+            }
+            params.delete('demo')
+            const query = params.toString()
+            history.replaceState(
+              null,
+              '',
+              window.location.pathname + (query ? '?' + query : '') + window.location.hash,
+            )
+          }
+          if (!window.__FINANCE_NAMESPACE__ && localStorage.getItem('finance-demo-mode') === '1') {
+            window.__FINANCE_NAMESPACE__ = 'demo'
+            document.documentElement.dataset.demo = '1'
+            document.cookie =
+              'finance-demo-mode=1; Path=/; Max-Age=2592000; SameSite=Lax' +
+              (window.location.protocol === 'https:' ? '; Secure' : '')
+          }
+        } catch {
+          /* storage no disponible — sin modo demo */
+        }
+      })()
+    </script>
+    <meta name="theme-color" content="#1B1A18" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#F7EBE2" media="(prefers-color-scheme: light)" />
+    <title>Finance Tracker 2026</title>
+    <link rel="canonical" href={canonicalUrl} />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials" />
+    <meta name="application-name" content="Finance Tracker" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <NeonFontPreloads />
+    <script>
+      import '../../scripts/app'
+      import '../../scripts/shell'
+    </script>
+  </head>
+  <body>
+    <NeonFrame activeSection={activeSection}>
+      <AppWorkspace activeSection={activeSection ?? undefined} page={page} client:only="vue" />
+    </NeonFrame>
+
+    <!-- A manual popover, so it renders in the top layer above an open side
+         panel or confirmation (both modal dialogs). The block and margin
+         utilities undo the popover's centring from the browser stylesheet. -->
+    <div
+      id="toast"
+      popover="manual"
+      class="bg-text text-bg rounded-field frame:inset-x-auto frame:inset-e-24 frame:inset-be-6 frame:max-w-105 pointer-events-none fixed inset-x-4 inset-bs-auto inset-be-[calc(96px+env(safe-area-inset-bottom))] z-60 m-0 h-auto w-auto translate-y-2.5 overflow-visible border-0 px-4.5 py-3.5 text-[15px] leading-snug font-bold opacity-0 shadow-[0_12px_30px_-10px_oklch(0%_0_none/0.6)] transition duration-200 data-visible:translate-y-0 data-visible:opacity-100"
+      role="status"
+      aria-live="polite"
+    ></div>
+  </body>
+</html>

@@ -2,17 +2,12 @@ import { defineStore } from 'pinia'
 import { computed, shallowRef } from 'vue'
 
 import { buildPortfolioValuation, type PortfolioValuation } from '../domain/investment/valuation'
-import {
-  isUnlinkedMovementForInstrument,
-  quoteSourceKey,
-} from '../domain/investment/symbol-matching'
+import { quoteSourceKey } from '../domain/investment/symbol-matching'
 import { fetchMarketQuotes } from '../services/market-api'
 import { runClientHttp } from '../lib/client/runtime'
 import type { Instrument, InstrumentType } from '../scripts/types'
-import { todayISO } from '../scripts/utils'
 import { newId } from '../lib/client/ids'
 import { resolveEntityId, syncCreate, syncUpdate, syncRemove } from '../lib/client/command-mapping'
-import { syncMovements } from '../lib/client/movement-commands'
 import { isReadOnlyDemoActive } from '../lib/client/demo-source'
 import { useFinancialStateStore } from './financial-state'
 import { useSyncStore } from './sync'
@@ -40,7 +35,6 @@ export const useMarketStore = defineStore('market', () => {
   const valuation = computed<PortfolioValuation>(() =>
     buildPortfolioValuation(financialStateStore.state, { now: now.value }),
   )
-  const isLoading = shallowRef(false)
   const errorMessage = shallowRef<string | null>(null)
   const lastRefreshAt = shallowRef<string | null>(null)
   let refreshPromise: Promise<boolean> | null = null
@@ -106,21 +100,6 @@ export const useMarketStore = defineStore('market', () => {
     return true
   }
 
-  function updateCurrentUnits(id: string, value: string | number): void {
-    const currentUnits = normalizeUnits(value)
-    financialStateStore.commitState((draft) => {
-      const instrument = draft.instruments.find((item) => item.id === id)
-      if (instrument) {
-        instrument.holdingUnits = currentUnits
-        instrument.holdingsAsOf = todayISO()
-        instrument.holdingsUpdatedAt = new Date().toISOString()
-        instrument.holdingsSource = 'manual'
-      }
-    })
-    const updated = instruments.value.find((instrument) => instrument.id === id)
-    if (updated) persistConfiguration(updated)
-  }
-
   function removeInstrument(id: string): void {
     const ownerId = syncStore.userId
     financialStateStore.commitState((draft) => {
@@ -137,121 +116,6 @@ export const useMarketStore = defineStore('market', () => {
       .catch((error) => {
         errorMessage.value = String(error)
       })
-  }
-
-  function setInstrumentProvider(id: string, provider: string): void {
-    const normalizedProvider = provider.trim().toLowerCase()
-    if (!normalizedProvider) return
-    financialStateStore.commitState((draft) => {
-      const instrument = draft.instruments.find((item) => item.id === id)
-      if (instrument) instrument.provider = normalizedProvider
-    })
-    const updated = instruments.value.find((instrument) => instrument.id === id)
-    if (updated) persistConfiguration(updated)
-  }
-
-  function updateInstrumentSymbol(id: string, symbol: string): boolean {
-    const instrument = instruments.value.find((item) => item.id === id)
-    return configureInstrumentSymbols(id, symbol, instrument?.quoteSymbol || '')
-  }
-
-  function configureInstrumentSymbols(id: string, symbol: string, quoteSymbol: string): boolean {
-    const normalizedSymbol = symbol.trim().toUpperCase()
-    const normalizedQuoteSymbol = quoteSymbol.trim().toUpperCase()
-    if (!normalizedSymbol) return false
-    let updated = false
-    financialStateStore.commitState((draft) => {
-      const instrument = draft.instruments.find((item) => item.id === id)
-      if (instrument) {
-        if (
-          quoteSourceKey(instrument) !==
-          quoteSourceKey({
-            ...instrument,
-            symbol: normalizedSymbol,
-            quoteSymbol: normalizedQuoteSymbol || undefined,
-          })
-        )
-          delete draft.quotes[id]
-        instrument.symbol = normalizedSymbol
-        if (normalizedQuoteSymbol) instrument.quoteSymbol = normalizedQuoteSymbol
-        else delete instrument.quoteSymbol
-        updated = true
-      }
-    })
-    const instrument = instruments.value.find((item) => item.id === id)
-    if (updated && instrument) persistConfiguration(instrument)
-    return updated
-  }
-
-  function matchingMovementCount(instrumentId: string): number {
-    const instrument = instruments.value.find((item) => item.id === instrumentId)
-    if (!instrument) return 0
-    const assetName = financialStateStore.investmentAssets.find(
-      (asset) => asset.id === instrument.investmentAssetId,
-    )?.name
-    return financialStateStore.transactions.filter((transaction) =>
-      isUnlinkedMovementForInstrument(transaction, instrument, assetName),
-    ).length
-  }
-
-  function linkedMovementCount(instrumentId: string): number {
-    return financialStateStore.transactions.filter(
-      (transaction) =>
-        transaction.type === 'investment' && transaction.instrumentId === instrumentId,
-    ).length
-  }
-
-  function linkExistingMovements(instrumentId: string): number {
-    const ownerId = syncStore.userId
-    const instrument = instruments.value.find((item) => item.id === instrumentId)
-    if (!instrument) return 0
-    const assetName = financialStateStore.investmentAssets.find(
-      (asset) => asset.id === instrument.investmentAssetId,
-    )?.name
-    let linkedCount = 0
-    const before = financialStateStore.transactions
-    financialStateStore.commitState((draft) => {
-      const draftInstrument = draft.instruments.find((item) => item.id === instrumentId)
-      draft.transactions.forEach((transaction) => {
-        if (isUnlinkedMovementForInstrument(transaction, instrument, assetName)) {
-          transaction.instrumentId = instrument.id
-          linkedCount += 1
-        }
-      })
-      if (linkedCount && draftInstrument) {
-        // Vincular movimientos hace que sean la fuente inicial de la tenencia.
-        // Esto también corrige instrumentos creados por versiones anteriores que
-        // guardaban un snapshot provisional de cero al configurarlos.
-        delete draftInstrument.holdingUnits
-        delete draftInstrument.holdingsAsOf
-        delete draftInstrument.holdingsUpdatedAt
-        delete draftInstrument.holdingsSource
-      }
-    })
-    const updated = instruments.value.find((item) => item.id === instrumentId)
-    if (linkedCount && updated) {
-      const after = financialStateStore.transactions
-      const currency = financialStateStore.currency
-      persistConfiguration(updated)
-      configurationWrites = configurationWrites
-        .then(async () => {
-          if (!ownerId || syncStore.userId !== ownerId || isReadOnlyDemoActive()) return
-          // A newly configured symbol gets its catalog id on the server.
-          // Confirm that write before resolving the movement's operation.
-          await syncStore.syncNow()
-          if (syncStore.userId !== ownerId) return
-          if (!(await syncStore.getInstrumentId(instrumentId))) {
-            throw new Error('Sincroniza la cotización antes de vincular movimientos.')
-          }
-          if ((await syncMovements(before, after, currency)) === false) {
-            throw new Error('No se pudieron guardar los movimientos vinculados.')
-          }
-        })
-        .catch((error) => {
-          errorMessage.value = error instanceof Error ? error.message : String(error)
-        })
-    }
-    return linkedCount
   }
 
   function tickClock(): void {
@@ -299,7 +163,6 @@ export const useMarketStore = defineStore('market', () => {
 
   async function executeRefresh(): Promise<boolean> {
     if (!instruments.value.length) return true
-    isLoading.value = true
     errorMessage.value = null
     try {
       const requested = instruments.value
@@ -327,8 +190,6 @@ export const useMarketStore = defineStore('market', () => {
       errorMessage.value =
         error instanceof Error ? error.message : 'No se pudieron cargar las cotizaciones'
       return false
-    } finally {
-      isLoading.value = false
     }
   }
 
@@ -336,25 +197,12 @@ export const useMarketStore = defineStore('market', () => {
     instruments,
     quotes,
     valuation,
-    isLoading,
     errorMessage,
     lastRefreshAt,
     addInstrument,
     removeInstrument,
-    setInstrumentProvider,
-    updateInstrumentSymbol,
-    configureInstrumentSymbols,
-    updateCurrentUnits,
-    matchingMovementCount,
-    linkedMovementCount,
-    linkExistingMovements,
     refreshQuotes,
     tickClock,
     startClock,
   }
 })
-
-function normalizeUnits(value: string | number): number {
-  const parsed = Number(value)
-  return Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed * 100_000_000) / 100_000_000 : 0
-}

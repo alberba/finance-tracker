@@ -16,7 +16,7 @@ import {
 import type { State, Transaction } from '../../../scripts/types'
 import { signedPct, toneOf, type Tone } from './view-model'
 
-// The detail of an asset in the new Inversión (artboard «Inversión · detalle de
+// The detail of an asset in Inversión (artboard «Inversión · detalle de
 // activo (VWCE) · 2560 px», #439): what it is worth and how it did, its price
 // against the operations that were made, a few figures and the operations
 // themselves by year. Everything here is words and figures already formatted;

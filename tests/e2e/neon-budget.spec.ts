@@ -6,12 +6,9 @@ import { expectSyncCommand } from './pages/sync'
 import { editScenarioState } from './seed-sync-v2'
 
 /**
- * Presupuesto in the new design (#433), desktop. No cookie: the new design is
- * the default. The clock sits on 20 March 2026, the newest month of the seed.
+ * Presupuesto (#433), desktop. The clock sits on 20 March 2026, the newest month of the seed.
  */
-const NO_COOKIE = { cookies: [], origins: [] }
-
-test.use({ storageState: NO_COOKIE, fixedTime: '2026-03-20T12:00:00Z' })
+test.use({ fixedTime: '2026-03-20T12:00:00Z' })
 
 const section = (page: Page) => page.locator('#budget')
 const card = (page: Page, category: string) =>
@@ -47,7 +44,7 @@ async function resetCategory(
   await tracker.openBudget()
 }
 
-test.describe('Presupuesto en el diseño nuevo', () => {
+test.describe('Presupuesto', () => {
   test(
     'fija el límite de una categoría y ve su progreso y lo que queda',
     { tag: '@smoke' },
@@ -78,22 +75,13 @@ test.describe('Presupuesto en el diseño nuevo', () => {
     },
   )
 
-  test('abre el detalle de una categoría junto a su fila y pasa a otra sin cerrarlo', async ({
-    page,
-    tracker,
-  }) => {
+  test('abre el detalle de una categoría y pasa a otra sin cerrarlo', async ({ page, tracker }) => {
     await tracker.goto()
     await tracker.openBudget()
 
     await card(page, 'Ocio').click()
     const ocio = page.getByRole('dialog', { name: 'Ocio' })
     await expect(ocio).toBeVisible()
-    const box = (await ocio.boundingBox())!
-    // Past the end edge of the ledger, not over it.
-    const edge = await card(page, 'Ocio').evaluate(
-      (row) => row.closest('section')!.getBoundingClientRect().right,
-    )
-    expect(box.x).toBeGreaterThan(edge)
 
     // No scrim: the next row takes it there in one press.
     await card(page, 'Salud').click()

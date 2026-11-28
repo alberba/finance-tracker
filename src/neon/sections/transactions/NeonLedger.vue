@@ -222,8 +222,8 @@ const CHIP_TONE: Record<string, string> = {
             <button
               v-if="!selecting"
               type="button"
-              class="group/pick outline-accent absolute inset-bs-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:active:scale-[0.94] @min-[560px]/registry:inset-s-6"
-              :class="flat ? 'inset-s-4' : 'inset-s-3.5'"
+              class="group/pick outline-accent absolute inset-bs-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:active:scale-[0.94] @min-[560px]/registry:inset-s-5.5"
+              :class="flat ? 'inset-s-3.5' : 'inset-s-3'"
               :aria-label="`Seleccionar ${row.description}`"
               data-tx-pick
               @click="pickFrom(row.id)"

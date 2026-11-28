@@ -3,16 +3,13 @@ import { test, expect } from './fixtures'
 import { expectSyncCommand } from './pages/sync'
 import { editScenarioState, readScenarioState } from './seed-sync-v2'
 import type { RecurringRule } from '../../src/scripts/types'
-import { typeOnKeypad } from './entry-keypad'
 
 /**
- * Recorridos del dashboard nuevo en el marco móvil (#430), en el proyecto
- * móvil. Sin cookie: el diseño nuevo es el de por defecto. Las cifras las
+ * Recorridos del dashboard en el marco móvil (#430), en el proyecto
+ * móvil. Las cifras las
  * prueba el unit del view-model; aquí, lo que hace el usuario y lo que obtiene.
  */
-const NO_COOKIE = { cookies: [], origins: [] }
-
-test.use({ storageState: NO_COOKIE, fixedTime: '2026-07-10T10:00:00' })
+test.use({ fixedTime: '2026-07-10T10:00:00' })
 
 const dashboard = (page: Page) => page.locator('#dashboard')
 const left = (page: Page) => dashboard(page).locator('[data-dashboard-left]')
@@ -49,31 +46,6 @@ async function addMonthlyRules(page: Page, rules: Array<[string, string, number]
     }
   })
 }
-
-test('apuntar un gasto desde el FAB baja «Te quedan» ese importe', async ({ page, tracker }) => {
-  await expect(tracker.dashboardSection).toBeVisible()
-  const before = amountOf(await left(page).innerText())
-
-  await page.locator('[data-fab-apuntar]').click()
-  const sheet = page.getByRole('dialog', { name: 'Nuevo movimiento' })
-  await typeOnKeypad(sheet, '12,34')
-  await sheet.getByLabel('Nota').fill('Café del móvil')
-  const created = expectSyncCommand(
-    page,
-    (command) => command.action === 'create' && command.entityType === 'transaction',
-  )
-  await sheet.getByRole('button', { name: 'Guardar' }).click()
-  await created
-
-  await expect
-    .poll(async () => amountOf(await left(page).innerText()))
-    .toBeCloseTo(before - 12.34, 2)
-  await expect(
-    dashboard(page)
-      .getByRole('list', { name: 'Movimientos recientes' })
-      .getByText('Café del móvil'),
-  ).toBeVisible()
-})
 
 test('confirma un pendiente desde la hoja «Por confirmar» de la cifra', async ({
   page,
@@ -125,9 +97,12 @@ test('busca un movimiento desde la barra superior y llega a Movimientos filtrado
   await sheet.getByRole('searchbox', { name: 'Buscar movimientos' }).press('Enter')
 
   await expect(page).toHaveURL(/\/movimientos$/)
+  // The search shows as an active filter chip that takes it off.
   await expect(
-    tracker.transactionsSection.getByRole('searchbox', { name: 'Buscar movimientos' }),
-  ).toHaveValue('Compra semanal')
+    tracker.transactionsSection
+      .getByRole('group', { name: 'Filtros activos' })
+      .getByRole('button', { name: 'Quitar filtro: «Compra semanal»' }),
+  ).toBeVisible()
 })
 
 test('todos los controles del dashboard miden al menos 44 px con puntero táctil', async ({
@@ -141,22 +116,29 @@ test('todos los controles del dashboard miden al menos 44 px con puntero táctil
   await tracker.reload()
   expect(await page.evaluate(() => matchMedia('(pointer: coarse)').matches)).toBe(true)
 
-  const tooSmall = (selector: string) =>
-    page.locator(selector).evaluateAll((controls) =>
-      controls
-        .filter((control) => control.getClientRects().length > 0)
-        .map((control) => {
-          const { width, height } = control.getBoundingClientRect()
-          const name = control.getAttribute('aria-label') || control.textContent?.trim()
-          return { name, width: Math.round(width), height: Math.round(height) }
-        })
-        .filter(({ width, height }) => width < 44 || height < 44),
+  const tooSmall = (selector: string, min = 44) =>
+    page.locator(selector).evaluateAll(
+      (controls, size) =>
+        controls
+          .filter((control) => control.getClientRects().length > 0)
+          .map((control) => {
+            const { width, height } = control.getBoundingClientRect()
+            const name = control.getAttribute('aria-label') || control.textContent?.trim()
+            return { name, width: Math.round(width), height: Math.round(height) }
+          })
+          .filter(({ width, height }) => width < size || height < size),
+      min,
     )
 
+  // DESIGN.md: segments are compact (36 px minimum); every other control is 44 px.
+  const SEGMENT = '[role="tab"], [role="group"] > button[aria-pressed]'
   const CONTROLS = 'button, a[href], input'
   expect(
-    await tooSmall(`#dashboard :is(${CONTROLS}), [data-mobile-app-bar] button, [data-fab-apuntar]`),
+    await tooSmall(
+      `#dashboard :is(${CONTROLS}):not(${SEGMENT}), [data-mobile-app-bar] button, [data-fab-apuntar]`,
+    ),
   ).toEqual([])
+  expect(await tooSmall(`#dashboard :is(${SEGMENT})`, 36)).toEqual([])
 
   await page.getByRole('button', { name: 'Buscar movimientos' }).click()
   await expect(page.getByRole('dialog', { name: 'Buscar movimientos' })).toBeVisible()

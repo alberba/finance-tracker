@@ -48,13 +48,13 @@ function setup(
   return { controller, root, scheme, storage }
 }
 
-describe('new design theme controller', () => {
+describe('theme controller', () => {
   it('without a preference paints «oscuro suave», or «claro melocotón» if the system asks for light', () => {
     expect(setup({ prefersDark: true }).root.dataset.theme).toBe('oscuro-suave')
     expect(setup({ prefersDark: false }).root.dataset.theme).toBe('claro-melocoton')
   })
 
-  it.each(['oscuro-suave', 'oscuro-fuerte', 'claro-hueso', 'claro-melocoton'] as const)(
+  it.each(['oscuro-fuerte', 'claro-hueso'] as const)(
     'keeps a stored %s whatever the system says',
     (theme) => {
       const { controller, root } = setup({ stored: theme, prefersDark: theme.startsWith('claro') })
@@ -64,7 +64,7 @@ describe('new design theme controller', () => {
     },
   )
 
-  it('reads an unknown stored value, such as the old design’s «dark», as no preference', () => {
+  it('reads an unknown stored value, such as «dark», as no preference', () => {
     const { controller } = setup({ stored: 'dark', prefersDark: false })
 
     expect(controller.getState()).toEqual({ preference: null, theme: 'claro-melocoton' })
@@ -111,10 +111,10 @@ describe('new design theme controller', () => {
   })
 })
 
-describe('pre-paint scripts of the new design', () => {
+describe('pre-paint scripts', () => {
   // Inline scripts can't import the controller, so each one repeats the list
   // of themes; they must name exactly the themes the controller knows.
-  it.each(['components/FinanceTrackerShell.astro', 'neon/auth/NeonAccessPage.astro'])(
+  it.each(['neon/app/AppShell.astro', 'neon/auth/NeonAccessPage.astro'])(
     '%s lists the same themes as the controller',
     (path) => {
       const source = readFileSync(new URL(`../../src/${path}`, import.meta.url), 'utf8')

@@ -14,7 +14,7 @@ import NeonBudgetReviewMobile from './NeonBudgetReviewMobile.vue'
 import NeonBudgetYear from './NeonBudgetYear.vue'
 import NeonBudgetYearMobile from './NeonBudgetYearMobile.vue'
 
-// Presupuesto in the new design (artboard «Presupuesto · 2560 px», #433): one
+// Presupuesto (artboard «Presupuesto · 2560 px», #433): one
 // section with a cover, «Este mes», and three screens it opens: the review of
 // the month just closed, the plan of the next one and the whole year. Each
 // screen brings its own header; this only switches between them and moves

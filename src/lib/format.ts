@@ -264,9 +264,3 @@ export function formatMonthYear(month: Month, year: number): string {
   const name = formatMonthName(month)
   return name ? `${name} ${year}` : String(year)
 }
-
-/** Short x-axis label: month names shrink to three letters, dates stay whole. */
-export function formatAxisLabel(label: string | undefined): string {
-  const text = label ?? ''
-  return /^\p{L}+$/u.test(text) ? text.slice(0, 3) : text
-}

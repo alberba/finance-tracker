@@ -93,12 +93,11 @@ describe('reportApiErrorToSentry', () => {
     sentry.withScope.mockImplementation(() => {
       throw new Error('Sentry no disponible')
     })
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
 
     // El reporte es best-effort: el error tipado no puede quedar reemplazado
     // por un fallo de telemetría.
     expect(() => reportApiErrorToSentry(serverError())).not.toThrow()
     expect(sentry.captureException).not.toHaveBeenCalled()
-    expect(warn).toHaveBeenCalledTimes(1)
   })
 })

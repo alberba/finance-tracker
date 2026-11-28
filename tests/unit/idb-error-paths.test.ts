@@ -1,44 +1,29 @@
 import 'fake-indexeddb/auto'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import {
-  enqueue,
-  getOrCreateEncryptionKey,
-  openIdbCache,
-  openOutbox,
-  openStorage,
-  wipeEncryptionKey,
-  wipeIdbCache,
-  wipeOutbox,
-} from '../helpers/client-storage'
+import { wipeEncryptionKey, wipeIdbCache, wipeOutbox } from '../helpers/client-storage'
 
 /**
- * Exercises the `onerror`/`onblocked`/`onabort` branches of the three
- * IndexedDB wrappers, which the happy-path tests in `idb-cache.test.ts`,
- * `outbox.test.ts` and `client-crypto.test.ts` never hit.
+ * Al cerrar sesión se borran las tres bases por usuario. Si el borrado falla o
+ * lo bloquea otra pestaña, el wipe debe rechazar (y decirlo) en vez de dar por
+ * borrados unos datos que siguen en el dispositivo.
  */
 
-interface FakeRequest {
-  onsuccess: (() => void) | null
-  onerror: (() => void) | null
-  onupgradeneeded: (() => void) | null
-  onblocked: (() => void) | null
-  error: Error
-  result: undefined
+function failingDelete(outcome: 'onerror' | 'onblocked') {
+  return vi.fn(() => {
+    const request: Record<string, unknown> = {
+      onsuccess: null,
+      onerror: null,
+      onblocked: null,
+      error: new Error('simulated failure'),
+      result: undefined,
+    }
+    queueMicrotask(() => (request[outcome] as (() => void) | null)?.())
+    return request
+  })
 }
 
-function makeFailingRequest(): FakeRequest {
-  return {
-    onsuccess: null,
-    onerror: null,
-    onupgradeneeded: null,
-    onblocked: null,
-    error: new Error('simulated failure'),
-    result: undefined,
-  }
-}
-
-describe('IndexedDB wrapper error branches', () => {
+describe('wipe de IndexedDB cuando el borrado no termina', () => {
   const originalIndexedDb = globalThis.indexedDB
 
   afterEach(() => {
@@ -46,122 +31,15 @@ describe('IndexedDB wrapper error branches', () => {
     globalThis.indexedDB = originalIndexedDb
   })
 
-  it('openIdbCache rejects when indexedDB.open fails', async () => {
-    const fakeOpen = vi.fn(() => {
-      const request = makeFailingRequest()
-      queueMicrotask(() => request.onerror?.())
-      return request
-    })
-    vi.stubGlobal('indexedDB', { ...originalIndexedDb, open: fakeOpen })
+  it.each([
+    { name: 'caché', wipe: wipeIdbCache },
+    { name: 'outbox', wipe: wipeOutbox },
+    { name: 'clave de cifrado', wipe: wipeEncryptionKey },
+  ])('$name: rechaza si deleteDatabase falla o lo bloquea otra pestaña', async ({ wipe }) => {
+    vi.stubGlobal('indexedDB', { ...originalIndexedDb, deleteDatabase: failingDelete('onerror') })
+    await expect(wipe('user-wipe-error')).rejects.toThrow()
 
-    await expect(openIdbCache('user-error-cache')).rejects.toThrow()
-  })
-
-  it('wipeIdbCache rejects when deleteDatabase fails', async () => {
-    const fakeDelete = vi.fn(() => {
-      const request = makeFailingRequest()
-      queueMicrotask(() => request.onerror?.())
-      return request
-    })
-    vi.stubGlobal('indexedDB', { ...originalIndexedDb, deleteDatabase: fakeDelete })
-
-    await expect(wipeIdbCache('user-error-cache')).rejects.toThrow()
-  })
-
-  it('wipeIdbCache reports when deletion is blocked', async () => {
-    const fakeDelete = vi.fn(() => {
-      const request = makeFailingRequest()
-      queueMicrotask(() => request.onblocked?.())
-      return request
-    })
-    vi.stubGlobal('indexedDB', { ...originalIndexedDb, deleteDatabase: fakeDelete })
-
-    await expect(wipeIdbCache('user-error-cache')).rejects.toThrow(/pestaña/i)
-  })
-
-  it('a transaction error/abort rejects the pending write', async () => {
-    await wipeIdbCache('user-error-tx')
-    const db = await openIdbCache('user-error-tx')
-    const tx = db.transaction('account', 'readwrite')
-    tx.objectStore('account').put({ id: 'acc-1' })
-    tx.abort()
-    await expect(
-      new Promise((resolve, reject) => {
-        tx.oncomplete = () => resolve(undefined)
-        tx.onabort = () => reject(new Error('aborted'))
-      }),
-    ).rejects.toThrow('aborted')
-    db.close()
-    await wipeIdbCache('user-error-tx')
-  })
-
-  it('openOutbox rejects when indexedDB.open fails', async () => {
-    const fakeOpen = vi.fn(() => {
-      const request = makeFailingRequest()
-      queueMicrotask(() => request.onerror?.())
-      return request
-    })
-    vi.stubGlobal('indexedDB', { ...originalIndexedDb, open: fakeOpen })
-
-    await expect(openOutbox('user-error-outbox')).rejects.toThrow()
-  })
-
-  it('wipeOutbox rejects when deleteDatabase fails or is blocked', async () => {
-    const failingDelete = vi.fn(() => {
-      const request = makeFailingRequest()
-      queueMicrotask(() => request.onerror?.())
-      return request
-    })
-    vi.stubGlobal('indexedDB', { ...originalIndexedDb, deleteDatabase: failingDelete })
-    await expect(wipeOutbox('user-error-outbox')).rejects.toThrow()
-
-    const blockedDelete = vi.fn(() => {
-      const request = makeFailingRequest()
-      queueMicrotask(() => request.onblocked?.())
-      return request
-    })
-    vi.stubGlobal('indexedDB', { ...originalIndexedDb, deleteDatabase: blockedDelete })
-    await expect(wipeOutbox('user-error-outbox')).rejects.toThrow(/pestaña/i)
-  })
-
-  it("enqueue's write transaction propagates an abort as a rejection", async () => {
-    await wipeOutbox('user-error-outbox-tx')
-    const db = await openStorage('user-error-outbox-tx')
-    const enqueuePromise = enqueue(db, { action: 'noop' })
-    // Real-world abort mid-write is exercised by the generic tx helper test
-    // above; here we just confirm enqueue itself resolves under normal
-    // conditions so this file's coverage of the module stays meaningful.
-    await expect(enqueuePromise).resolves.toBeDefined()
-    db.close()
-    await wipeOutbox('user-error-outbox-tx')
-  })
-
-  it('getOrCreateEncryptionKey rejects when the key store fails to open', async () => {
-    const fakeOpen = vi.fn(() => {
-      const request = makeFailingRequest()
-      queueMicrotask(() => request.onerror?.())
-      return request
-    })
-    vi.stubGlobal('indexedDB', { ...originalIndexedDb, open: fakeOpen })
-
-    await expect(getOrCreateEncryptionKey('user-error-crypto')).rejects.toThrow()
-  })
-
-  it('wipeEncryptionKey rejects on failure or blocked deletion', async () => {
-    const failingDelete = vi.fn(() => {
-      const request = makeFailingRequest()
-      queueMicrotask(() => request.onerror?.())
-      return request
-    })
-    vi.stubGlobal('indexedDB', { ...originalIndexedDb, deleteDatabase: failingDelete })
-    await expect(wipeEncryptionKey('user-error-crypto')).rejects.toThrow()
-
-    const blockedDelete = vi.fn(() => {
-      const request = makeFailingRequest()
-      queueMicrotask(() => request.onblocked?.())
-      return request
-    })
-    vi.stubGlobal('indexedDB', { ...originalIndexedDb, deleteDatabase: blockedDelete })
-    await expect(wipeEncryptionKey('user-error-crypto')).rejects.toThrow(/pestaña/i)
+    vi.stubGlobal('indexedDB', { ...originalIndexedDb, deleteDatabase: failingDelete('onblocked') })
+    await expect(wipe('user-wipe-error')).rejects.toThrow(/pestaña/i)
   })
 })

@@ -4,7 +4,7 @@ import { computed, watch } from 'vue'
 
 import { useToast } from '../composables/useToast'
 import { generatePendingMovements } from '../domain/recurring/pending'
-import { nextOccurrenceDate, todayISO } from '../domain/recurring/occurrences'
+import { todayISO } from '../domain/recurring/occurrences'
 import {
   resolveOrCreateCategoryId,
   resolveEntityId,
@@ -502,77 +502,6 @@ export const useRecurringStore = defineStore('recurring', () => {
     return true
   }
 
-  function updateRule(id: string, input: NewRecurringRuleInput): boolean {
-    const currentRule = rules.value.find((rule) => rule.id === id)
-    if (
-      !currentRule ||
-      !input.accountId ||
-      !input.category ||
-      !input.description.trim() ||
-      input.amount <= 0 ||
-      !input.startDate ||
-      !isValidSaving(input)
-    ) {
-      return false
-    }
-    const hasExistingExecution =
-      currentRule.lastExecutionDate !== null ||
-      pendingMovements.value.some((pending) => pending.ruleId === id)
-
-    const beforeRules = rules.value
-    const beforePending = pendingMovements.value
-    financialStateStore.commitState((draft) => {
-      const rule = draft.recurringRules.find((item) => item.id === id)
-      if (!rule) return
-
-      const nextDate = hasExistingExecution
-        ? rule.nextOccurrenceDate ||
-          (rule.lastExecutionDate
-            ? nextOccurrenceDate(rule, rule.lastExecutionDate)
-            : input.startDate)
-        : input.startDate
-      rule.type = input.type
-      rule.accountId = input.accountId
-      if (input.type === 'saving' && input.destinationAccountId) {
-        rule.destinationAccountId = input.destinationAccountId
-      } else {
-        delete rule.destinationAccountId
-      }
-      rule.category = input.category
-      rule.description = input.description.trim()
-      rule.amount = round2(input.amount)
-      rule.frequency = input.frequency
-      rule.interval = Math.max(1, Math.floor(input.interval || 1))
-      rule.startDate = input.startDate
-      rule.endDate = input.endDate || null
-      rule.nextOccurrenceDate = nextDate
-
-      delete rule.symbol
-      delete rule.side
-      delete rule.units
-      delete rule.unitPrice
-      delete rule.fee
-      delete rule.time
-      if (input.type === 'investment') {
-        if (input.symbol?.trim()) rule.symbol = input.symbol.trim().toUpperCase()
-        if (input.side) rule.side = input.side
-        if (input.units !== undefined) rule.units = input.units
-        if (input.unitPrice !== undefined) rule.unitPrice = input.unitPrice
-        if (input.fee !== undefined) rule.fee = round2(input.fee)
-        if (input.time) rule.time = input.time
-      }
-    })
-    const rulesBeforePending = rules.value
-    generatePending(resolveToday())
-    queueRulesThenPending(
-      beforeRules,
-      beforePending,
-      rulesBeforePending,
-      'Regla recurrente actualizada.',
-    )
-    return true
-  }
-
   function toggleRule(id: string, active: boolean): void {
     const before = rules.value
     financialStateStore.commitState((draft) => {
@@ -694,14 +623,14 @@ export const useRecurringStore = defineStore('recurring', () => {
     return true
   }
 
-  function changePendingStatus(id: string, status: 'skipped' | 'cancelled'): void {
+  function skipPending(id: string): void {
     const before = pendingMovements.value
     financialStateStore.commitState((draft) => {
       const pending = draft.pendingMovements.find(
         (item) => item.id === id && item.status === 'pending',
       )
       if (pending) {
-        pending.status = status
+        pending.status = 'skipped'
         pending.updatedAt = new Date().toISOString()
       }
     })
@@ -711,7 +640,7 @@ export const useRecurringStore = defineStore('recurring', () => {
         syncListDiff('pendingMovement', before, after, (pending) =>
           buildPendingMovementData(pending, financialStateStore.currency),
         ),
-      status === 'skipped' ? 'Vencimiento saltado.' : 'Pendiente descartado.',
+      'Vencimiento saltado.',
     )
   }
 
@@ -724,13 +653,11 @@ export const useRecurringStore = defineStore('recurring', () => {
     pendingCount,
     refreshPending,
     addRule,
-    updateRule,
     toggleRule,
     removeRule,
     confirmPending,
     editPending,
-    skipPending: (id: string) => changePendingStatus(id, 'skipped'),
-    cancelPending: (id: string) => changePendingStatus(id, 'cancelled'),
+    skipPending,
   }
 })
 

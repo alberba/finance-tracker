@@ -19,7 +19,7 @@ import {
   subscriptionsSummary,
 } from './subscriptions-view-model'
 
-// «Suscripciones» of the new Movimientos: a table that compares them by what
+// «Suscripciones» of Movimientos: a table that compares them by what
 // each costs per month (the active ones, with their total, then the paused
 // ones with what they save) and, in the aside, what they commit each month,
 // the charges of the next 12 months as bars and the next charge of each.

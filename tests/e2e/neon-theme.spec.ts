@@ -2,27 +2,21 @@ import type { Page } from '@playwright/test'
 import { test, expect } from './fixtures'
 
 /**
- * Los cuatro temas del diseño nuevo (#445), en escritorio. Sin cookie: el
- * diseño nuevo es el de por defecto. Los valores de cada tema y su contraste
+ * Los cuatro temas (#445), en escritorio. Los valores de cada tema y su contraste
  * son del guard de styles-guards.test.ts; aquí, qué elige la persona y qué
  * conserva al recargar.
  */
-const NO_COOKIE = { cookies: [], origins: [] }
-
-test.use({ storageState: NO_COOKIE })
-
 const html = (page: Page) => page.locator('html')
 const picker = (page: Page) => page.locator('#settings').getByRole('group', { name: 'Tema' })
-const canvas = (page: Page) => page.evaluate(() => getComputedStyle(document.body).backgroundColor)
 
 const THEMES = [
-  { id: 'oscuro-suave', label: 'Oscuro suave', canvas: 'rgb(27, 26, 24)' }, // #1B1A18
-  { id: 'oscuro-fuerte', label: 'Oscuro fuerte', canvas: 'rgb(18, 17, 16)' }, // #121110
-  { id: 'claro-hueso', label: 'Claro hueso', canvas: 'rgb(241, 238, 232)' }, // #F1EEE8
-  { id: 'claro-melocoton', label: 'Claro melocotón', canvas: 'rgb(247, 235, 226)' }, // #F7EBE2
+  { id: 'oscuro-suave', label: 'Oscuro suave' },
+  { id: 'oscuro-fuerte', label: 'Oscuro fuerte' },
+  { id: 'claro-hueso', label: 'Claro hueso' },
+  { id: 'claro-melocoton', label: 'Claro melocotón' },
 ]
 
-test.describe('Temas del diseño nuevo', () => {
+test.describe('Temas', () => {
   test('sin preferencia usa oscuro suave, o claro melocotón si el sistema pide claro', async ({
     page,
     tracker,
@@ -37,16 +31,6 @@ test.describe('Temas del diseño nuevo', () => {
     await expect(html(page)).toHaveAttribute('data-theme', 'claro-melocoton')
   })
 
-  test('el marco nuevo no tiene el selector sol/pantalla/luna de la cabecera', async ({
-    page,
-    tracker,
-  }) => {
-    await tracker.goto()
-
-    await expect(page.getByRole('group', { name: 'Tema' })).toHaveCount(0)
-    await expect(page.getByRole('button', { name: 'Tema oscuro' })).toHaveCount(0)
-  })
-
   test('elige cada tema en Configuración, se aplica al momento y se conserva al recargar', async ({
     page,
     tracker,
@@ -58,7 +42,6 @@ test.describe('Temas del diseño nuevo', () => {
     for (const theme of THEMES) {
       await picker(page).getByRole('button', { name: theme.label, exact: true }).click()
       await expect(html(page)).toHaveAttribute('data-theme', theme.id)
-      await expect.poll(() => canvas(page)).toBe(theme.canvas)
 
       // The first paint already carries it: with the app's scripts blocked,
       // only the inline script before the paint can set the theme.

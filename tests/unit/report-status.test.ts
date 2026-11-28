@@ -1,11 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { IssueNode, ReportEntry } from '../../src/domain/reports/report-entry'
-import {
-  buildAvailableEntry,
-  describeReportStatus,
-  resolveFollowed,
-} from '../../src/domain/reports/report-status'
+import { describeReportStatus, resolveFollowed } from '../../src/domain/reports/report-status'
 
 const REPO = 'acme/finance-tracker'
 
@@ -54,11 +50,6 @@ describe('resolveFollowed', () => {
     const result = resolveFollowed(root, REPO)
     expect(result.followed?.number).toBe(4)
     expect(result.duplicateLinkUnavailable).toBe(false)
-  })
-
-  it('muestra el estado de la principal cuando está completada', () => {
-    const root = duplicate(1, node({ number: 2, state: 'CLOSED', stateReason: 'COMPLETED' }))
-    expect(resolveFollowed(root, REPO).followed?.stateReason).toBe('COMPLETED')
   })
 
   it('marca el enlace roto cuando falta la principal', () => {
@@ -165,21 +156,5 @@ describe('describeReportStatus', () => {
     expect(description.headline).toBe('Reporte #30')
     expect(description.state).toBeNull()
     expect(description.warning).toBe('Este reporte ya no está disponible en GitHub')
-  })
-})
-
-describe('buildAvailableEntry', () => {
-  it('copia los datos de la original y añade el seguimiento', () => {
-    const entry = buildAvailableEntry(
-      duplicate(1, node({ number: 2 })),
-      { followed: node({ number: 2 }), duplicateLinkUnavailable: false },
-      { ...BASE, statusChangedAt: '2026-10-03T00:00:00.000Z' },
-    )
-    expect(entry).toMatchObject({
-      number: 1,
-      state: 'CLOSED',
-      followed: { number: 2 },
-      statusChangedAt: '2026-10-03T00:00:00.000Z',
-    })
   })
 })

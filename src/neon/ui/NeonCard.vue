@@ -2,7 +2,7 @@
 import { getPathFromSection } from '../../scripts/app/dashboard-section-routing'
 import type { SectionId } from '../../scripts/types'
 
-// Card of the new design (DESIGN.md, Tarjeta): a block title on top and the
+// Card (DESIGN.md, Tarjeta): a block title on top and the
 // content below, with the mobile padding in a narrow container. `to` adds the
 // link that opens that section: an arrow named by `label` («Ir a
 // Patrimonio»), or with `text` a short word and a chevron («Ver todos ›»).

@@ -36,39 +36,54 @@ describe('round trip: shared movement commands (#263)', () => {
 
   beforeEach(async () => {
     trip = await startRoundTrip(async (db, userId) => {
-      await runWithDb(db, accounts.create(userId, {
-        id: accountId,
-        name: 'MyInvestor',
-        kind: 'cash',
-        currency: 'EUR',
-        openingBalance: 0,
-      }))
+      await runWithDb(
+        db,
+        accounts.create(userId, {
+          id: accountId,
+          name: 'MyInvestor',
+          kind: 'cash',
+          currency: 'EUR',
+          openingBalance: 0,
+        }),
+      )
       await runWithDb(db, accounts.createCategory(userId, { name: 'Acciones', kind: 'investment' }))
       await runWithDb(db, accounts.createCategory(userId, { name: 'Fondos', kind: 'investment' }))
       await runWithDb(db, accounts.createCategory(userId, { name: 'Ocio', kind: 'expense' }))
       await runWithDb(db, accounts.createCategory(userId, { name: 'Nómina', kind: 'income' }))
-      const instrument = await runWithDb(db, market.createInstrument({
-        legacyId: 'legacy-vwce',
-        symbol: 'VWCE',
-        normalizedSymbol: 'VWCE',
-        provider: 'yahoo',
-        currency: 'USD',
-      }))
+      const instrument = await runWithDb(
+        db,
+        market.createInstrument({
+          legacyId: 'legacy-vwce',
+          symbol: 'VWCE',
+          normalizedSymbol: 'VWCE',
+          provider: 'yahoo',
+          currency: 'USD',
+        }),
+      )
       instrumentId = 'legacy-vwce'
-      await runWithDb(db, market.createUserInstrument(userId, {
-        instrumentId: instrument.id,
-        alias: accountId,
-      }))
-      const canonicalInstrument = await runWithDb(db, market.createInstrument({
-        symbol: 'IWDA',
-        normalizedSymbol: 'IWDA',
-        provider: 'yahoo',
-        currency: 'USD',
-      }))
-      await runWithDb(db, market.createUserInstrument(userId, {
-        instrumentId: canonicalInstrument.id,
-        alias: accountId,
-      }))
+      await runWithDb(
+        db,
+        market.createUserInstrument(userId, {
+          instrumentId: instrument.id,
+          alias: accountId,
+        }),
+      )
+      const canonicalInstrument = await runWithDb(
+        db,
+        market.createInstrument({
+          symbol: 'IWDA',
+          normalizedSymbol: 'IWDA',
+          provider: 'yahoo',
+          currency: 'USD',
+        }),
+      )
+      await runWithDb(
+        db,
+        market.createUserInstrument(userId, {
+          instrumentId: canonicalInstrument.id,
+          alias: accountId,
+        }),
+      )
     })
   })
 
@@ -127,7 +142,10 @@ describe('round trip: shared movement commands (#263)', () => {
     expect(useInvestmentStore().addMovement(investmentInput)).toBe(true)
     const first = await trip.reload()
     const id = first.transactions[0].id
-    const changes = await runWithDb(trip.testDb.db as unknown as Db, listChangesSince(trip.userId, 0))
+    const changes = await runWithDb(
+      trip.testDb.db as unknown as Db,
+      listChangesSince(trip.userId, 0),
+    )
     const createPayload = changes
       .filter((change) => change.entityType === 'transaction' && change.entityId === id)
       .flatMap((change) => (change.payload ? [JSON.parse(change.payload)] : []))
@@ -464,38 +482,6 @@ describe('round trip: shared movement commands (#263)', () => {
     expect(await trip.pending()).toEqual([])
   })
 
-  it('shows the edited operation after an offline restart', async () => {
-    useInvestmentStore().addMovement(investmentInput)
-    const first = await trip.reload()
-    trip.setOffline(true)
-    expect(
-      useInvestmentStore().saveEditedMovement(first.transactions[0].id, {
-        ...investmentInput,
-        side: 'sell',
-        units: '2',
-        unitPrice: '50',
-        fee: '2',
-        time: '11:45',
-        declared: false,
-      }),
-    ).toBe(true)
-    const offline = await trip.reloadOffline()
-    expect(offline.transactions[0]).toMatchObject({
-      symbol: 'VWCE',
-      side: 'sell',
-      units: 2,
-      unitPrice: 50,
-      fee: 2,
-      amount: -98,
-      movementCurrency: 'USD',
-      time: '11:45',
-      declared: false,
-      instrumentId,
-    })
-    trip.setOffline(false)
-    expect((await trip.reload()).transactions[0]).toMatchObject(offline.transactions[0])
-  })
-
   it('preserves an offline queued create when its local operation becomes incomplete', async () => {
     trip.setOffline(true)
     useInvestmentStore().addMovement(investmentInput)
@@ -529,7 +515,8 @@ describe('round trip: shared movement commands (#263)', () => {
     expect((await trip.reload()).transactions[0]).toMatchObject(offline.transactions[0])
   })
 
-  it.each(['income', 'expense'] as const)('edits an ordinary %s', async (type) => {
+  it('edits an ordinary income', async () => {
+    const type = 'income'
     useMovementsStore().addTransaction({
       date: '2026-09-12',
       month: 9,
@@ -557,47 +544,6 @@ describe('round trip: shared movement commands (#263)', () => {
       description: 'Movimiento corregido',
     })
   })
-  it.each(['income', 'expense'] as const)('creates an ordinary %s', async (type) => {
-    useMovementsStore().addTransaction({
-      date: '2026-09-12',
-      month: 9,
-      type,
-      accountId,
-      category: type === 'income' ? 'Nómina' : 'Ocio',
-      description: 'Movimiento ordinario',
-      amount: 100,
-    })
-    const reloaded = await trip.reload()
-    expect(reloaded.transactions).toHaveLength(1)
-    expect(reloaded.transactions[0]).toMatchObject({
-      type,
-      accountId,
-      amount: 100,
-      description: 'Movimiento ordinario',
-    })
-  })
-
-  it.each(['income', 'expense', 'investment'] as const)(
-    'deletes a %s and its operation',
-    async (type) => {
-      if (type === 'investment') {
-        useInvestmentStore().addMovement(investmentInput)
-      } else {
-        useMovementsStore().addTransaction({
-          date: '2026-09-12',
-          month: 9,
-          type,
-          accountId,
-          category: type === 'income' ? 'Nómina' : 'Ocio',
-          description: 'Movimiento ordinario',
-          amount: 100,
-        })
-      }
-      const first = await trip.reload()
-      useMovementsStore().deleteTransaction(first.transactions[0].id)
-      expect((await trip.reload()).transactions).toEqual([])
-    },
-  )
 })
 
 describe('round trip: imported movement protections (#263)', () => {
@@ -620,29 +566,20 @@ describe('round trip: imported movement protections (#263)', () => {
 
   beforeEach(async () => {
     trip = await startRoundTrip(async (db, userId) => {
-      await runWithDb(db, accounts.create(userId, {
-        id: accountId,
-        name: 'Bitvavo',
-        kind: 'cash',
-        currency: 'EUR',
-        openingBalance: 0,
-      }))
+      await runWithDb(
+        db,
+        accounts.create(userId, {
+          id: accountId,
+          name: 'Bitvavo',
+          kind: 'cash',
+          currency: 'EUR',
+          openingBalance: 0,
+        }),
+      )
       await runWithDb(db, importOperation(userId, accountId, remoteOperation, null))
     })
   })
   afterEach(() => trip.cleanup())
-
-  it('synchronizes declaration changes without sending immutable financial fields', async () => {
-    const id = useFinancialStateStore().transactions[0].id
-    useInvestmentStore().toggleDeclared(id)
-    const reloaded = await trip.reload()
-    expect(reloaded.transactions[0]).toMatchObject({
-      id,
-      declared: true,
-      amount: 6.85,
-      remoteOperation,
-    })
-  })
 
   it.each([
     {
@@ -659,19 +596,9 @@ describe('round trip: imported movement protections (#263)', () => {
         }),
     },
     {
-      action: 'editing from Inversión',
-      expectedResult: false,
-      run: (id: string) => useInvestmentStore().saveEditedMovement(id, investmentInput),
-    },
-    {
       action: 'deleting from Movimientos',
       expectedResult: false,
       run: (id: string) => useMovementsStore().deleteTransaction(id),
-    },
-    {
-      action: 'deleting from Inversión',
-      expectedResult: undefined,
-      run: (id: string) => useInvestmentStore().deleteMovement(id),
     },
     {
       action: 'bulk editing',

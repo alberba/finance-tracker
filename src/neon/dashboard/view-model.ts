@@ -16,7 +16,7 @@ import { buildInvestmentDashboardViewModel } from '../../domain/investment/view-
 import { buildLineChart, type LabelledLineChart } from '../ui/line-chart'
 
 /**
- * The home of the new design (DESIGN.md, «Inicio en escritorio»): what is left
+ * The home (DESIGN.md, «Inicio en escritorio»): what is left
  * this month, what waits for a yes, net worth, investments, the latest
  * movements, spending by category and goals. Always one month, with no picker:
  * the current one while the configured year is this year, December for a past

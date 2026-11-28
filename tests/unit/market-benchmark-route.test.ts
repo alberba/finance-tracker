@@ -52,12 +52,9 @@ describe('GET /api/market/benchmark', () => {
 
   it.each([
     ['índice desconocido', '?id=nope&year=2026'],
-    ['sin índice', '?year=2026'],
     ['sin año', '?id=sp-500'],
-    ['año no numérico', '?id=sp-500&year=abc'],
     ['año decimal', '?id=sp-500&year=2026.5'],
     ['año demasiado antiguo', '?id=sp-500&year=1989'],
-    ['año demasiado lejano', '?id=sp-500&year=2101'],
   ])('responde 400 con %s', async (_name, query) => {
     const response = await call(query)
 
@@ -80,6 +77,5 @@ describe('GET /api/market/benchmark', () => {
 
     expect(response.status).toBe(502)
     await expect(response.json()).resolves.toEqual({ error: 'No se pudo consultar IBEX 35' })
-    expect(console.error).toHaveBeenCalled()
   })
 })

@@ -64,7 +64,6 @@ export default defineConfig({
         '@sentry/browser',
         'better-auth/client',
         'better-auth/client/plugins',
-        'chart.js',
         'pinia',
         'zod',
       ],

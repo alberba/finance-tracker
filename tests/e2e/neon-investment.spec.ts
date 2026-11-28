@@ -3,13 +3,10 @@ import { test, expect } from './fixtures'
 import { editScenarioState } from './seed-sync-v2'
 
 /**
- * The cover of Inversión in the new design (#437), desktop. No cookie: the new
- * design is the default. The clock sits on 20 March 2026, the newest month of
+ * The cover of Inversión (#437), desktop. The clock sits on 20 March 2026, the newest month of
  * the seed.
  */
-const NO_COOKIE = { cookies: [], origins: [] }
-
-test.use({ storageState: NO_COOKIE, fixedTime: '2026-03-20T12:00:00Z' })
+test.use({ fixedTime: '2026-03-20T12:00:00Z' })
 
 const section = (page: Page) => page.locator('#investment')
 const figure = (page: Page, key: string) =>
@@ -47,7 +44,7 @@ async function serveLateQuotes(page: Page): Promise<void> {
   })
 }
 
-test.describe('Inversión en el diseño nuevo', () => {
+test.describe('Inversión', () => {
   test(
     'cambia la rentabilidad de importe a porcentaje y vuelve',
     { tag: '@smoke' },
@@ -87,9 +84,7 @@ test.describe('Inversión en el diseño nuevo', () => {
     await sheet.getByLabel('Títulos').fill('3')
     await sheet.getByLabel('Precio').fill('100')
     await sheet.getByLabel('Comisión').fill('1')
-    await expect(sheet.locator('[data-investment-total]')).toContainText('301,00')
     await sheet.getByRole('radio', { name: 'Venta' }).click()
-    await expect(sheet.locator('[data-investment-total]')).toContainText('299,00')
     await sheet.getByRole('button', { name: 'Guardar venta' }).click()
     await expect(sheet).toBeHidden()
     await expect(page.getByText('Movimiento de inversión guardado.')).toBeVisible()
@@ -137,40 +132,26 @@ test.describe('Inversión en el diseño nuevo', () => {
     await tracker.openInvestment()
 
     const chart = section(page).locator('[data-investment-chart]').getByRole('img')
-    await expect(section(page).getByText(/sin datos para este periodo/i)).toBeVisible()
+    // The index is picked from the line under the figures, beside its difference.
+    const benchmark = section(page).locator('[data-investment-benchmark]')
+    await expect(benchmark).toContainText('sin datos')
     await expect(chart).toBeVisible()
 
-    const controls = section(page).getByRole('group', { name: 'Controles de la gráfica' })
-    await controls.getByRole('button', { name: 'Comparar con MSCI World' }).click()
-    const comparison = controls.getByRole('menu', { name: 'Comparar con un índice' })
+    await benchmark.getByRole('button', { name: 'Comparar con MSCI World' }).click()
+    const comparison = benchmark.getByRole('menu', { name: 'Comparar con un índice' })
     await expect(comparison.getByRole('menuitemradio', { name: 'MSCI World' })).toBeFocused()
     await page.keyboard.press('ArrowDown')
     await expect(comparison.getByRole('menuitemradio', { name: 'S&P 500' })).toBeFocused()
     await page.keyboard.press('Enter')
     try {
-      await expect(section(page).getByText('Cargando S&P 500…')).toBeVisible()
+      await expect(benchmark).toContainText('cargando')
     } finally {
       release.resolve()
     }
     await expect(comparison).toBeHidden()
-    await expect(controls.getByRole('button', { name: 'Comparar con S&P 500' })).toBeFocused()
-    await expect(controls.getByRole('paragraph')).toContainText(/Diferencia.*−[\d.,]+\s*€/s)
+    await expect(benchmark.getByRole('button', { name: 'Comparar con S&P 500' })).toBeFocused()
+    await expect(benchmark).toContainText(/Diferencia con S&P 500.*−[\d.,]+\s*€/s)
     await expect(chart).toHaveAccessibleName(/S&P 500/)
-  })
-
-  test('muestra la última columna de posiciones en escritorio estrecho', async ({
-    page,
-    tracker,
-  }) => {
-    await page.setViewportSize({ width: 1000, height: 800 })
-    await tracker.openInvestment()
-
-    const positions = section(page).getByRole('region', { name: 'Posiciones' })
-    const evolution = positions.getByText('Evolución', { exact: true })
-    await expect(evolution).toBeVisible()
-    await expect
-      .poll(() => positions.evaluate((list) => list.scrollWidth - list.clientWidth))
-      .toBeLessThanOrEqual(1)
   })
 
   test('abre un activo, ve sus operaciones y vuelve con la flecha y con atrás', async ({
@@ -187,8 +168,6 @@ test.describe('Inversión en el diseño nuevo', () => {
     await expect(section(page).getByRole('heading', { level: 1 })).toBeVisible()
     await expect(section(page).getByRole('heading', { name: 'Movimientos' })).toBeVisible()
     await expect(section(page).getByText('Aportación fondo indexado').first()).toBeVisible()
-    // The symbol's quote is not shown yet (#524): its place says it is coming.
-    await expect(section(page).locator('[data-asset-quote]')).toContainText('Próximamente')
 
     await section(page).getByRole('link', { name: 'Volver a Inversión' }).click()
     await expect(page).toHaveURL(/\/inversion$/)

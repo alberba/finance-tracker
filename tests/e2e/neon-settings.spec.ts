@@ -3,16 +3,11 @@ import { test, expect } from './fixtures'
 import { expectSyncCommand } from './pages/sync'
 
 /**
- * Configuración in the new design (#443), desktop. No cookie: the new design is
- * the default. The seed brings its accounts, so the journeys edit those.
+ * Configuración (#443), desktop. The seed brings its accounts, so the journeys edit those.
  */
-const NO_COOKIE = { cookies: [], origins: [] }
-
-test.use({ storageState: NO_COOKIE })
-
 const section = (page: Page) => page.locator('#settings')
 
-test.describe('Configuración en el diseño nuevo', () => {
+test.describe('Configuración', () => {
   test(
     'cambia la moneda en Preferencias y la ve aplicada al recargar',
     { tag: '@smoke' },

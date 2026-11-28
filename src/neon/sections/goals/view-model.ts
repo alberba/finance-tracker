@@ -4,7 +4,7 @@ import { asMonth } from '../../../lib/month'
 import { parseDecimal } from '../../../lib/number'
 import type { State } from '../../../scripts/types'
 
-// Objetivos in the new design (artboard «Objetivos · 2560 px», #441): one
+// Objetivos (artboard «Objetivos · 2560 px», #441): one
 // column per savings goal, filled with what it has saved, and when it arrives
 // at the monthly amount planned for it against its deadline. Months are
 // counted as one number (year × 12 + month − 1) so they subtract cleanly.
@@ -51,7 +51,7 @@ function months(count: number): string {
   return count === 1 ? '1 mes' : `${count} meses`
 }
 
-/** One savings goal as the new design plans it. */
+/** One savings goal as Objetivos plans it. */
 export interface GoalPlan {
   id: string
   name: string

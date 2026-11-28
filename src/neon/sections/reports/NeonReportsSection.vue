@@ -11,7 +11,7 @@ import NeonReportCard from './NeonReportCard.vue'
 import NeonReportDetail from './NeonReportDetail.vue'
 import NeonReportList from './NeonReportList.vue'
 
-// «Mis reportes» in the new design (artboards «Mis reportes · 2560 px» and
+// «Mis reportes» (artboards «Mis reportes · 2560 px» and
 // «· estados en escritorio», #448): the list and the open report's thread side
 // by side. It is not a section of the menu: the shell mounts it at `/reportes`
 // and no entry is marked as current.

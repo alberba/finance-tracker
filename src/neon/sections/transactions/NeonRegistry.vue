@@ -41,7 +41,7 @@ import {
   type ExtraFilters,
 } from './registry-view-model'
 
-// «Registro» of the new Movimientos: search and filters, the year's ledger
+// «Registro» of Movimientos: search and filters, the year's ledger
 // from the aside's month to the newest (older months fold away, as the domain
 // rule says, and every match shows while filtering), the month's summary in
 // the aside, the detail of a movement in the shared panel and the undo notice

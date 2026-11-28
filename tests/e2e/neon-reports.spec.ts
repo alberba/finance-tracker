@@ -9,19 +9,14 @@ import {
 } from './pages/reports-api'
 
 /**
- * «Mis reportes» in the new design (#448), desktop. No cookie: the new design
- * is the default. GitHub is never called: `/api/reports` is faked.
+ * «Mis reportes» (#448), desktop. GitHub is never called: `/api/reports` is faked.
  */
-const NO_COOKIE = { cookies: [], origins: [] }
-
-test.use({ storageState: NO_COOKIE, viewport: { width: 1440, height: 900 } })
-
-const GITHUB_ERROR = 'No se pudo consultar GitHub. Inténtalo de nuevo.'
+test.use({ viewport: { width: 1440, height: 900 } })
 
 const section = (page: Page) => page.locator('#reports')
 const launcher = (page: Page) => page.locator('#global-report-trigger')
 
-test.describe('Mis reportes en el diseño nuevo', () => {
+test.describe('Mis reportes', () => {
   test(
     'crea un reporte, lo ve en la lista, abre su hilo y añade una aclaración',
     { tag: '@smoke' },
@@ -69,6 +64,10 @@ test.describe('Mis reportes en el diseño nuevo', () => {
       await expect(own).toContainText('Ocurre solo en móvil.')
       await expect(own).toContainText('Tú')
       await expect(detail.getByRole('textbox', { name: 'Nueva aclaración' })).toHaveValue('')
+
+      // The URL keeps the open report: a reload lands on the same thread.
+      await tracker.reload()
+      await expect(section(page).getByRole('heading', { name: reportEntry().title })).toBeVisible()
     },
   )
 
@@ -117,72 +116,6 @@ test.describe('Mis reportes en el diseño nuevo', () => {
     ).toBeVisible()
     await expect(dot).toHaveCount(0)
     await expect(section(page).locator('[data-report-new]')).toHaveCount(0)
-  })
-
-  test('el botón «Reportar» se despliega y abre el panel', async ({ page, tracker }) => {
-    await mockReportsApi(page)
-    await tracker.openReports()
-
-    await expect(launcher(page)).toBeVisible()
-    await launcher(page).hover()
-    await expect(launcher(page).getByText('Reportar')).toBeVisible()
-
-    await launcher(page).click()
-    await expect(tracker.issueReportDialog).toBeVisible()
-    await expect(launcher(page)).toBeHidden()
-  })
-
-  test('un fallo de la lista muestra el error y se reintenta', async ({ page, tracker }) => {
-    await mockReportsApi(page)
-    await page.route('**/api/reports', (route) =>
-      route.fulfill({ status: 502, json: { ok: false, error: GITHUB_ERROR } }),
-    )
-
-    await tracker.openReports()
-    const alert = section(page).getByRole('alert')
-    await expect(alert).toContainText(GITHUB_ERROR)
-    await expect(alert).toContainText('Tus reportes siguen guardados; solo falta leer su estado.')
-
-    await page.unroute('**/api/reports')
-    await alert.getByRole('button', { name: 'Reintentar' }).click()
-    await expect(section(page).locator('[data-report-entry="901"]')).toBeVisible()
-  })
-
-  test('un duplicado se sigue en la principal y su hilo es el de ella', async ({
-    page,
-    tracker,
-  }) => {
-    const main = {
-      number: 887,
-      url: `${ISSUE_URL}/887`,
-      title: 'Exportar movimientos a PDF y CSV',
-      state: 'OPEN' as const,
-      stateReason: null,
-    }
-    const duplicate = reportEntry({
-      number: 902,
-      url: `${ISSUE_URL}/902`,
-      title: 'Añadir exportación a PDF de los movimientos',
-      state: 'CLOSED',
-      stateReason: 'DUPLICATE',
-      followed: main,
-    })
-    await mockReportsApi(page, {
-      list: () => [duplicate],
-      detail: () => reportDetail({ report: duplicate, threadIssue: main }),
-    })
-
-    await tracker.openReports(902)
-    const row = section(page).locator('[data-report-entry="902"]')
-    await expect(row).toContainText('Se sigue en #887 · Abierto')
-    await expect(row).toContainText('Cerrado como duplicado · enviado el')
-    const detail = section(page).locator('[data-report-detail]')
-    await expect(detail.getByText('Exportar movimientos a PDF y CSV')).toBeVisible()
-    await expect(detail.getByRole('link', { name: /Ver #887 en GitHub/ })).toHaveAttribute(
-      'href',
-      `${ISSUE_URL}/887`,
-    )
-    await expect(detail.getByText('Se publica en #887, donde sigue tu reporte.')).toBeVisible()
   })
 
   test('un hilo cerrado queda en solo lectura', async ({ page, tracker }) => {

@@ -299,7 +299,7 @@ const BLEED = '-mx-[clamp(16px,2.6vw,40px)]'
       >
         <button
           type="button"
-          class="outline-accent grid min-h-9 w-full place-items-center rounded-full focus-visible:outline-2 focus-visible:-outline-offset-2"
+          class="outline-accent grid min-h-11 w-full place-items-center rounded-full focus-visible:outline-2 focus-visible:-outline-offset-2"
           :aria-expanded="expanded"
           :aria-label="
             expanded ? 'Reducir la lista de posiciones' : 'Ampliar la lista de posiciones'

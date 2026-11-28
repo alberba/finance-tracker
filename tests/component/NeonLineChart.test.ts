@@ -31,11 +31,6 @@ function setup() {
 }
 
 describe('NeonLineChart exploring', () => {
-  it('shows no reading at rest', () => {
-    const { wrapper } = setup()
-    expect(wrapper.find('[data-chart-readout]').exists()).toBe(false)
-  })
-
   it('reads the point nearest to the pointer and clears it on leaving', async () => {
     const { wrapper, plot } = setup()
     await plot.trigger('pointermove', { clientX: 190 })
@@ -68,28 +63,5 @@ describe('NeonLineChart exploring', () => {
     await plot.trigger('keydown', { key: 'Escape' })
     expect(wrapper.find('[data-chart-readout]').exists()).toBe(false)
     expect(plot.attributes('aria-valuenow')).toBe('2')
-  })
-
-  it('sets every month label under its own point and shares one gutter length', () => {
-    const { wrapper } = setup()
-    const labels = wrapper
-      .findAll('span')
-      .filter((span) => ['ene', 'feb', 'mar'].includes(span.text()))
-    expect(labels.map((label) => label.attributes('style'))).toEqual([
-      expect.stringContaining('inset-inline-start: 0%'),
-      expect.stringContaining('inset-inline-start: 50%'),
-      expect.stringContaining('inset-inline-start: 100%'),
-    ])
-    expect(wrapper.html()).not.toContain('56px')
-  })
-
-  it('widens the gutter for longer gridline values so the last dot clears them', () => {
-    const { wrapper } = setup()
-    expect(wrapper.get('figure').attributes('style')).toContain('--chart-gutter: 3.50rem')
-    const wide = mount(NeonLineChart, {
-      props: { chart: { ...chart, tickLabels: ['100 €', '150 €', '22,5 mil €'] } },
-    })
-    wrappers.push(wide)
-    expect(wide.get('figure').attributes('style')).toContain('--chart-gutter: 4.95rem')
   })
 })

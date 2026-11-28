@@ -12,7 +12,7 @@ export interface InvestmentEntryPreset {
 }
 
 /**
- * Whether the new design's entry sheet (the «Apuntar» sheet, DESIGN.md
+ * Whether the entry sheet (the «Apuntar» sheet, DESIGN.md
  * «Hoja / panel de alta») is open, and what it holds: nothing for a new
  * movement, or the pending movement it edits and confirms. Module-level so the
  * islands that open it (the FAB, the sidebar button, «Por confirmar») and the

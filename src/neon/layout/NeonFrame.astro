@@ -1,5 +1,4 @@
 ---
-import type { Design } from '../../lib/design'
 import type { SectionId } from '../../scripts/types'
 import NeonBottomBar from './NeonBottomBar.astro'
 import NeonDemoBanner from './NeonDemoBanner.astro'
@@ -11,7 +10,7 @@ import NeonTopBar from './NeonTopBar.astro'
 import type { Props as NeonTopBarProps } from './NeonTopBar.astro'
 
 /**
- * Desktop frame of the new design (DESIGN.md, Layout): the 236px sidebar and a
+ * Desktop frame (DESIGN.md, Layout): the 236px sidebar and a
  * fluid main area, `max-width: 1640px` and centred. One media query decides the
  * frame (`frame:`): from it up the sidebar shows, below it the mobile frame
  * (top bar, bottom bar, «Más» sheet and the «Apuntar» button). The demo strip
@@ -20,11 +19,10 @@ import type { Props as NeonTopBarProps } from './NeonTopBar.astro'
  */
 export interface Props {
   activeSection: SectionId | null
-  design: Design
   detail?: NeonTopBarProps['detail']
 }
 
-const { activeSection, design, detail } = Astro.props
+const { activeSection, detail } = Astro.props
 ---
 
 <a
@@ -35,10 +33,10 @@ const { activeSection, design, detail } = Astro.props
 </a>
 <div class="frame:grid-cols-[var(--sidebar-width)_minmax(0,1fr)] frame:content-stretch grid min-h-(--ui-dvh) grid-cols-1 content-start overflow-x-clip">
   <div id="nav-tabs" class="contents">
-    <NeonSidebar activeSection={activeSection} design={design} />
+    <NeonSidebar activeSection={activeSection} />
     <NeonTopBar detail={detail} />
     <NeonBottomBar activeSection={activeSection} />
-    <NeonMoreSheet activeSection={activeSection} design={design} />
+    <NeonMoreSheet activeSection={activeSection} />
   </div>
   <NeonFab client:only="vue" />
   <NeonEntrySheet client:only="vue" />

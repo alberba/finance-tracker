@@ -73,14 +73,14 @@ afterEach(() => {
 describe('service worker font cache', () => {
   it('returns a cached font when the stored response varies on Origin', async () => {
     const listeners = startServiceWorker()
-    const url = `${ORIGIN}/fonts/syne-latin-wght.woff2`
+    const url = `${ORIGIN}/fonts/unbounded-latin-wght.woff2`
     const cache = await caches.open('finance-tracker-v4')
 
     // `cache.addAll` stores a request without Origin; the page later fetches
     // the font in CORS mode with one.
     await cache.put(
       new Request(url),
-      new Response('syne-bytes', { headers: { 'Content-Type': 'font/woff2', Vary: 'Origin' } }),
+      new Response('unbounded-bytes', { headers: { 'Content-Type': 'font/woff2', Vary: 'Origin' } }),
     )
     vi.stubGlobal('fetch', async () => {
       throw new TypeError('offline')
@@ -95,6 +95,6 @@ describe('service worker font cache', () => {
     })
 
     expect(response).toBeDefined()
-    await expect(response!.then((value) => value.text())).resolves.toBe('syne-bytes')
+    await expect(response!.then((value) => value.text())).resolves.toBe('unbounded-bytes')
   })
 })

@@ -2,14 +2,10 @@ import type { Page } from '@playwright/test'
 import { test, expect } from './fixtures'
 import type { FinanceSectionId } from './pages/FinanceTrackerPage'
 
-/** Marco móvil del diseño nuevo (#425). No cookie: el diseño nuevo es el de por defecto. */
-const NO_COOKIE = { cookies: [], origins: [] }
-
+/** Marco móvil (#425). */
 const bottomBar = (page: Page) => page.getByRole('navigation', { name: 'Navegación principal' })
 const moreTrigger = (page: Page) => page.getByRole('button', { name: 'Más secciones' })
 const moreSheet = (page: Page) => page.getByRole('dialog', { name: 'Más secciones' })
-// The desktop sidebar has its own «Apuntar»: the mobile frame is told apart by the FAB.
-const fab = (page: Page) => page.locator('[data-fab-apuntar]')
 const current = (page: Page) => page.locator('#nav-tabs [aria-current="page"]:visible')
 
 const BAR_SECTIONS: Array<[FinanceSectionId, string]> = [
@@ -26,14 +22,11 @@ const MORE_SECTIONS: Array<[FinanceSectionId, string]> = [
 ]
 
 test.describe('Marco móvil nuevo', () => {
-  test.use({ storageState: NO_COOKIE })
-
   test.beforeEach(async ({ tracker }) => {
     await tracker.goto()
   })
 
   test('navega a cada sección desde la barra y desde «Más»', async ({ page, tracker }) => {
-    await expect(page.locator('html')).toHaveAttribute('data-ui', 'neon')
     await expect(bottomBar(page)).toBeVisible()
     await expect(page.getByRole('complementary')).toBeHidden()
 
@@ -52,61 +45,6 @@ test.describe('Marco móvil nuevo', () => {
       await expect(tracker.section(id)).toBeVisible()
       await expect(moreTrigger(page)).toHaveAttribute('data-active', 'true')
     }
-  })
-
-  test('la hoja «Más» solo lleva lo que la barra no tiene, y cierra con su botón', async ({
-    page,
-  }) => {
-    await moreTrigger(page).click()
-    const names = await moreSheet(page)
-      .getByRole('navigation', { name: 'Más secciones' })
-      .getByRole('button')
-      .allTextContents()
-    expect(names.map((name) => name.trim())).toEqual(MORE_SECTIONS.map(([, label]) => label))
-
-    await moreSheet(page).getByRole('button', { name: 'Cerrar menú' }).click()
-    await expect(moreSheet(page)).toBeHidden()
-  })
-
-  test('cambia de diseño desde «Más»', async ({ page, tracker }) => {
-    await moreTrigger(page).click()
-    const toggle = moreSheet(page).getByRole('group', { name: 'Diseño' })
-    await expect(toggle.getByRole('button', { name: 'Diseño nuevo' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    )
-    await toggle.getByRole('button', { name: 'Diseño antiguo' }).click()
-    await expect(page.locator('html')).toHaveAttribute('data-ui', 'legacy')
-
-    await tracker.reload()
-    await expect(page.locator('html')).toHaveAttribute('data-ui', 'legacy')
-    await page.getByRole('button', { name: 'Más secciones' }).click()
-    await page
-      .getByRole('dialog', { name: 'Más secciones' })
-      .getByRole('group', { name: 'Diseño' })
-      .getByRole('button', { name: 'Diseño nuevo' })
-      .click()
-    await expect(page.locator('html')).toHaveAttribute('data-ui', 'neon')
-  })
-
-  test('«Por confirmar» abre una hoja que cierra con Escape y al pulsar fuera', async ({
-    page,
-  }) => {
-    const trigger = page.getByRole('button', { name: /^Por confirmar/ })
-    const sheet = page.getByRole('dialog', { name: 'Por confirmar' })
-
-    await trigger.click()
-    await expect(sheet).toBeVisible()
-    await expect(sheet.getByText('No queda nada por confirmar')).toBeVisible()
-
-    await page.keyboard.press('Escape')
-    await expect(sheet).toBeHidden()
-    await expect(trigger).toBeFocused()
-
-    await trigger.click()
-    await expect(sheet).toBeVisible()
-    await page.mouse.click(10, 100)
-    await expect(sheet).toBeHidden()
   })
 
   test('todos los controles del marco miden al menos 44 px con puntero táctil', async ({
@@ -134,29 +72,17 @@ test.describe('Marco móvil nuevo', () => {
       )
     expect(small).toEqual([])
   })
-
-  test('el marco lo decide el ancho de ventana, también en un escritorio estrecho', async ({
-    page,
-    tracker,
-  }) => {
-    await page.setViewportSize({ width: 1200, height: 800 })
-    await expect(page.getByRole('complementary')).toBeVisible()
-    await expect(bottomBar(page)).toBeHidden()
-    await expect(fab(page)).toBeHidden()
-
-    await page.setViewportSize({ width: 900, height: 800 })
-    await expect(page.getByRole('complementary')).toBeHidden()
-    await expect(bottomBar(page)).toBeVisible()
-    await expect(fab(page)).toBeVisible()
-    await tracker.open('dashboard')
-  })
 })
 
 test.describe('Marco móvil nuevo en un escritorio estrecho', () => {
-  test.use({ storageState: NO_COOKIE, hasTouch: false, isMobile: false })
+  test.use({ hasTouch: false, isMobile: false })
 
-  test('con puntero fino y 900 px se ve el marco móvil', async ({ page, tracker }) => {
+  test('el marco lo decide el ancho de ventana, no el puntero', async ({ page, tracker }) => {
     await tracker.reload()
+    await page.setViewportSize({ width: 1200, height: 800 })
+    await expect(page.getByRole('complementary')).toBeVisible()
+    await expect(bottomBar(page)).toBeHidden()
+
     await page.setViewportSize({ width: 900, height: 800 })
     await expect(bottomBar(page)).toBeVisible()
     await expect(page.getByRole('complementary')).toBeHidden()

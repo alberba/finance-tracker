@@ -17,7 +17,7 @@ import { parseDecimal, round2 } from '../../../lib/number'
 import type { Tone } from '../../../lib/tone'
 import type { BudgetType } from '../../../scripts/types'
 
-// «El año», the yearly screen of the new Presupuesto (artboard «Presupuesto ·
+// «El año», the yearly screen of Presupuesto (artboard «Presupuesto ·
 // 2560 px», #433): the plan against what was recorded, by category and month,
 // as a grid (year or quarter) or as one month's list. Pure functions over the
 // shared budget view-model.

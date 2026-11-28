@@ -1,5 +1,10 @@
 # Migración con convivencia aislada
 
+> **Cumplida** (#453). El diseño antiguo, el toggle, la cookie `finance-design`, `data-ui`, la lista
+> de secciones migradas y los puntos de unión se borraron. Queda de esta ADR la regla de lint, ya
+> reducida a «el código compartido no importa de `src/neon/`», y el árbol `src/neon/` como única
+> interfaz. Lo que sigue es el registro de la decisión tal como se tomó.
+
 El rediseño «neón de garaje» (épica #419) toca ocho secciones, `/reportes`, el login, el
 onboarding, el marco y las hojas compartidas. Hacerlo de golpe no es viable, y hacerlo por partes
 sin red tiene dos riesgos: pantallas a medio rehacer sin vuelta atrás, y lo nuevo enredado con lo
@@ -12,7 +17,7 @@ solo golpe:
   llega ya con el diseño elegido y sin parpadeo. El interruptor es el mismo en escritorio y móvil;
   desaparece cuando termina la migración. Es una preferencia del navegador, no de la cuenta.
 - **Frontera física.** Todo lo nuevo (componentes, secciones, view-models, stores de presentación y
-  estilos) vive en `src/neon/`. Lo antiguo se queda donde está, `src/components/` y `src/styles/`,
+  estilos) vive en `src/neon/`. Lo antiguo se queda donde está, el árbol `components/` y `styles/`,
   y se trata como legacy en bloque.
 - **Frontera vigilada por lint.** `pnpm lint` falla si el árbol nuevo importa del antiguo o al
   revés, y si el código compartido (dominio, sync, stores, configuración, libs, tipos) importa de
@@ -25,13 +30,13 @@ solo golpe:
   `legacy.css` (tokens y `@theme` del diseño antiguo) y `src/neon/styles/neon.css` (tokens nuevos
   con los nombres finales de `DESIGN.md`, todos bajo `[data-ui="neon"]`). `global.css` solo las
   importa, y las nuevas van al final para ganar a los nombres que comparten con el `@theme`
-  antiguo. `tests/unit/style-isolation.test.ts` falla si una regla nueva queda fuera del ámbito o
+  antiguo. El test de aislamiento de estilos fallaba si una regla nueva queda fuera del ámbito o
   si lo común define tokens.
 - **Código compartido que solo crece.** Un ticket del diseño nuevo puede añadir a `src/domain`,
   `src/lib` o `src/stores`, nunca cambiar lo que ya hay de forma que afecte al diseño antiguo.
 - **Diseño antiguo congelado.** Solo recibe correcciones de errores. Las funciones nuevas van al
   diseño nuevo; lo que llegue a `main` mientras tanto en una sección ya migrada se porta también.
-- **Borrado final mecánico.** El último ticket borra `src/components/`, `legacy.css`, el toggle, la
+- **Borrado final mecánico.** El último ticket borra el árbol `components/`, `legacy.css`, el toggle, la
   cookie, `data-ui` y la lista de secciones migradas, y simplifica los puntos de unión. Tras
   borrar, tipos, build, lint y tests pasan sin tocar nada de `src/neon/`.
 

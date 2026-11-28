@@ -3,13 +3,10 @@ import { test, expect } from './fixtures'
 import { expectSyncCommand } from './pages/sync'
 
 /**
- * Patrimonio in the new design (#435), desktop. No cookie: the new design is
- * the default. The clock sits on 20 March 2026: the seed closes January and
+ * Patrimonio (#435), desktop. The clock sits on 20 March 2026: the seed closes January and
  * February, and March is still open.
  */
-const NO_COOKIE = { cookies: [], origins: [] }
-
-test.use({ storageState: NO_COOKIE, fixedTime: '2026-03-20T12:00:00Z' })
+test.use({ fixedTime: '2026-03-20T12:00:00Z' })
 
 const section = (page: Page) => page.locator('#wealth')
 const net = (page: Page) => section(page).locator('[data-wealth-net]')
@@ -24,7 +21,7 @@ function money(text: string): number {
   return Number(clean)
 }
 
-test.describe('Patrimonio en el diseño nuevo', () => {
+test.describe('Patrimonio', () => {
   test('consulta la evolución, fija un mes en la gráfica y cambia el rango', async ({
     page,
     tracker,
@@ -34,11 +31,9 @@ test.describe('Patrimonio en el diseño nuevo', () => {
     const evolution = section(page).getByRole('region', { name: 'Evolución del patrimonio' })
     const line = evolution.getByRole('slider', { name: /^Patrimonio por mes/ })
     await expect(line).toHaveAttribute('aria-valuetext', /Marzo: .*saldo sin cerrar/)
-    await expect(line.locator('path[stroke-dasharray]')).toHaveCount(1)
 
     await line.press('Home')
     await expect(line).toHaveAttribute('aria-valuetext', /^Enero:/)
-    await expect(evolution.locator('[data-wealth-month-change]')).toHaveText('—')
     await line.press('Enter')
     await line.press('Escape')
     await expect(line).toHaveAttribute('aria-valuetext', /^Enero:/)

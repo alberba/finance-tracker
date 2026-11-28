@@ -351,7 +351,6 @@ function confirmPending(id: string): void {
 
 function openInvestmentMovements(): void {
   closeEntrySheet()
-  uiStore.ui.investmentTab = 'movements'
   navigateTo('investment')
 }
 

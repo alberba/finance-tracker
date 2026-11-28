@@ -41,18 +41,6 @@ describe('idb-cache', () => {
     db.close()
   })
 
-  it('upserts many entities and lists them all', async () => {
-    const db = await openStorage(USER_ID)
-    await putEntities(db, 'category', [
-      { id: 'cat-1', name: 'Ingresos' },
-      { id: 'cat-2', name: 'Gastos' },
-    ])
-    const all = await getAllEntities(db, 'category')
-    expect(all).toHaveLength(2)
-    expect(all.map((entity) => entity.id).sort()).toEqual(['cat-1', 'cat-2'])
-    db.close()
-  })
-
   it('replaceEntities clears the store before writing', async () => {
     const db = await openStorage(USER_ID)
     await putEntities(db, 'goal', [{ id: 'goal-1', name: 'Fondo emergencia' }])
@@ -101,18 +89,6 @@ describe('idb-cache', () => {
     await setCachedBootstrap(db, { revision: 4, accounts: [{ id: 'acc-1' }] })
     expect(await getCachedBootstrap(db)).toEqual({ revision: 4, accounts: [{ id: 'acc-1' }] })
     db.close()
-  })
-
-  it('wipeIdbCache deletes the whole per-user database', async () => {
-    const db = await openStorage(USER_ID)
-    await putEntity(db, 'account', { id: 'acc-1' })
-    db.close()
-
-    await wipeIdbCache(USER_ID)
-
-    const reopened = await openStorage(USER_ID)
-    expect(await getAllEntities(reopened, 'account')).toEqual([])
-    reopened.close()
   })
 
   it('scopes storage per user id', async () => {

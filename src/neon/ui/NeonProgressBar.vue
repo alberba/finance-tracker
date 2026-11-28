@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Progress bar of the new design (DESIGN.md, Barra de progreso): a 6px track
+// Progress bar (DESIGN.md, Barra de progreso): a 6px track
 // with a neutral fill, which only turns to loss when it goes over the limit.
 // The fill draws itself up to its value when it first shows (`anim-wipe`),
 // after `delay` ms so the bars of a list arrive one after another, and slides

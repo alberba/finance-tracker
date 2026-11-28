@@ -55,9 +55,8 @@ pnpm gate                   # dependencias + lint + tipos + unit/component/integ
 pnpm test:e2e:smoke          # recorridos críticos
 ```
 
-El CI de cada PR ejecuta lint, tipos (`astro check` + `vue-tsc`), `pnpm test:coverage` con sus
-umbrales, comprueba que las migraciones D1 locales v2 aplican limpias y ejecuta `pnpm build`. El
-resumen de cobertura se publica como artefacto. Un único job de navegador comprueba los recorridos
+El CI de cada PR ejecuta lint, tipos (`astro check` + `vue-tsc`), `pnpm test`, comprueba que las
+migraciones D1 locales v2 aplican limpias y ejecuta `pnpm build`. Un único job de navegador comprueba los recorridos
 `@smoke` de la app, de autenticación y de sync, automáticamente y sin labels.
 Al empujar a `main`, un job breve busca el CI verde de la PR que produjo el merge y compara
 el árbol Git del push con el árbol que realmente se probó. Si coinciden, reutiliza la validación

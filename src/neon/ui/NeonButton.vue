@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Buttons of the new design (DESIGN.md, «Botón primario» and «Botón
+// Buttons (DESIGN.md, «Botón primario» and «Botón
 // secundario»): the primary is the one accent pill per view; the secondary
 // reads as an underlined link next to it. `danger` paints the secondary in
 // --color-loss (Eliminar). Pressed, both shrink to 0.97.

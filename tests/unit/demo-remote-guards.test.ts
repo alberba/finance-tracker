@@ -5,7 +5,7 @@ vi.mock('../../src/scripts/demo-mode', () => ({
 }))
 
 import { submitIssueReport } from '../../src/services/issue-report-api'
-import { fetchMarketQuotes, searchMarketSymbols } from '../../src/services/market-api'
+import { fetchMarketQuotes } from '../../src/services/market-api'
 import { runClientHttp } from '../../src/lib/client/runtime'
 
 describe('demo remote guards', () => {
@@ -19,11 +19,6 @@ describe('demo remote guards', () => {
     await expect(
       runClientHttp(fetchMarketQuotes([{ id: 'fund' } as never], fallbackQuotes as never)),
     ).resolves.toBe(fallbackQuotes)
-    expect(fetch).not.toHaveBeenCalled()
-  })
-
-  it('does not search symbols remotely', async () => {
-    await expect(runClientHttp(searchMarketSymbols('ACME', 'manual'))).resolves.toEqual([])
     expect(fetch).not.toHaveBeenCalled()
   })
 

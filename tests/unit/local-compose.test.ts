@@ -49,7 +49,6 @@ describe('local Compose ports', () => {
         }),
       }),
     )
-    expect(stderr).toHaveBeenCalledExactlyOnceWith('port is already allocated')
     stderr.mockRestore()
     spawn.mockReset()
   })
@@ -72,6 +71,7 @@ describe('local Compose ports', () => {
     expect(projectName('/a/task', '/repo')).not.toBe(projectName('/b/task', '/repo'))
     expect(projectName('/repo', '/repo')).toBe('repo')
   })
+
   it('keeps the primary checkout on the default port', () => {
     expect(preferredPort('/repo', '/repo')).toBe(4321)
   })

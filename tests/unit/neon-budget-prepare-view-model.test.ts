@@ -7,7 +7,6 @@ import {
   cellsToWrite,
   defaultStart,
   freeFigures,
-  prepareKicker,
   prepareTarget,
   repeatLabel,
   rowNote,
@@ -68,18 +67,9 @@ describe('prepareTarget', () => {
     expect(prepareTarget(buildBudgetViewModel(state(false), new Date(2027, 2, 5)))).toBeNull()
     expect(prepareTarget(buildBudgetViewModel(state(false), new Date(2025, 2, 5)))).toBeNull()
   })
-
-  it('words the kicker', () => {
-    expect(prepareKicker(2026, 11)).toBe('Planificación · noviembre 2026')
-  })
 })
 
 describe('groups and rows', () => {
-  it('maps each budget type to a group in screen order', () => {
-    expect(groups.map((g) => g.label)).toEqual(['Lo que entra', 'Gastos', 'Ahorro', 'Inversión'])
-    expect(groups[0].income).toBe(true)
-  })
-
   it('averages the actuals of the closed months and keeps the current plan', () => {
     expect(comida.average).toBeCloseTo(66.67, 2)
     expect(comida.closedCount).toBe(9)

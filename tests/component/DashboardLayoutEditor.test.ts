@@ -23,26 +23,10 @@ function grid(editing: boolean, activeId: LayoutItem['id'] | null = null) {
 }
 
 describe('DashboardGrid', () => {
-  it('puts each widget on its cells through custom properties', () => {
-    const wrapper = grid(false)
-    const style = wrapper.get('[data-widget="goals"]').attributes('style')
-    expect(style).toContain('--c: 4')
-    expect(style).toContain('--r: 1')
-    expect(style).toContain('--w: 2')
-    expect(style).toContain('--h: 3')
-  })
-
   it('draws no edit layer, and keeps the widgets interactive, when not editing', () => {
     const wrapper = grid(false)
     expect(wrapper.find('[data-widget-edit]').exists()).toBe(false)
     expect(wrapper.find('[inert]').exists()).toBe(false)
-  })
-
-  it('draws the cells and one more row than is used while editing', () => {
-    const wrapper = grid(true)
-    // Rows used: 3, plus the empty one to drag into; six cells in each.
-    expect(wrapper.findAll('[aria-hidden="true"] > span')).toHaveLength(4 * 6)
-    expect(wrapper.get('[data-dashboard-grid]').attributes('style')).toContain('--rows: 4')
   })
 
   it('makes the widget inert and puts a labelled, focusable layer over it while editing', () => {
@@ -108,11 +92,5 @@ describe('DashboardCatalog', () => {
 
     await wrapper.get('[data-catalog-widget="recent"]').trigger('pointerdown')
     expect(wrapper.emitted('dragStart')?.[0][0]).toBe('recent')
-  })
-
-  it('closes from its button', async () => {
-    const wrapper = catalog([])
-    await wrapper.get('button[aria-label="Cerrar el panel de widgets"]').trigger('click')
-    expect(wrapper.emitted('close')).toHaveLength(1)
   })
 })

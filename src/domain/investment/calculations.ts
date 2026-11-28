@@ -1,4 +1,4 @@
-import { asMonth, type Month, type MonthOrStart } from '../../lib/month'
+import type { Month, MonthOrStart } from '../../lib/month'
 import {
   computeAccountBalance as coreAccountBalance,
   computeInvestmentValue as coreInvestmentValue,
@@ -11,7 +11,7 @@ import {
 } from '../../lib/finance-core'
 import { findLiquidityTargets } from '../../scripts/contribution-workflow'
 import type { State } from '../../scripts/types'
-import { monthFromISO, round2 } from '../../scripts/utils'
+import { round2 } from '../../scripts/utils'
 
 export { matchesInvestmentAsset }
 
@@ -126,15 +126,4 @@ export function computeInvestmentPortfolioValueForReturnMode(
     return round2(wealth.investment)
   }
   return round2(wealth.investment + computeTwrLiquidityValue(state, month))
-}
-
-export function getLatestDataMonth(state: State, fallbackMonth: Month): Month {
-  let latest: Month | null = null
-  const consider = (month: Month | null) => {
-    if (month !== null && (latest === null || month > latest)) latest = month
-  }
-  state.transactions.forEach((item) => consider(asMonth(Number(item.month))))
-  Object.keys(state.snapshots || {}).forEach((monthKey) => consider(asMonth(Number(monthKey))))
-  state.contributions.forEach((entry) => consider(monthFromISO(entry.portfolioDate || entry.date)))
-  return latest ?? fallbackMonth
 }

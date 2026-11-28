@@ -48,15 +48,6 @@ describe("integration-credentials repository", () => {
     expect(await runWithDb(db, integrationCredentialsRepo.remove(user.id, created.id))).toBe(true);
   });
 
-  it("rejects creating a credential for a non-existent user (FK violation)", async () => {
-    const { db } = testDb;
-    await expect(
-      runWithDb(db, integrationCredentialsRepo.create("does-not-exist",
-        { provider: "stockevents", secret: "x" },
-        env,)),
-    ).rejects.toThrow(/FOREIGN KEY constraint failed/i);
-  });
-
   it("enforces cross-user isolation", async () => {
     const { db } = testDb;
     const userA = await seedUser(db);

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Empty state of the new design (DESIGN.md, Estado vacío): a block with no
+// Empty state (DESIGN.md, Estado vacío): a block with no
 // data. A note in the default slot and, when it applies, a secondary button in
 // the `action` slot.
 </script>

@@ -202,15 +202,6 @@ describe('buildInvestmentDashboardViewModel · posiciones', () => {
       lastMovementDate: null,
     })
   })
-
-  it('asigna a cada posición un color de la paleta de series', () => {
-    const vm = buildInvestmentDashboardViewModel(portfolio(), 3, 'simple')
-
-    expect(vm.positions.map((position) => position.color)).toEqual([
-      'var(--chart-series-1)',
-      'var(--chart-series-2)',
-    ])
-  })
 })
 
 describe('buildInvestmentDashboardViewModel · series', () => {
@@ -228,14 +219,6 @@ describe('buildInvestmentDashboardViewModel · series', () => {
       'Capital aportado',
     ])
     expect(vm.valueSeries[1]).toMatchObject({ values: [0, 1000, 2400, 2400], dashed: true })
-  })
-
-  it('en % da una sola serie de rentabilidad acumulada', () => {
-    const vm = buildInvestmentDashboardViewModel(portfolio(), 3, 'simple')
-
-    expect(vm.percentSeries).toHaveLength(1)
-    expect(vm.percentSeries[0].name).toBe('Cartera Total')
-    expect(vm.percentSeries[0].values).toHaveLength(4)
   })
 
   it('cada posición trae su serie de rentabilidad con los mismos puntos', () => {

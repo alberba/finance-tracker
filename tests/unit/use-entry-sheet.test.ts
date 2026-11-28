@@ -103,14 +103,6 @@ describe('useEntrySheet', () => {
     expect(sheet.takeReturnFocus()).toBe(row)
   })
 
-  it('un pendiente editado sin elemento al que volver no deja foco pendiente', () => {
-    const sheet = useEntrySheet()
-    sheet.openPendingEdit(pending)
-    expect(sheet.takeReturnFocus()).toBeNull()
-    sheet.openPendingEdit(pending, null)
-    expect(sheet.takeReturnFocus()).toBeNull()
-  })
-
   it('entrega el foco una sola vez', () => {
     const sheet = useEntrySheet()
     const row = document.createElement('li')

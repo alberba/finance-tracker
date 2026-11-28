@@ -11,7 +11,7 @@ import NeonWealthMonths from './NeonWealthMonths.vue'
 import NeonWealthMonthsMobile from './NeonWealthMonthsMobile.vue'
 import { useNeonWealthScreens } from './wealth-screens'
 
-// Patrimonio in the new design (artboards «Patrimonio · 2560 px», #435, and
+// Patrimonio (artboards «Patrimonio · 2560 px», #435, and
 // «Patrimonio · móvil · Pixel 10», #436): the cover and «Balance por meses»,
 // where a month is closed. Each screen brings its own header; this switches
 // between them and moves focus to the new title so a keyboard or screen-reader

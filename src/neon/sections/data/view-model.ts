@@ -5,7 +5,7 @@ import type { OutboxEntry } from '../../../lib/client/outbox'
 import type { SyncEntityType } from '../../../lib/server/sync/command-schemas'
 import type { SyncStatus } from '../../../stores/sync'
 
-// Presentation of Datos in the new design (artboard «Datos · 2560 px», #446):
+// Presentation of Datos (artboard «Datos · 2560 px», #446):
 // what an export contains, the state of the sync with its queue, the steps of
 // the import flow and what a Bitvavo preview will do. Pure: the section reads
 // the stores and hands the values in.

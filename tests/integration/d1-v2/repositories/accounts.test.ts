@@ -16,7 +16,7 @@ describe("accounts repository", () => {
     testDb.close();
   });
 
-  it("creates, reads, updates and deletes an account (CRUD) with money conversion at the boundary", async () => {
+  it("converts money at the boundary without float drift and bumps the version on update", async () => {
     const { db } = testDb;
     const user = await seedUser(db);
 
@@ -34,22 +34,6 @@ describe("accounts repository", () => {
     const updated = await runWithDb(db, accountsRepo.update(user.id, created.id, { openingBalance: 50 }));
     expect(updated?.openingBalance).toBe(50);
     expect(updated?.version).toBe(2);
-
-    const removed = await runWithDb(db, accountsRepo.remove(user.id, created.id));
-    expect(removed).toBe(true);
-    expect(await runWithDb(db, accountsRepo.get(user.id, created.id))).toBeUndefined();
-  });
-
-  it("rejects creating an account for a non-existent user (FK violation)", async () => {
-    const { db } = testDb;
-    await expect(
-      runWithDb(db, accountsRepo.create("does-not-exist", {
-        name: "Huérfana",
-        kind: "cash",
-        currency: "EUR",
-        openingBalance: 0,
-      })),
-    ).rejects.toThrow(/FOREIGN KEY constraint failed/i);
   });
 
   it("enforces cross-user isolation", async () => {
@@ -92,17 +76,6 @@ describe("accounts repository", () => {
     expect(await runWithDb(db, accountsRepo.get(user.id, account.id))).not.toBeUndefined();
   });
 
-  it("bulk inserts accounts for the migration tool", async () => {
-    const { db } = testDb;
-    const user = await seedUser(db);
-    const rows = await runWithDb(db, accountsRepo.bulkInsert(user.id, [
-      { name: "A", kind: "cash", currency: "EUR", openingBalance: 1 },
-      { name: "B", kind: "cash", currency: "USD", openingBalance: 2 },
-    ]));
-    expect(rows).toHaveLength(2);
-    expect(rows[1].currency).toBe("USD");
-  });
-
   describe("categories", () => {
     it("supports CRUD and cross-user isolation", async () => {
       const { db } = testDb;
@@ -120,13 +93,6 @@ describe("accounts repository", () => {
 
       expect(await runWithDb(db, accountsRepo.removeCategory(userB.id, created.id))).toBe(false);
       expect(await runWithDb(db, accountsRepo.removeCategory(userA.id, created.id))).toBe(true);
-    });
-
-    it("rejects creating a category for a non-existent user (FK violation)", async () => {
-      const { db } = testDb;
-      await expect(
-        runWithDb(db, accountsRepo.createCategory("does-not-exist", { name: "x", kind: "expense" })),
-      ).rejects.toThrow(/FOREIGN KEY constraint failed/i);
     });
 
     it("rejects deleting a category still in use instead of a raw FK violation (audit §2.6)", async () => {

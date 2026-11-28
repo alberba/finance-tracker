@@ -1,5 +1,5 @@
 /**
- * Better Auth answers in English. The login of the new design shows its
+ * Better Auth answers in English. The login shows its
  * common refusals in Spanish; anything else (our own server errors are
  * already Spanish) passes through as it came.
  */

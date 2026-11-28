@@ -9,7 +9,7 @@ import NeonCents from './NeonCents.vue'
 import { ICON_PREPARE, ICON_REVIEW, useMonthCover } from './month-session'
 import { categoryAria, daysText, isWarning, monthKicker, STATUS_LABEL } from './month-view-model'
 
-// «Este mes», the cover of the new Presupuesto: every category's budget in one
+// «Este mes», the cover of Presupuesto: every category's budget in one
 // ledger, tightest first, with today's pace marked; beside it, what is left to
 // spend, the two things to do this month (review the month just closed, prepare
 // the next one) and the month's spending day by day. A category opens its

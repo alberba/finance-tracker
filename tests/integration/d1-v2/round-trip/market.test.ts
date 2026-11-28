@@ -2,7 +2,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import * as accountsRepository from '../../../../src/db/repositories/accounts'
 import * as marketRepository from '../../../../src/db/repositories/market'
-import * as transactionsRepository from '../../../../src/db/repositories/transactions'
 import { seedUser } from '../repositories/fixtures'
 import { useMarketStore } from '../../../../src/stores/market'
 import { useSettingsStore } from '../../../../src/stores/settings'
@@ -27,57 +26,13 @@ describe('configuración de cotizaciones persistente', () => {
   })
   afterEach(() => trip.cleanup())
 
-  it('persiste la vinculación de un movimiento sin símbolo al recargar', async () => {
-    const cash = await runWithDb(
-      trip.testDb.db,
-      accountsRepository.create(trip.userId, {
-        name: 'Broker',
-        kind: 'cash',
-        currency: 'EUR',
-        openingBalance: 0,
-      }),
-    )
-    const category = await runWithDb(
-      trip.testDb.db,
-      accountsRepository.createCategory(trip.userId, {
-        name: 'Crypto',
-        kind: 'investment',
-      }),
-    )
-    await runWithDb(
-      trip.testDb.db,
-      transactionsRepository.create(trip.userId, {
-        accountId: cash.id,
-        categoryId: category.id,
-        type: 'investment',
-        date: '2026-01-15',
-        amount: -100,
-        currency: 'EUR',
-        operation: { symbol: null, side: 'buy', units: 2, unitPrice: 50, fee: 0 },
-      }),
-    )
-    await trip.reload()
-    useMarketStore().addInstrument({
-      investmentAssetId: 'crypto',
-      type: 'crypto',
-      symbol: 'BTC',
-      market: '',
-      currency: 'EUR',
-      provider: 'yahoo',
-    })
-    const market = useMarketStore()
-    const id = market.instruments[0].id
-    expect(market.matchingMovementCount(id)).toBe(1)
-    expect(market.linkExistingMovements(id)).toBe(1)
-    expect((await trip.reload()).transactions[0].instrumentId).toBe(id)
-  })
-
-  it('conserva el símbolo, proveedor y títulos al reiniciar el cliente', async () => {
+  it('conserva el símbolo y el proveedor al reiniciar el cliente', async () => {
     let market = useMarketStore()
     market.addInstrument({
       investmentAssetId: 'crypto',
       type: 'crypto',
       symbol: 'BTC',
+      quoteSymbol: 'BTC-EUR',
       market: '',
       currency: 'EUR',
       provider: 'yahoo',
@@ -86,8 +41,6 @@ describe('configuración de cotizaciones persistente', () => {
     market = useMarketStore()
     expect(market.instruments).toHaveLength(1)
     const id = market.instruments[0].id
-    market.configureInstrumentSymbols(id, 'BTC', 'BTC-EUR')
-    market.updateCurrentUnits(id, 0.09491284)
     await trip.reload()
     expect((await trip.reboot()).instruments).toEqual([
       expect.objectContaining({
@@ -95,7 +48,6 @@ describe('configuración de cotizaciones persistente', () => {
         symbol: 'BTC',
         quoteSymbol: 'BTC-EUR',
         provider: 'yahoo',
-        holdingUnits: 0.09491284,
         investmentAssetId: 'crypto',
       }),
     ])
@@ -140,7 +92,7 @@ describe('configuración de cotizaciones persistente', () => {
           },
         }),
       ),
-    ).rejects.toThrow()
+    ).rejects.toThrow(/no existe o no pertenece/i)
     expect(
       await runWithDb(trip.testDb.db, marketRepository.listUserInstrumentsByUser(other.id)),
     ).toEqual([])

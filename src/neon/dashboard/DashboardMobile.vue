@@ -17,7 +17,7 @@ import { sharedScale } from './mobile-chart'
 import { useNeonDashboardStore } from './store'
 import type { ChartPreset, NeonDashboardViewModel } from './view-model'
 
-// Home of the new design in the mobile frame (DESIGN.md, «Inicio en móvil»).
+// Home in the mobile frame (DESIGN.md, «Inicio en móvil»).
 // On top, three figures to swipe through, each with the chart that answers its
 // question: what is left this month (spent day by day against last month), net
 // worth (its evolution) and the portfolio (what it gains over what was put in).
@@ -287,7 +287,7 @@ const PRESS =
           v-for="(item, index) in SLIDES"
           :key="item.key"
           type="button"
-          class="outline-accent min-h-10 rounded-sm px-3 text-sm font-extrabold underline decoration-2 underline-offset-8 focus-visible:outline-2 motion-safe:transition-colors motion-safe:duration-200"
+          class="outline-accent min-h-11 rounded-sm px-3 text-sm font-extrabold underline decoration-2 underline-offset-8 focus-visible:outline-2 motion-safe:transition-colors motion-safe:duration-200"
           :class="
             slide === index ? 'text-text decoration-current' : 'text-muted decoration-transparent'
           "

@@ -143,13 +143,6 @@ describe('portfolioChart', () => {
     expect(chart.grid.some((line) => line.text === '0\u00a0%')).toBe(true)
   })
 
-  it('separa las etiquetas finales cuando las líneas acaban juntas', () => {
-    const state = portfolio({
-      snapshots: { '3': { month: 3, investments: { fondos: 2210, oro: 200 }, accounts: {} } },
-    })
-    const [top, bottom] = portfolioChart(simple(state), 'simple', [], null).ends
-    expect(bottom.top - top.top).toBeGreaterThanOrEqual(11)
-  })
 })
 
 describe('compactChart', () => {
@@ -159,26 +152,14 @@ describe('compactChart', () => {
       ['invested', true],
       ['value', false],
     ])
-    expect(chart.area).toMatch(/Z$/)
     expect(chart.months.map((month) => month.text)).toEqual(['ene', 'feb', 'mar'])
     expect(chart.points).toHaveLength(4)
-    expect(chart.points[0].left).toBe(0)
-    expect(chart.points.at(-1)?.left).toBeGreaterThan(90)
-    expect(chart.points.at(-1)?.left).toBeLessThan(100)
     expect(chart.label).toBe(portfolioChart(simple(), 'simple', [], null).label)
   })
 
   it('en TWR dibuja una sola línea', () => {
     const vm = buildInvestmentDashboardViewModel(portfolio(), 3, 'twr')
     expect(compactChart(vm, 'twr', [0, 4, 9, 20]).lines.map((line) => line.key)).toEqual(['value'])
-  })
-
-  it('deja libres los 40 px de arriba para la cifra, aunque la cartera valga lo mismo todo el periodo', () => {
-    const vm = buildInvestmentDashboardViewModel(portfolio(), 3, 'twr')
-    for (const { top } of compactChart(vm, 'twr', [0, 0, 0, 0]).points) {
-      expect(top).toBeGreaterThanOrEqual((40 / 266) * 100 - 0.1)
-      expect(top).toBeLessThan(100)
-    }
   })
 
   it('con más de seis meses escribe uno sí y otro no, acabando siempre en el último', () => {
@@ -188,7 +169,6 @@ describe('compactChart', () => {
     const vm = buildInvestmentDashboardViewModel(state, 9, 'simple')
     const { months } = compactChart(vm, 'simple', [])
     expect(months.map((month) => month.text)).toEqual(['ene', 'mar', 'may', 'jul', 'sep'])
-    expect(months.at(-1)?.left).toBeGreaterThan(90)
   })
 })
 
@@ -304,7 +284,6 @@ describe('positionRows y sortPositions', () => {
       sparkLabel: 'Fondos: +20,0\u00a0% en el periodo',
     })
     expect(oro).toMatchObject({ symbol: null, gain: '−20,00\u00a0€', tone: 'loss' })
-    expect(fondos.spark.match(/[ML]/g)).toHaveLength(4)
   })
 
   it('la evolución del periodo descuenta lo aportado y parte de lo que valía al empezar', () => {

@@ -26,7 +26,7 @@ import { niceStep } from '../../ui/line-chart'
 import type { State } from '../../../scripts/types'
 import { round2 } from '../../../scripts/utils'
 
-// The cover of the new Inversión (artboard «Inversión · 2560 px», #437): what
+// The cover of Inversión (artboard «Inversión · 2560 px», #437): what
 // the portfolio is worth and how it has done in the period, its evolution, each
 // position and the worst fall. Everything here is words and figures already
 // formatted; the components only lay them out.

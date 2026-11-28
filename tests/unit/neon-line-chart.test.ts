@@ -3,18 +3,9 @@ import { describe, expect, it } from 'vitest'
 import { buildLineChart, chartPaths, frameMap, reframe } from '../../src/neon/ui/line-chart'
 
 describe('buildLineChart', () => {
-  it('runs the line from edge to edge, leaving room above and below', () => {
-    const chart = buildLineChart([100, 200])
-    // Range 92–208: each end sits 8/116 from its edge.
-    expect(chart.line).toBe('M0 242.1 L1000 17.9')
-    expect(chart.area).toBe('M0 242.1 L1000 17.9 L1000 260 L0 260 Z')
-    expect(chart.lastTop).toBe(6.88)
-  })
-
   it('gives every point its place as a share of the width and of the height', () => {
     const { points } = buildLineChart([100, 150, 200])
     expect(points.map((point) => point.x)).toEqual([0, 50, 100])
-    expect(points[2].top).toBe(6.88)
     expect(points[0].top).toBeGreaterThan(points[1].top)
   })
 

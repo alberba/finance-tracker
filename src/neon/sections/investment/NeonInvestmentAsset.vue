@@ -9,7 +9,7 @@ import NeonInvestmentAssetYears from './NeonInvestmentAssetYears.vue'
 import NeonInvestmentQuoteSoon from './NeonInvestmentQuoteSoon.vue'
 import { TONE_TEXT } from './view-model'
 
-// The detail of an asset in the new Inversión (#439), desktop. The header is
+// The detail of an asset in Inversión (#439), desktop. The header is
 // the detail header («‹ VWCE», DESIGN.md): the arrow and the symbol, nothing
 // else. Under it two columns of cards: on the main one the price against the
 // operations that were made (the chart reads with the mouse or the arrow keys)

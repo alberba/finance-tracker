@@ -4,7 +4,6 @@ import { buildWealthViewModel } from '../../src/domain/wealth/view-model'
 import type { Month } from '../../src/lib/month'
 import type { State } from '../../src/scripts/types'
 import {
-  ACCOUNT_FILTERS,
   mobileAccountGroups,
   monthHistory,
 } from '../../src/neon/sections/wealth/mobile-view-model'
@@ -100,22 +99,10 @@ describe('mobileAccountGroups', () => {
     ])
     expect(mobileAccountGroups(vm(), 3, 'liabilities')[0].tiles[0].value).toBe('−500\u00a0€')
   })
-
-  it('offers the groups in the order of the cover', () => {
-    expect(ACCOUNT_FILTERS.map((filter) => filter.label)).toEqual([
-      'Todo',
-      'Efectivo',
-      'Inversión',
-      'Pasivos',
-    ])
-  })
 })
 
 describe('monthHistory', () => {
   it('reads the latest month first, with its net, whether it is closed and its groups', () => {
-    const [latest] = monthHistory(vm())
-    expect(latest.month).toBe(12)
-
     const months = monthHistory(vm())
     const january = months.find((entry) => entry.month === 1)
     const february = months.find((entry) => entry.month === 2)

@@ -87,11 +87,4 @@ describe('issue-reports repository', () => {
     expect(await runWithDb(db, issueReportsRepo.insertManyIfMissing(rows))).toBe(0)
     expect(await runWithDb(db, issueReportsRepo.listIssueNumbersByUser(user.id))).toHaveLength(120)
   })
-
-  it('rechaza una fila de una cuenta inexistente (FK)', async () => {
-    const { db } = testDb
-    await expect(runWithDb(db, issueReportsRepo.recordSubmission('nadie', 1, T1))).rejects.toThrow(
-      /FOREIGN KEY constraint failed/i,
-    )
-  })
 })

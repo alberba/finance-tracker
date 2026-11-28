@@ -215,95 +215,6 @@ describe('reglas recurrentes y pendientes', () => {
     expect(state.pendingMovements[0].unitPrice).toBe(3210.654321)
   })
 
-  it('edita una regla sin modificar pendientes ya generados y aplica cambios al siguiente vencimiento', () => {
-    setActivePinia(createTestPinia())
-    vi.stubGlobal('window', { __FINANCE_TODAY__: '2024-01-15' })
-    const financialStore = useFinancialStateStore()
-    financialStore.replaceState({
-      year: 2024,
-      currency: 'EUR',
-      accounts: [{ id: 'broker', name: 'Broker', openingBalance: 0 }],
-      investmentAssets: [],
-      liabilities: [],
-      incomeCategories: [],
-      expenseCategories: [],
-      investmentCategories: ['Fondos'],
-      transactions: [],
-      snapshots: {},
-      budget: { income: {}, expense: {}, investment: {} },
-      goals: {},
-      contributions: [],
-      recurringRules: [],
-      pendingMovements: [],
-      instruments: [],
-      quotes: {},
-    })
-    const store = useRecurringStore()
-    expect(
-      store.addRule({
-        type: 'investment',
-        accountId: 'broker',
-        category: 'Fondos',
-        description: 'Aporte original',
-        amount: 100,
-        symbol: 'VWCE',
-        side: 'buy',
-        units: 1,
-        unitPrice: 100,
-        fee: 0,
-        frequency: 'monthly',
-        interval: 1,
-        startDate: '2024-01-01',
-      }),
-    ).toBe(true)
-    expect(store.pendingCount).toBe(1)
-    const firstPending = store.openPendingMovements[0]
-    const ruleId = store.rules[0].id
-
-    expect(
-      store.updateRule(ruleId, {
-        type: 'investment',
-        accountId: 'broker',
-        category: 'Fondos',
-        description: 'Aporte actualizado',
-        amount: 210,
-        symbol: 'VWCE',
-        side: 'buy',
-        units: 2,
-        unitPrice: 105,
-        fee: 0,
-        frequency: 'monthly',
-        interval: 1,
-        startDate: '2024-01-01',
-      }),
-    ).toBe(true)
-    expect(store.openPendingMovements[0]).toMatchObject({
-      id: firstPending.id,
-      description: 'Aporte original',
-      amount: 100,
-      units: 1,
-      unitPrice: 100,
-    })
-    expect(store.rules[0]).toMatchObject({
-      description: 'Aporte actualizado',
-      amount: 210,
-      units: 2,
-      unitPrice: 105,
-      nextOccurrenceDate: '2024-02-01',
-    })
-
-    store.refreshPending('2024-02-02')
-    expect(store.openPendingMovements).toHaveLength(2)
-    expect(store.openPendingMovements[1]).toMatchObject({
-      description: 'Aporte actualizado',
-      amount: 210,
-      units: 2,
-      unitPrice: 105,
-      occurrenceDate: '2024-02-01',
-    })
-    vi.unstubAllGlobals()
-  })
-
   it('sincroniza una inversión recurrente con Stock Events al confirmarla', async () => {
     setActivePinia(createTestPinia())
     vi.stubGlobal('window', { __FINANCE_TODAY__: '2024-02-20' })
@@ -395,91 +306,6 @@ describe('reglas recurrentes y pendientes', () => {
   })
 })
 describe('valoración de cartera', () => {
-  it('enlaza movimientos existentes al instrumento configurado', () => {
-    setActivePinia(createTestPinia())
-    const financialStore = useFinancialStateStore()
-    financialStore.replaceState({
-      year: 2024,
-      currency: 'EUR',
-      accounts: [{ id: 'broker', name: 'Broker', openingBalance: 0 }],
-      investmentAssets: [{ id: 'fund', name: 'Fondo', openingBalance: 0 }],
-      liabilities: [],
-      incomeCategories: [],
-      expenseCategories: [],
-      investmentCategories: ['Fondo'],
-      transactions: [
-        {
-          id: 'old-buy',
-          date: '2024-01-01',
-          month: 1,
-          type: 'investment',
-          accountId: 'broker',
-          category: 'Fondo',
-          description: 'Compra antigua',
-          amount: 200,
-          symbol: 'VWCE',
-          side: 'buy',
-          units: 2,
-          unitPrice: 100,
-        },
-      ],
-      snapshots: {},
-      budget: { income: {}, expense: {}, investment: {} },
-      goals: {},
-      contributions: [],
-      recurringRules: [],
-      pendingMovements: [],
-      instruments: [],
-      quotes: {},
-    })
-    const marketStore = useMarketStore()
-    expect(
-      marketStore.addInstrument({
-        investmentAssetId: 'fund',
-        type: 'etf',
-        symbol: 'VWCE',
-        market: 'XETRA',
-        currency: 'EUR',
-        provider: 'twelve-data',
-      }),
-    ).toBe(true)
-    const instrumentId = marketStore.instruments[0].id
-    expect(marketStore.matchingMovementCount(instrumentId)).toBe(1)
-    financialStore.commitState((draft) => {
-      const instrument = draft.instruments.find((item) => item.id === instrumentId)
-      if (instrument) {
-        instrument.holdingUnits = 0
-        instrument.holdingsAsOf = '2026-07-10'
-        instrument.holdingsUpdatedAt = '2026-07-10T10:00:00.000Z'
-      }
-    })
-    expect(marketStore.linkExistingMovements(instrumentId)).toBe(1)
-    expect(financialStore.transactions[0].instrumentId).toBe(instrumentId)
-    expect(marketStore.linkedMovementCount(instrumentId)).toBe(1)
-    expect(marketStore.valuation.instruments[0].units).toBe(2)
-    marketStore.updateCurrentUnits(instrumentId, 3)
-    expect(marketStore.valuation.instruments[0].units).toBe(3)
-    financialStore.commitState((draft) => {
-      draft.transactions.push({
-        id: 'future-buy',
-        date: '2026-07-11',
-        month: 7,
-        type: 'investment',
-        accountId: 'broker',
-        category: 'Fondo',
-        description: 'Compra posterior',
-        amount: 200,
-        symbol: 'VWCE',
-        instrumentId,
-        side: 'buy',
-        units: 2,
-        unitPrice: 100,
-        createdAt: new Date(Date.now() + 1_000).toISOString(),
-      })
-    })
-    expect(marketStore.valuation.instruments[0].units).toBe(5)
-  })
-
   it('corrige snapshots antiguos cuando los movimientos ya estaban enlazados', () => {
     const financialStore = useFinancialStateStore()
     financialStore.replaceState({
@@ -535,7 +361,7 @@ describe('valoración de cartera', () => {
     expect(marketStore.valuation.instruments[0].units).toBe(1)
   })
 
-  it('enlaza AGED con AGED.MI y suma sus títulos', () => {
+  it('suma los títulos de AGED con el ticker AGED.MI sin vincular el movimiento', () => {
     const financialStore = useFinancialStateStore()
     financialStore.replaceState({
       year: 2024,
@@ -583,59 +409,7 @@ describe('valoración de cartera', () => {
     })
 
     const marketStore = useMarketStore()
-    expect(marketStore.matchingMovementCount('aged-mi')).toBe(1)
-    expect(marketStore.linkExistingMovements('aged-mi')).toBe(1)
     expect(marketStore.valuation.instruments[0].units).toBe(5)
-  })
-
-  it('enlaza movimientos legacy sin símbolo por la categoría del activo', () => {
-    const financialStore = useFinancialStateStore()
-    financialStore.replaceState({
-      year: 2024,
-      currency: 'EUR',
-      accounts: [{ id: 'broker', name: 'Broker', openingBalance: 0 }],
-      investmentAssets: [{ id: 'aged', name: 'ETF AGED', openingBalance: 0 }],
-      liabilities: [],
-      incomeCategories: [],
-      expenseCategories: [],
-      investmentCategories: ['ETF AGED'],
-      transactions: [
-        {
-          id: 'legacy-aged',
-          date: '2024-01-01',
-          month: 1,
-          type: 'investment',
-          accountId: 'broker',
-          category: 'ETF AGED',
-          description: '',
-          amount: 41.4,
-        },
-      ],
-      snapshots: {},
-      budget: { income: {}, expense: {}, investment: {} },
-      goals: {},
-      contributions: [],
-      recurringRules: [],
-      pendingMovements: [],
-      instruments: [
-        {
-          id: 'aged-mi-legacy',
-          investmentAssetId: 'aged',
-          type: 'etf',
-          symbol: 'AGED.MI',
-          market: '',
-          currency: 'EUR',
-          provider: 'yahoo',
-          active: true,
-        },
-      ],
-      quotes: {},
-    })
-
-    const marketStore = useMarketStore()
-    expect(marketStore.matchingMovementCount('aged-mi-legacy')).toBe(1)
-    expect(marketStore.linkExistingMovements('aged-mi-legacy')).toBe(1)
-    expect(financialStore.transactions[0].instrumentId).toBe('aged-mi-legacy')
   })
 
   it('suma títulos, convierte moneda y marca cotizaciones antiguas', () => {

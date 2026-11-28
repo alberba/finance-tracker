@@ -16,15 +16,11 @@ export function initReportsBadge(): void {
     () => store.unseenCount,
     (count) => {
       const badge = unseenBadge(count)
-      document.querySelectorAll<HTMLElement>('[data-reports-badge]').forEach((legacy) => {
-        legacy.textContent = badge?.text ?? '0'
-        legacy.hidden = badge === null
-      })
       document.querySelectorAll<HTMLElement>('[data-reports-badge-dot]').forEach((dot) => {
         dot.hidden = count === 0
       })
-      // The new design's markup: a pill holding the visible count and its
-      // spoken sentence, and a description of the «Más» button for the news.
+      // The «Más» sheet: a pill holding the visible count and its spoken
+      // sentence, and a description of the «Más» button for the news.
       document.querySelectorAll<HTMLElement>('[data-reports-count-badge]').forEach((pill) => {
         pill.hidden = badge === null
       })

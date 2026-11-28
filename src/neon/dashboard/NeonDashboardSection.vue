@@ -24,7 +24,7 @@ import { useLayoutGestures } from './layout/use-layout-gestures'
 import { WIDGETS, type WidgetId } from './layout/widgets'
 import { useNeonDashboardStore } from './store'
 
-// Home of the new design (DESIGN.md, «Inicio en escritorio»): the header with
+// Home (DESIGN.md, «Inicio en escritorio»): the header with
 // search and «Apuntar», then the widgets on a grid of six columns of square
 // cells, as many rows as they need. Where each one sits and how big it is
 // comes from the layout in the store (by default: net worth with «Te quedan»;

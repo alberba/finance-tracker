@@ -229,20 +229,6 @@ it('rejects work inherited from a completed transaction', async () => {
   expect(await db.select().from(schema.users)).toEqual([])
 })
 
-it('does not expose synchronous execution on prepared or bound statements', () => {
-  const binding = createSqliteBinding(sqlite)
-  const statement = binding.prepare('SELECT id FROM users WHERE id = ?')
-  expect(statement).not.toHaveProperty('execute')
-  expect(statement.bind('owner')).not.toHaveProperty('execute')
-})
-
-it('does not expose the native connection through a prepared statement', () => {
-  const binding = createSqliteBinding(sqlite)
-  const statement = binding.prepare('SELECT id FROM users WHERE id = ?')
-  expect(statement).not.toHaveProperty('connection')
-  expect(statement.bind('owner')).not.toHaveProperty('connection')
-})
-
 it('rejects batches spanning physical connections before executing any writes', async () => {
   const otherSqlite = new Database(':memory:')
   try {

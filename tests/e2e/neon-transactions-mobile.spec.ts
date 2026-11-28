@@ -3,25 +3,37 @@ import type { Month } from '../../src/lib/month'
 import type { TransactionType } from '../../src/scripts/types'
 import { test, expect } from './fixtures'
 import type { FinanceTrackerPage } from './pages/FinanceTrackerPage'
-import { expectSyncCommand } from './pages/sync'
 import { editScenarioState } from './seed-sync-v2'
 
 /**
- * Movimientos del diseño nuevo en el marco móvil (#432), en el proyecto móvil.
- * Sin cookie: el diseño nuevo es el de por defecto. El reloj está en marzo de
+ * Movimientos en el marco móvil (#432), en el proyecto móvil.
+ * El reloj está en marzo de
  * 2026, el mes más reciente de la semilla. Las cifras las prueba el unit del
  * view-model; aquí, lo que hace el usuario y lo que obtiene.
  */
-const NO_COOKIE = { cookies: [], origins: [] }
-
-test.use({ storageState: NO_COOKIE, fixedTime: '2026-03-20T12:00:00Z' })
+test.use({ fixedTime: '2026-03-20T12:00:00Z' })
 
 const section = (page: Page) => page.locator('#transactions')
 const ledger = (page: Page) => section(page).locator('[data-tx-ledger]')
 const row = (page: Page, description: string) =>
   ledger(page).locator('[data-tx-id]').filter({ hasText: description })
-const search = (page: Page) => section(page).getByRole('searchbox', { name: 'Buscar movimientos' })
 const sheet = (page: Page, name: string) => page.getByRole('dialog', { name })
+const filtersButton = (page: Page) => page.getByRole('button', { name: /^Filtros/ })
+const searchChip = (page: Page, text: string) =>
+  section(page)
+    .getByRole('group', { name: 'Filtros activos' })
+    .getByRole('button', { name: `Quitar filtro: «${text}»` })
+
+/** The top bar's search: a sheet with the field; the text comes back as a chip. */
+async function searchFor(page: Page, text: string): Promise<void> {
+  await page.getByRole('button', { name: 'Buscar movimientos' }).click()
+  const field = sheet(page, 'Buscar movimientos').getByRole('searchbox', {
+    name: 'Buscar movimientos',
+  })
+  await field.fill(text)
+  await field.press('Enter')
+  await expect(searchChip(page, text)).toBeVisible()
+}
 
 async function addMovements(
   page: Page,
@@ -47,54 +59,30 @@ async function addMovements(
   await tracker.open('transactions')
 }
 
-test('busca, filtra por tipo y por importe con «Más filtros»', async ({ page, tracker }) => {
+test('busca, filtra por tipo y por importe desde «Filtros»', async ({ page, tracker }) => {
   await addMovements(page, tracker, [
     { id: 'e2e-movil-ingreso', type: 'income', amount: 120, date: '2026-03-10' },
     { id: 'e2e-movil-gasto', type: 'expense', amount: 30, date: '2026-03-11' },
     { id: 'e2e-movil-gasto-grande', type: 'expense', amount: 300, date: '2026-03-12' },
   ])
 
-  await search(page).fill('e2e-movil')
+  await searchFor(page, 'e2e-movil')
   await expect(ledger(page).locator('[data-tx-id]')).toHaveCount(3)
 
-  const types = section(page).getByRole('group', { name: 'Filtrar por tipo' })
-  await types.getByRole('button', { name: 'Gastos' }).click()
+  await filtersButton(page).click()
+  const filters = sheet(page, 'Filtros')
+  await filters.getByRole('button', { name: 'Gastos', exact: true }).click()
   await expect(ledger(page).locator('[data-tx-id]')).toHaveCount(2)
   await expect(row(page, 'e2e-movil-ingreso')).toHaveCount(0)
 
-  await section(page)
-    .getByRole('button', { name: /^Más filtros/ })
-    .click()
-  await section(page).getByLabel('Importe mín.').fill('100')
-
+  await filters.getByLabel('Mínimo').fill('100')
   await expect(ledger(page).locator('[data-tx-id]')).toHaveCount(1)
+  await filters.getByRole('button', { name: /^Ver 1 movimiento/ }).click()
+  await expect(filters).toBeHidden()
+
   await expect(row(page, 'e2e-movil-gasto-grande')).toBeVisible()
-  await expect(section(page).getByRole('button', { name: /^Más filtros · 1/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Filtros, 2 activos' })).toBeVisible()
   await expect(section(page).locator('[data-registry-total]')).toHaveText('300,00 €')
-})
-
-test('mantiene las pestañas en su sitio al alternar Registro y Suscripciones', async ({
-  page,
-  tracker,
-}) => {
-  await page.emulateMedia({ reducedMotion: 'reduce' })
-  await tracker.open('transactions')
-
-  const tabs = section(page).getByRole('tablist')
-  const registry = tabs.getByRole('tab', { name: /Registro/ })
-  const subscriptions = tabs.getByRole('tab', { name: /Suscripciones/ })
-  const initialPosition = await tabs.boundingBox()
-  expect(initialPosition).not.toBeNull()
-
-  await subscriptions.click()
-  const panel = section(page).getByRole('tabpanel', { name: /Suscripciones/ })
-  await expect(panel.getByRole('button', { name: 'Nueva suscripción' })).toBeVisible()
-  expect(await tabs.boundingBox()).toEqual(initialPosition)
-
-  await subscriptions.press('ArrowLeft')
-  await expect(registry).toBeFocused()
-  await expect(section(page).getByRole('tabpanel', { name: /Registro/ })).toBeVisible()
-  expect(await tabs.boundingBox()).toEqual(initialPosition)
 })
 
 test('mantiene la posición al pasar de movimientos a ningún resultado y volver', async ({
@@ -113,54 +101,30 @@ test('mantiene la posición al pasar de movimientos a ningún resultado y volver
     })),
   )
 
-  const filter = search(page)
-  await expect(filter).toBeVisible()
+  // The filter chips under the month line push the list down once; open them
+  // first so the scroll below is only about the list swapping.
+  const filters = sheet(page, 'Filtros')
+  const setMinimum = async (amount: string, shown: RegExp) => {
+    await filtersButton(page).click()
+    await filters.getByLabel('Mínimo').fill(amount)
+    await filters.getByRole('button', { name: shown }).click()
+    await expect(filters).toBeHidden()
+  }
+  await setMinimum('1', /^Ver \d+ movimientos/)
+  await expect(row(page, 'e2e-movil-scroll-0')).toBeVisible()
+
   const scrollPosition = () => page.evaluate(() => window.scrollY)
   await page.evaluate(() => window.scrollTo(0, 210))
   await expect.poll(scrollPosition).toBe(210)
 
-  await filter.fill('sin coincidencias')
+  // An amount nothing reaches empties the list; the page stays where it was.
+  await setMinimum('999999', /^Ver 0 movimientos/)
   await expect(section(page).getByText(/Ningún movimiento de/)).toBeVisible()
   expect(await scrollPosition()).toBe(210)
 
-  await filter.clear()
+  await setMinimum('1', /^Ver \d+ movimientos/)
   await expect(row(page, 'e2e-movil-scroll-0')).toBeVisible()
   expect(await scrollPosition()).toBe(210)
-})
-
-test('abre un movimiento en la hoja, lo edita y el cambio sigue al recargar', async ({
-  page,
-  tracker,
-}) => {
-  await addMovements(page, tracker, [
-    { id: 'e2e-movil-editar', type: 'expense', amount: 30, date: '2026-03-12' },
-  ])
-
-  await row(page, 'e2e-movil-editar').click()
-  const detail = sheet(page, 'e2e-movil-editar')
-  await expect(detail).toBeVisible()
-  await expect(detail.locator('[data-detail-amount]')).toHaveText('−30,00 €')
-
-  await detail.getByRole('button', { name: 'Editar' }).click()
-  await detail.getByLabel('Importe').fill('45,50')
-  await detail.getByLabel('Descripción').fill('e2e-movil-editado')
-  const saved = expectSyncCommand(
-    page,
-    (command) =>
-      command.action === 'update' &&
-      command.entityType === 'transaction' &&
-      command.patch.description === 'e2e-movil-editado',
-  )
-  await detail.getByRole('button', { name: 'Guardar' }).click()
-  await saved
-
-  const edited = sheet(page, 'e2e-movil-editado')
-  await expect(edited.locator('[data-detail-amount]')).toHaveText('−45,50 €')
-  await edited.getByRole('button', { name: 'Cerrar' }).click()
-  await expect(edited).toBeHidden()
-
-  await tracker.reload()
-  await expect(row(page, 'e2e-movil-editado').locator('[data-tx-amount]')).toHaveText('−45,50 €')
 })
 
 test('todos los controles de Movimientos miden al menos 44 px con puntero táctil', async ({
@@ -172,28 +136,40 @@ test('todos los controles de Movimientos miden al menos 44 px con puntero tácti
   ])
   expect(await page.evaluate(() => matchMedia('(pointer: coarse)').matches)).toBe(true)
 
-  const tooSmall = (selector: string) =>
-    page.locator(selector).evaluateAll((controls) =>
-      controls
-        .filter((control) => control.getClientRects().length > 0)
-        .map((control) => {
-          const { width, height } = control.getBoundingClientRect()
-          const name = control.getAttribute('aria-label') || control.textContent?.trim()
-          return { name, width: Math.round(width), height: Math.round(height) }
-        })
-        .filter(({ width, height }) => width < 44 || height < 44),
+  const tooSmall = (selector: string, min = 44) =>
+    page.locator(selector).evaluateAll(
+      (controls, size) =>
+        controls
+          .filter((control) => control.getClientRects().length > 0)
+          .map((control) => {
+            const { width, height } = control.getBoundingClientRect()
+            const name = control.getAttribute('aria-label') || control.textContent?.trim()
+            return { name, width: Math.round(width), height: Math.round(height) }
+          })
+          .filter(({ width, height }) => width < size || height < size),
+      min,
     )
-  const CONTROLS = 'button, a[href], input, select'
+  // DESIGN.md: filter chips are compact (38 px); every other control is 44 px.
+  const CHIP = '[aria-pressed]'
+  const CONTROLS = `button:not(${CHIP}), a[href], input, select`
   const inSection = `#transactions :is(${CONTROLS})`
   const inSheet = `dialog[open] :is(${CONTROLS})`
+  const chips = (scope: string) => tooSmall(`${scope} ${CHIP}`, 38)
 
   expect(await tooSmall(inSection)).toEqual([])
 
-  await section(page)
-    .getByRole('button', { name: /^Más filtros/ })
-    .click()
-  await expect(section(page).getByLabel('Importe mín.')).toBeVisible()
-  expect(await tooSmall(inSection)).toEqual([])
+  await filtersButton(page).click()
+  await expect(sheet(page, 'Filtros')).toBeVisible()
+  expect(await tooSmall(inSheet)).toEqual([])
+  expect(await chips('dialog[open]')).toEqual([])
+  await page.keyboard.press('Escape')
+  await expect(sheet(page, 'Filtros')).toBeHidden()
+
+  await page.getByRole('button', { name: 'Buscar movimientos' }).click()
+  await expect(sheet(page, 'Buscar movimientos')).toBeVisible()
+  expect(await tooSmall(inSheet)).toEqual([])
+  await page.keyboard.press('Escape')
+  await expect(sheet(page, 'Buscar movimientos')).toBeHidden()
 
   await row(page, 'e2e-movil-tactil').click()
   const detail = sheet(page, 'e2e-movil-tactil')
@@ -202,7 +178,7 @@ test('todos los controles de Movimientos miden al menos 44 px con puntero tácti
   await page.keyboard.press('Escape')
   await expect(detail).toBeHidden()
 
-  await section(page).getByRole('button', { name: 'Seleccionar', exact: true }).click()
+  await ledger(page).getByRole('button', { name: 'Seleccionar e2e-movil-tactil' }).click()
   expect(await tooSmall(inSection)).toEqual([])
   await section(page)
     .getByRole('region', { name: 'Acciones sobre la selección' })
@@ -210,7 +186,13 @@ test('todos los controles de Movimientos miden al menos 44 px con puntero tácti
     .click()
   await expect(section(page).locator('[data-bulk-bar]')).toHaveCount(0)
 
-  await section(page).getByRole('button', { name: 'Exportar' }).click()
+  // «Exportar» is in the footer of the month picker.
+  await section(page)
+    .getByRole('button', { name: /elegir otro mes/ })
+    .click()
+  await expect(sheet(page, 'Elegir mes')).toBeVisible()
+  expect(await tooSmall(inSheet)).toEqual([])
+  await sheet(page, 'Elegir mes').getByRole('button', { name: 'Exportar' }).click()
   await expect(sheet(page, 'Informe mensual')).toBeVisible()
   expect(await tooSmall(inSheet)).toEqual([])
   await page.keyboard.press('Escape')

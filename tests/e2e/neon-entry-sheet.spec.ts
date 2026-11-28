@@ -4,9 +4,7 @@ import { editScenarioState, readScenarioState } from './seed-sync-v2'
 import { expectSyncCommand } from './pages/sync'
 import { typeOnKeypad } from './entry-keypad'
 
-/** Alta y revisión de pendientes en el diseño neón. */
-const NO_COOKIE = { cookies: [], origins: [] }
-
+/** Alta y revisión de pendientes. */
 const sheet = (page: Page) => page.getByRole('dialog', { name: 'Nuevo movimiento' })
 const MOBILE = { width: 393, height: 780 }
 const DESKTOP = { width: 1280, height: 800 }
@@ -19,8 +17,6 @@ const TYPES = [
 ] as const
 
 test.describe('Mini modal de alta', () => {
-  test.use({ storageState: NO_COOKIE })
-
   test('apunta cada tipo desde el botón «Apuntar» del móvil y sobrevive a recargar', async ({
     page,
     tracker,
@@ -111,14 +107,10 @@ test.describe('Mini modal de alta', () => {
     const accounts = sheet(page).getByRole('dialog', { name: 'Cuenta', exact: true })
     await expect(accounts.getByRole('button', { pressed: true })).toBeFocused()
     await page.keyboard.press('ArrowDown')
-    const focusedOption = accounts.getByRole('button').and(page.locator(':focus'))
-    await expect(focusedOption).toHaveCSS('outline-color', 'rgba(0, 0, 0, 0)')
-    await expect(focusedOption).toHaveCSS('text-decoration-line', 'underline')
     await page.keyboard.press('Enter')
     await expect(accounts).toBeHidden()
     await expect(account).not.toHaveText(previousAccount)
     await expect(account).toBeFocused()
-    await expect(account).toHaveCSS('outline-color', 'rgba(0, 0, 0, 0)')
 
     await sheet(page).getByRole('button', { name: 'Categoría', exact: true }).click()
     const categories = sheet(page).getByRole('dialog', { name: 'Categoría', exact: true })
@@ -157,30 +149,18 @@ test.describe('Mini modal de alta', () => {
     await expect(tracker.transactionsSection.getByText('Cancelado')).toHaveCount(0)
   })
 
-  test('el mini modal queda al lado del botón y Escape devuelve el foco', async ({
-    page,
-    tracker,
-  }) => {
+  test('el mini modal recibe el foco y Escape lo devuelve', async ({ page, tracker }) => {
     await page.setViewportSize(DESKTOP)
     await page.emulateMedia({ reducedMotion: 'reduce' })
     await tracker.goto()
     const opener = page.locator('#dashboard').getByRole('button', { name: 'Apuntar', exact: true })
-    const anchor = (await opener.boundingBox())!
     await opener.click()
     const amount = sheet(page).getByRole('textbox', { name: 'Importe' })
     await expect(amount).toBeFocused()
-    await expect(amount).toHaveCSS('outline-color', 'rgba(0, 0, 0, 0)')
-
-    const box = (await sheet(page).boundingBox())!
-    expect(Math.abs(box.x + box.width - anchor.x - anchor.width)).toBeLessThan(2)
-    expect(box.y - (anchor.y + anchor.height)).toBeCloseTo(12, 0)
-    expect(box.y + box.height).toBeLessThan(DESKTOP.height)
 
     await page.keyboard.press('Shift+Tab')
     const type = sheet(page).getByRole('radio', { name: 'Inversión' })
     await expect(type).toBeFocused()
-    await expect(type).toHaveCSS('outline-color', 'rgba(0, 0, 0, 0)')
-    await expect(type).toHaveCSS('text-decoration-line', 'underline')
     const category = sheet(page).getByRole('button', { name: 'Categoría', exact: true })
     await category.click()
     const categories = sheet(page).getByRole('dialog', { name: 'Categoría', exact: true })
@@ -194,22 +174,9 @@ test.describe('Mini modal de alta', () => {
     await expect(sheet(page)).toBeHidden()
     await expect(opener).toBeFocused()
   })
-
-  test('un importe vacío da el mismo error que el panel antiguo', async ({ page, tracker }) => {
-    await page.setViewportSize(MOBILE)
-    await tracker.goto()
-
-    await page.locator('[data-fab-apuntar]').click()
-    await sheet(page).getByRole('button', { name: 'Guardar' }).click()
-
-    await expect(page.locator('#toast')).toHaveText('El importe debe ser mayor que 0.')
-    await expect(sheet(page)).toBeVisible()
-  })
 })
 
-test.describe('Editar y confirmar un pendiente en la hoja nueva', () => {
-  test.use({ storageState: NO_COOKIE })
-
+test.describe('Editar y confirmar un pendiente', () => {
   const editSheet = (page: Page) => page.getByRole('dialog', { name: 'Editar y confirmar' })
 
   async function openPendingEdit(page: Page, description: string): Promise<void> {

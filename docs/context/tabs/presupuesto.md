@@ -21,14 +21,16 @@ se pueden interpretar o son negativos.
 
 ## Archivos y recorrido técnico
 
-1. `src/components/FinanceWorkspace.vue` monta `src/components/sections/BudgetSection.vue`.
-   La sección lee `useBudgetStore` con `storeToRefs`, selecciona el tipo y compone el resumen,
-   `src/components/budget/BudgetTable.vue` y `src/components/budget/BudgetPlanPanel.vue`.
+1. `src/neon/app/AppWorkspace.vue` monta `src/neon/sections/budget/NeonBudgetSection.vue`,
+   que reparte la portada y las pantallas Revisar, Preparar y El año. Cada pantalla lee
+   `useBudgetStore` a través de su sesión (`month-session.ts`, `review-session.ts`,
+   `prepare-session.ts`); el plan anual de una categoría se edita en
+   `NeonBudgetPlanPanel.vue`.
 2. `src/domain/budget/view-model.ts` calcula filas, importes reales a partir de movimientos,
    estados de mes, desvíos, tonos y ventanas. Acepta una fecha para probar los cálculos con un
    reloj fijo.
-3. `BudgetTable.vue` usa `LedgerTable` y `LedgerInput`, valida el importe y emite `update`.
-   La sección llama a `updateBudgetValue` del store. El panel llama a `saveBudgetPlan`.
+3. Preparar valida cada importe y llama a `updateBudgetValue` del store; el panel del plan anual
+   llama a `saveBudgetPlan`.
 4. `src/stores/budget.ts` actualiza el estado compartido. Guardar el plan hace un solo commit
    y sincroniza únicamente los meses que cambiaron.
 5. El store resuelve o crea la categoría antes de enviar cada celda con `syncBudgetEntry`, en
@@ -43,9 +45,8 @@ El estado que consume la UI guarda el plan en `state.budget[type][category][mont
 
 ## Pruebas y puntos sensibles
 
-- `tests/e2e/neon-budget.spec.ts` (diseño nuevo): fijar el límite de una categoría y ver lo que
+- `tests/e2e/neon-budget.spec.ts`: fijar el límite de una categoría y ver lo que
   queda, una categoría pasada tras apuntar un gasto y el plan anual desde su panel.
-- `tests/e2e/legacy-design-smoke.spec.ts`: el diseño antiguo abre la sección.
 - `tests/unit/neon-budget-month-view-model.test.ts`, `neon-budget-review-view-model.test.ts`,
   `neon-budget-prepare-view-model.test.ts` y `neon-budget-year-view-model.test.ts`: cifras,
   estados y etiquetas de «Este mes», Revisar, Preparar y El año.

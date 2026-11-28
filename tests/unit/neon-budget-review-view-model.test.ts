@@ -133,7 +133,7 @@ describe('suggest', () => {
 describe('decisions', () => {
   const view = build()
   const categories = reviewCategories(view.types.expense.rows, reviewPosition(view)!)
-  const [casa, supermarket] = categories
+  const supermarket = categories[1]
 
   it('takes the typed amount, or the default when it is not a number', () => {
     expect(decisionAmount(supermarket, { mode: 'up', draft: '450,5' })).toBe(450.5)
@@ -156,7 +156,6 @@ describe('decisions', () => {
       planBefore: 1110,
       planAfter: 1160,
     })
-    expect(casa.category).toBe('Casa')
   })
 })
 
@@ -165,12 +164,6 @@ describe('reviewStrip', () => {
     const view = build()
     const categories = reviewCategories(view.types.expense.rows, reviewPosition(view)!)
     const strip = reviewStrip(categories, 9)
-    expect(strip.map((k) => k.label)).toEqual([
-      'Gastado en septiembre',
-      'Presupuesto',
-      'Diferencia',
-      'Se pasaron',
-    ])
     expect(strip[3]).toMatchObject({ value: '1 de 3', note: 'Súper' })
     expect(strip[2].loss).toBe(true)
   })

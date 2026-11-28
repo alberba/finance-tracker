@@ -30,8 +30,8 @@ Fuente: `docs/architecture/frontend.md`.
   organización; un composable o adaptador debe tener una responsabilidad propia, como gestionar
   ciclo de vida o traducir una integración. Delegar una llamada o renombrar métodos, por sí solo,
   no justifica otra capa.
-- `FinanceTrackerShell.astro` solo compone layout, sidebar y secciones. La navegación vive en
-  `src/components/layout`.
+- `src/neon/app/AppShell.astro` solo compone documento, marco y secciones. El marco y la navegación
+  viven en `src/neon/layout`.
 - Una isla Vue no habla directamente con `window` salvo dentro de un adaptador o composable dedicado.
 - Los componentes Vue reciben datos por props/composables y emiten acciones explícitas. No leen el
   bus global.
@@ -63,31 +63,24 @@ Fuente: `docs/adr/0006-effect-de-punta-a-punta.md`.
 Fuente: `docs/adr/0004-estilos-hibridos-tailwind-y-componentes-base.md`.
 
 - Utilidades Tailwind en la plantilla por defecto, solo con tokens de `@theme` (`bg-panel`,
-  `text-gain`, `rounded-md`, `shadow-soft`…). Un valor arbitrario (`p-[22px]`, `bg-(--x)`) solo
+  `text-gain`, `rounded-card`, `shadow-float`…). Un valor arbitrario (`p-[22px]`, `bg-(--x)`) solo
   cuando no exista token.
 - Un estilo que se repite entre ficheros se convierte en componente base. No en clase global ni en
   `@apply`.
 - `<style scoped>` solo para animaciones, selectores estructurales o pseudo-elementos,
   `::backdrop`, internos de gráficos o librerías y `v-bind()`. Siempre con variables de tema
   (`var(--…)`) y sin `@apply`.
-- El CSS global son tres partes que importa `src/styles/global.css`: `common.css` (fuentes, reset,
-  variante `neon:`; sin tokens), `legacy.css` (tokens y shell del diseño antiguo, congelado) y
-  `src/neon/styles/neon.css` (tokens nuevos, todos bajo `[data-ui="neon"]`). Sin clases, sin hojas
-  nuevas ni capas propias, solo las de Tailwind. `tests/unit/styles-guards.test.ts` y
-  `tests/unit/style-isolation.test.ts` lo comprueban.
-- Dos diseños conviven (ADR 0010). Lo nuevo vive en `src/neon/`; no importa de `src/components/` ni
-  de `src/styles/`, ni al revés, y el código compartido (`domain`, `lib`, `stores`, `config`)
-  no importa de ninguno. Solo cruzan los puntos de unión con nombre de
-  `scripts/lib/eslint-design-boundary.ts`. El diseño antiguo está congelado: solo correcciones de
-  errores. En `src/neon/` no se usan Syne, DM Sans ni DM Mono: manda `DESIGN.md`.
-- El tema oscuro va por tokens: los colores de `@theme` apuntan a variables que cambian con
-  `[data-theme=dark]`. Cuando haga falta una variante, `dark:` está ligada a ese atributo, no a
-  `prefers-color-scheme`.
-- Texto sobre superficie cumple AA (4,5:1) en claro y en oscuro. Para ganancias y pérdidas se usan
-  `text-gain` / `text-loss`, siempre con signo; `--income` / `--expense` son rellenos. `text-faint`
-  es para placeholders y decoración, no para texto que haya que leer. Un token de texto nuevo entra
-  en los pares del test de contraste. Los pares heredados por debajo de AA están listados en ese
-  test; la lista solo encoge y no admite entradas nuevas.
+- El CSS global son dos partes que importa `src/styles/global.css`: `common.css` (fuentes y reset;
+  sin tokens) y `src/neon/styles/neon.css` (los tokens de `DESIGN.md`, sus cuatro temas y las
+  utilidades que registran). Sin clases, sin hojas nuevas ni capas propias, solo las de Tailwind.
+  `tests/unit/styles-guards.test.ts` lo comprueba.
+- La interfaz vive en `src/neon/` y manda `DESIGN.md`. El código compartido (`domain`, `lib`,
+  `stores`, `config`) no importa de `src/neon/`; lo vigila `scripts/lib/eslint-design-boundary.ts`.
+- Los temas van por tokens: los colores de `@theme` se redefinen por tema con `[data-theme]`, que
+  fija el script previo al primer pintado. No se usa `prefers-color-scheme` en las plantillas.
+- Texto sobre superficie cumple AA (4,5:1) en los cuatro temas. Para ganancias y pérdidas se usan
+  `text-gain` / `text-loss`, siempre con signo. Un token de texto nuevo entra en los pares del test
+  de contraste.
 - Nada de `style="…"` en línea salvo valores de datos dinámicos (anchos de barra, colores de serie).
 
 ## Tests
@@ -108,8 +101,8 @@ Fuente: `docs/testing.md`.
 - Mockea límites externos, no la unidad que intentas validar.
 - Una regresión corregida incluye el test que la reproduce.
 - No subas timeouts ni workers para tapar una carrera: corrige el aislamiento.
-- Los umbrales de coverage representan el mínimo actual y suben con código nuevo. No se excluyen
-  módulos para mejorar el porcentaje.
+- No hay umbral de cobertura. No escribas tests para tocar líneas: si un test no protege una regla
+  que un usuario o el código de alrededor notaría rota, sobra.
 
 ## E2E
 

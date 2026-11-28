@@ -80,17 +80,6 @@ describe('round trip: ahorro', () => {
     })
   })
 
-  it('moves the balance from origin to destination without touching the total', async () => {
-    await addSaving(300)
-    const reloaded = await trip.reload()
-    const { computeAccountBalance } = await import('../../../../src/lib/finance-core')
-    const balance = (id: string) =>
-      computeAccountBalance(id, 9, reloaded.accounts, reloaded.transactions, {})
-
-    expect(balance(ids.origin)).toBe(700)
-    expect(balance(ids.destination)).toBe(300)
-  })
-
   it('rejects a saving to its own origin or to a non-cash account before queueing', async () => {
     const { useMovementsStore } = await import('../../../../src/stores/movements')
     const input = {
@@ -237,28 +226,7 @@ describe('round trip: ahorro', () => {
 
     await expect(
       runWithDb(trip.testDb.db as never, accountsRepository.remove(trip.userId, hucha.id)),
-    ).rejects.toThrow()
-  })
-
-  it('keeps a savings goal tied to its category and sums earlier savings', async () => {
-    const { useGoalsStore } = await import('../../../../src/stores/goals')
-    await addSaving(250)
-    await trip.reload()
-
-    expect(
-      useGoalsStore().addSavingGoal({
-        name: 'Colchón',
-        category: 'Fondo de emergencia',
-        targetAmount: 1000,
-      }),
-    ).toBe(true)
-
-    const reloaded = await trip.reload()
-    expect(reloaded.savingGoals).toMatchObject([
-      { name: 'Colchón', category: 'Fondo de emergencia', targetAmount: 1000 },
-    ])
-    const { buildSavingGoals } = await import('../../../../src/domain/goals/view-model')
-    expect(buildSavingGoals(reloaded)[0]).toMatchObject({ saved: 250, progress: 25 })
+    ).rejects.toThrow(/tiene movimientos/i)
   })
 
   it('does not mix savings goals into the fixed wealth goals', async () => {
@@ -372,7 +340,7 @@ describe('round trip: ahorro', () => {
     await settled()
     expect((await trip.reload()).savingGoals[0].monthlyAmount).toBe(310.5)
 
-    // An edit that does not carry the plan (the old design's panel) keeps it.
+    // An edit that does not carry the plan (an older client) keeps it.
     useGoalsStore().updateSavingGoal(id, {
       name: 'Japón',
       category: 'Fondo de emergencia',

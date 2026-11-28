@@ -267,11 +267,6 @@ describe('«Por confirmar»', () => {
     // Every one goes to the card, which shows the ones that fit.
     expect(vm.pending.moreLabel).toBeNull()
   })
-
-  it('has no «more» link with three or fewer', () => {
-    const vm = build({}, { pending: [pending('expense', 1, 'Uno')] })
-    expect(vm.pending.moreLabel).toBeNull()
-  })
 })
 
 describe('Patrimonio', () => {
@@ -334,11 +329,6 @@ describe('Patrimonio', () => {
     ])
     expect(build({ snapshots }, { range: '6m' }).wealth.chart.labels).toHaveLength(7)
     expect(build({ snapshots }, { range: '1a' }).wealth.chart.labels).toHaveLength(10)
-  })
-
-  it('names the months the range covers, inside the year', () => {
-    expect(build({}, { range: '3m' }).rangeSpan).toBe('jul – oct 2026')
-    expect(build({}, { range: '1a' }).rangeSpan).toBe('ene – oct 2026')
   })
 
   it('starts the range at a month picked by hand, up to today', () => {
@@ -416,10 +406,6 @@ describe('the recent movements', () => {
       ['Nómina', '+3.420,00 €', '3 oct'],
       ['Alquiler', '−650,00 €', '1 oct'],
     ])
-  })
-
-  it('says why the list is empty', () => {
-    expect(build({}).recent.empty).toBe('Aún no hay movimientos este mes.')
   })
 })
 
@@ -513,11 +499,9 @@ describe('Inversiones', () => {
     ])
   })
 
-  it('measures the gain against what was put in, and leaves the start of the year unlabelled', () => {
+  it('counts the opening balance as capital put in', () => {
     const assets = [{ id: 'asset-0', name: 'Fondo', openingBalance: 4000 }]
     const vm = build({ investmentAssets: assets } as unknown as Partial<State>)
     expect(vm.investments.invested).toBe('4.000,00\u00a0€')
-    expect(vm.investments.chart.labels[0]).toBe('inicio')
-    expect(vm.investments.chart.readings[0].name).toBe('Inicio')
   })
 })

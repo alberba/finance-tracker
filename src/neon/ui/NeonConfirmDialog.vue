@@ -3,7 +3,7 @@ import { nextTick, onMounted, useId, useTemplateRef, watch } from 'vue'
 
 import NeonButton from './NeonButton.vue'
 
-// Confirmation of a destructive action in the new design: a small modal
+// Confirmation of a destructive action: a small modal
 // <dialog> with the consequence in the default slot, «Cancelar» and the
 // action in --color-loss. Escape and a press on the scrim cancel; focus goes
 // back to what opened it.

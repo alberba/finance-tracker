@@ -26,25 +26,6 @@ describe("pending-movements repository", () => {
     testDb.close();
   });
 
-  it("creates, reads, updates and deletes a pending movement (CRUD)", async () => {
-    const { db } = testDb;
-    const user = await seedUser(db);
-    const rule = await seedRule(db, user.id);
-
-    const created = await runWithDb(db, pendingMovementsRepo.create(user.id, {
-      recurringRuleId: rule.id,
-      amount: 750,
-      currency: "EUR",
-      dueDate: "2026-02-01",
-    }));
-    expect(created.amount).toBe(750);
-
-    const updated = await runWithDb(db, pendingMovementsRepo.update(user.id, created.id, { status: "confirmed" }));
-    expect(updated?.status).toBe("confirmed");
-
-    expect(await runWithDb(db, pendingMovementsRepo.remove(user.id, created.id))).toBe(true);
-  });
-
   it("rejects creating a pending movement for a non-existent rule (WP10 ownership guard, formerly a raw FK violation)", async () => {
     const { db } = testDb;
     const user = await seedUser(db);

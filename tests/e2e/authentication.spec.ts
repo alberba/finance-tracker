@@ -3,7 +3,6 @@ import { spawnSync } from 'node:child_process'
 import { resolve } from 'node:path'
 import { FinanceTrackerPage } from './pages/FinanceTrackerPage'
 import { AuthenticationPage } from './pages/AuthenticationPage'
-import { DESIGN_COOKIE } from '../../src/lib/design'
 
 function authenticationHeaders(info: TestInfo) {
   let hash = 0
@@ -49,53 +48,25 @@ function executeSql(sql: string) {
 test('private pages and financial APIs require a Better Auth session @smoke', async ({ page }) => {
   await page.goto('/')
   await expect(page).toHaveURL(/\/login$/)
-  // The mode buttons only respond once the form has hydrated.
+  // The form must have hydrated before the page counts as loaded.
   await new AuthenticationPage(page).ready()
-  await expect(page.getByRole('button', { name: 'Verificar mi correo', exact: true })).toHaveCount(
-    0,
-  )
   await expect(page.getByLabel('Contraseña', { exact: true })).toBeVisible()
-  await expect(page.getByLabel('Código de seis cifras')).toHaveCount(0)
-  await page.getByRole('button', { name: 'Código por correo', exact: true }).click()
-  await expect(page.getByLabel('Código de seis cifras')).toBeDisabled()
-  await page.getByRole('button', { name: 'Contraseña', exact: true }).click()
-  await expect(page.getByLabel('Contraseña', { exact: true })).toBeVisible()
-  await expect(page.getByLabel('Código de seis cifras')).toHaveCount(0)
   expect((await page.request.get('/api/bootstrap')).status()).toBe(401)
 })
 
-test('the new login shows the error for wrong credentials and stays on /login @smoke', async ({
+test('the login shows the error for wrong credentials and stays on /login @smoke', async ({
   page,
 }) => {
   const email = `admin-${crypto.randomUUID()}@example.test`
   seedAdministrator(email)
   const access = new AuthenticationPage(page)
   await access.goto()
-  await expect(page.locator('html')).toHaveAttribute('data-ui', 'neon')
   await page.getByLabel('Correo electrónico').fill(email)
   await page.getByLabel('Contraseña', { exact: true }).fill('not-the-password')
   await page.getByRole('button', { name: 'Entrar en Finanzas', exact: true }).click()
   await expect(page.getByRole('alert')).toHaveText('El correo o la contraseña no son correctos.')
   await expect(page).toHaveURL(/\/login$/)
   expect((await page.request.get('/api/session')).status()).toBe(401)
-})
-
-test('the old design keeps its login while the toggle says «Antiguo» @smoke', async ({
-  page,
-  context,
-}) => {
-  await context.addCookies([
-    {
-      name: DESIGN_COOKIE,
-      value: 'legacy',
-      url: 'http://localhost:' + (process.env.AUTH_TEST_PORT ?? 4466),
-    },
-  ])
-  await new AuthenticationPage(page).goto()
-  await expect(page.locator('html')).not.toHaveAttribute('data-ui', 'neon')
-  await page.getByRole('button', { name: 'Código por correo', exact: true }).click()
-  await page.getByRole('button', { name: 'Acceder con contraseña', exact: true }).click()
-  await expect(page.getByLabel('Contraseña', { exact: true })).toBeVisible()
 })
 
 async function admittedAdministrator(page: import('@playwright/test').Page) {

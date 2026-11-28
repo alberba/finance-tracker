@@ -5,13 +5,10 @@ import { editScenarioState, readScenarioState } from './seed-sync-v2'
 import type { RecurringRule } from '../../src/scripts/types'
 
 /**
- * Recorridos del dashboard en el diseño nuevo (#429). Sin cookie: el diseño
- * nuevo es el de por defecto. Las cifras y estados del bloque los prueba el
+ * Recorridos del dashboard (#429). Las cifras y estados del bloque los prueba el
  * unit del view-model; aquí, lo que hace el usuario y lo que obtiene.
  */
-const NO_COOKIE = { cookies: [], origins: [] }
-
-test.use({ storageState: NO_COOKIE, fixedTime: '2026-07-10T10:00:00' })
+test.use({ fixedTime: '2026-07-10T10:00:00' })
 test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
 })
@@ -177,7 +174,7 @@ test('va a una sección desde el enlace de un bloque y vuelve con atrás', async
   await page.goBack()
   await expect(page).toHaveURL(/\/$/)
   await expect(
-    tracker.dashboardSection.getByRole('heading', { level: 1, name: 'Así va julio' }),
+    tracker.dashboardSection.getByRole('heading', { level: 1, name: 'Dashboard' }),
   ).toBeVisible()
 })
 

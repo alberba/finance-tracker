@@ -74,8 +74,8 @@ Identificadores clave en UI:
 
 - Cuentan un cambio de estado y un comentario nuevo del mantenedor en la issue seguida. No cuentan
   los comentarios propios ni los de la automatización.
-- El store arranca en `GlobalReportLauncher` (una carga por app) y `ReportsPage` fuerza otra al
-  entrar. Sin `setInterval` ni `visibilitychange`.
+- El store arranca en `NeonReportLauncher` (una carga por app) y `NeonReportsSection` fuerza otra
+  al entrar. Sin `setInterval` ni `visibilitychange`.
 - El aviso aparece en el punto del botón flotante, en el contador y el punto de la hoja «Más» y en
   la etiqueta «Nuevo» de la entrada. Se apaga al abrir el detalle (`lastSeenAt`), también si el POST
   falla (estado local hasta la próxima carga).
@@ -117,17 +117,14 @@ Identificadores clave en UI:
 
 - `src/services/reports-api.ts`, `src/stores/reports.ts`
 - `src/composables/useReportThread.ts`, `src/composables/useReportsRoute.ts`
-- `src/components/reports/ReportsPage.vue` y subcomponentes (`ReportList`, `ReportListItem`,
-  `ReportStatus`, `ReportDetail`, `ReportThread`, `ReportComposer`, `ReportMarkdown`)
-- Diseño nuevo (escritorio, #448): `src/neon/sections/reports/NeonReportsSection.vue` y sus piezas
-  (`NeonReportList`, `NeonReportDetail`, `NeonReportThread`, `NeonReportComposer`,
-  `NeonReportMarkdown*`, `view-model.ts`), más el botón «Reportar» con su punto de novedades en
-  `src/neon/layout/NeonReportLauncher.vue`. Usan el mismo store, composables y servicios; el
-  panel de alta sigue siendo `components/reports/IssueReportPanel.vue`, que monta `FinanceWorkspace`
-  dentro del lanzador nuevo.
+- `src/neon/sections/reports/NeonReportsSection.vue` y sus piezas (`NeonReportList`,
+  `NeonReportDetail`, `NeonReportThread`, `NeonReportComposer`, `NeonReportMarkdown*`,
+  `view-model.ts`); el botón «Reportar» con su punto de novedades en
+  `src/neon/layout/NeonReportLauncher.vue`, y el panel de alta en
+  `src/neon/layout/NeonIssueReportPanel.vue`.
 - `src/scripts/app/reports-badge.ts`
-- `src/pages/reportes.astro`, `src/components/FinanceWorkspace.vue`,
-  `src/components/FinanceTrackerShell.astro`, `src/scripts/app/shell-navigation.ts`
+- `src/pages/reportes.astro`, `src/neon/app/AppWorkspace.vue`, `src/neon/app/AppShell.astro`,
+  `src/scripts/app/shell-navigation.ts`
 
 ### Backfill
 
@@ -142,14 +139,13 @@ fechas son constantes y sirven de fixtures para la E2E.
 
 ## Tests
 
-- Diseño nuevo: `tests/unit/neon-reports-view-model.test.ts`,
+- `tests/unit/neon-reports-view-model.test.ts`,
   `tests/component/NeonReportsSection.test.ts`, `tests/e2e/neon-reports.spec.ts` (con la API simulada
   de `tests/e2e/pages/reports-api.ts`, compartida con `reports.spec.ts`).
 - `tests/unit/report-status.test.ts`, `reporter-comment.test.ts`, `report-updates.test.ts`,
   `report-markdown.test.ts`, `reports-backfill-plan.test.ts`, `issue-report-route.test.ts`.
 - `tests/integration/d1-v2/repositories/issue-reports.test.ts`, `api/reports.test.ts`,
-  `migrations/issue-reports.test.ts`, `reports-backfill.test.ts`.
-- `tests/component/ReportStatus.test.ts`, `ReportMarkdown.test.ts`, `ReportThread.test.ts`.
+  `reports-backfill.test.ts`.
 - `tests/e2e/reports.spec.ts`: acuse y recarga, cierre como duplicada, hilo completo, solo lectura,
   error que conserva el texto, demo sin API y lista vacía real.
 

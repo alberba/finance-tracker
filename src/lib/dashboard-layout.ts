@@ -1,7 +1,7 @@
 import { Schema } from 'effect'
 import { validator } from './schema'
 
-// The wire format is shared by both designs. Widget ids and their minimum
+// The wire format of the dashboard layout. Widget ids and their minimum
 // sizes belong to the renderer, which can ignore widgets it does not know.
 export const dashboardLayoutSchema = Schema.Struct({
   version: Schema.Literal(1),

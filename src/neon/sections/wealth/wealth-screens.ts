@@ -4,7 +4,7 @@ import { ref } from 'vue'
 import type { SnapshotKind } from '../../../scripts/types'
 import type { EvolutionRange } from './evolution-range'
 
-// Presentation state of the new Patrimonio (#435, #436): which of its two
+// Presentation state of Patrimonio (#435, #436): which of its two
 // screens is showing, the cover or «Balance por meses», and how «Cómo ha ido»
 // is drawn. The mobile composition adds its own choices: the cover's tab and
 // account filter, and which half of «Balance por meses» is open. A store so the

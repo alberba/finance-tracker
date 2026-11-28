@@ -17,7 +17,7 @@ import { atMonth, type Month } from '../../../lib/month'
 import { round2 } from '../../../lib/number'
 import type { SnapshotKind } from '../../../scripts/types'
 
-// Patrimonio in the new design (artboard «Patrimonio · 2560 px», #435): the
+// Patrimonio (artboard «Patrimonio · 2560 px», #435): the
 // cover (balance equation, month close, how it went, where it is, what you
 // have), the detail of one account and «Balance por meses», where a month is
 // closed. Pure functions over the shared wealth view-model; a month's values
@@ -31,7 +31,7 @@ export interface MonthTotals {
   net: number
 }
 
-/** The group names of the new design («Liquidez» and «Deuda» in the old one). */
+/** The group names. */
 export const GROUP_TITLE: Record<SnapshotKind, string> = {
   accounts: 'Efectivo',
   investments: 'Inversión',

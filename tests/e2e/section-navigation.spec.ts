@@ -1,7 +1,4 @@
-import type { Page } from '@playwright/test'
 import { test, expect } from './fixtures'
-
-const sidebarNav = (page: Page) => page.getByRole('navigation', { name: 'Secciones del tracker' })
 
 test.describe('Navegación de secciones', () => {
   test('pulsar Movimientos devuelve la vista al inicio sin abrir el alta', async ({
@@ -9,15 +6,10 @@ test.describe('Navegación de secciones', () => {
     tracker,
   }) => {
     await tracker.openTransactions()
-    await tracker.setTransactionTypeChip('Gastos', true)
     const transactionsHeading = tracker.transactionsSection.getByRole('heading', {
       name: 'Movimientos',
       exact: true,
     })
-    const createButton = tracker.transactionsSection.getByRole('button', {
-      name: 'Nuevo movimiento',
-    })
-    const registryTab = tracker.transactionsSection.getByRole('tab', { name: /^Registro/ })
 
     await tracker.scrollToPageBottom()
     await expect.poll(() => tracker.scrollY()).toBeGreaterThan(0)
@@ -28,14 +20,11 @@ test.describe('Navegación de secciones', () => {
     await expect(page).toHaveURL(/\/movimientos$/)
     await expect.poll(() => tracker.scrollY()).toBe(0)
     await expect(transactionsHeading).toBeInViewport()
-    await expect(createButton).toBeInViewport()
-    await expect(registryTab).toHaveAttribute('aria-selected', 'true')
-    await expect(sidebarNav(page).getByRole('button', { name: 'Movimientos' })).toHaveAttribute(
+    await expect(page.locator('#nav-tabs [data-section="transactions"]:visible')).toHaveAttribute(
       'aria-current',
       'page',
     )
-    await expect(tracker.typeChip('Gastos')).toBeChecked()
-    await expect(tracker.transactionPanel).toBeHidden()
+    await expect(page.getByRole('dialog', { name: 'Nuevo movimiento' })).toBeHidden()
   })
 
   test('llegar a Movimientos desde otra sección empieza al inicio', async ({ page, tracker }) => {

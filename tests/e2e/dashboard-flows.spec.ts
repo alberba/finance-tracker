@@ -1,68 +1,28 @@
 import { test, expect } from './fixtures'
 
 test.describe('Finance tracker E2E', () => {
-  test('redirige rutas de sección desconocidas al dashboard', async ({ page }) => {
+  test('redirige rutas de sección desconocidas al dashboard', async ({ page, tracker }) => {
     await page.goto('/seccion-inexistente')
     await expect(page).toHaveURL(/\/$/)
-    await expect(
-      page.locator('#dashboard').getByRole('heading', {
-        name: 'Dashboard',
-        exact: true,
-      }),
-    ).toBeVisible()
+    await expect(tracker.dashboardSection).toBeVisible()
   })
 
-  test('navega por todas las tabs principales y mantiene su heading visible', async ({
-    page,
-    tracker,
-  }) => {
-    const tabs = [
-      {
-        open: () => tracker.openDashboard(),
-        path: /\/$/,
-        heading: 'Dashboard',
-      },
-      {
-        open: () => tracker.openTransactions(),
-        path: /\/movimientos$/,
-        heading: 'Movimientos',
-      },
-      {
-        open: () => tracker.openBudget(),
-        path: /\/presupuesto$/,
-        heading: 'Presupuesto',
-      },
-      {
-        open: () => tracker.openWealth(),
-        path: /\/patrimonio$/,
-        heading: 'Patrimonio',
-      },
-      {
-        open: () => tracker.openInvestment(),
-        path: /\/inversion$/,
-        heading: 'Inversión',
-      },
-      {
-        open: () => tracker.openGoals(),
-        path: /\/objetivos$/,
-        heading: 'Objetivos',
-      },
-      {
-        open: () => tracker.openSettings(),
-        path: /\/configuracion$/,
-        heading: 'Configuración',
-      },
-      {
-        open: () => tracker.openData(),
-        path: /\/datos$/,
-        heading: 'Datos y backups',
-      },
+  // `open` waits for each section's heading; the route is what this adds.
+  test('navega por todas las secciones y cada una tiene su ruta', async ({ page, tracker }) => {
+    const sections = [
+      { open: () => tracker.openDashboard(), path: /\/$/ },
+      { open: () => tracker.openTransactions(), path: /\/movimientos$/ },
+      { open: () => tracker.openBudget(), path: /\/presupuesto$/ },
+      { open: () => tracker.openWealth(), path: /\/patrimonio$/ },
+      { open: () => tracker.openInvestment(), path: /\/inversion$/ },
+      { open: () => tracker.openGoals(), path: /\/objetivos$/ },
+      { open: () => tracker.openSettings(), path: /\/configuracion$/ },
+      { open: () => tracker.openData(), path: /\/datos$/ },
     ]
 
-    for (const tab of tabs) {
-      await tab.open()
-      await expect(page).toHaveURL(tab.path)
-      await expect(page.getByRole('heading', { name: tab.heading, exact: true })).toBeVisible()
+    for (const section of sections) {
+      await section.open()
+      await expect(page).toHaveURL(section.path)
     }
   })
 })

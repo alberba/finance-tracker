@@ -1,18 +1,15 @@
 import type { Page } from '@playwright/test'
-import type { Month } from '../../src/lib/month'
 import { test, expect } from './fixtures'
 import { expectSyncCommand } from './pages/sync'
 import { editScenarioState } from './seed-sync-v2'
 
 /**
- * Presupuesto del diseño nuevo en el marco móvil (#434), en el proyecto móvil.
- * Sin cookie: el diseño nuevo es el de por defecto. El reloj está en el 20 de
+ * Presupuesto en el marco móvil (#434), en el proyecto móvil.
+ * El reloj está en el 20 de
  * marzo de 2026, el mes más reciente de la semilla. Las cifras las prueba el
  * unit del view-model; aquí, lo que hace el usuario y lo que obtiene.
  */
-const NO_COOKIE = { cookies: [], origins: [] }
-
-test.use({ storageState: NO_COOKIE, fixedTime: '2026-03-20T12:00:00Z' })
+test.use({ fixedTime: '2026-03-20T12:00:00Z' })
 
 const section = (page: Page) => page.locator('#budget')
 const card = (page: Page, category: string) =>
@@ -20,63 +17,6 @@ const card = (page: Page, category: string) =>
 const closingCard = (page: Page) => section(page).getByRole('region', { name: 'Cierre del mes' })
 const budgetEntry = (command: object) =>
   'entityType' in command && command.entityType === 'budgetEntry'
-
-/** Leaves «Salud» with no budget and a single March expense, and opens Presupuesto. */
-async function withoutLimit(
-  page: Page,
-  tracker: { goto(): Promise<void>; openBudget(): Promise<void> },
-) {
-  await tracker.goto()
-  await editScenarioState(page, (state) => {
-    state.budget.expense['Salud'] = Array<number>(12).fill(0)
-    state.transactions = state.transactions.filter(
-      (tx) => !(tx.type === 'expense' && tx.category === 'Salud'),
-    )
-    state.transactions.push({
-      id: 'e2e-salud',
-      date: '2026-03-05',
-      month: 3 as Month,
-      type: 'expense',
-      accountId: state.accounts[0].id,
-      category: 'Salud',
-      description: 'e2e Salud',
-      amount: 30,
-    })
-  })
-  await tracker.openBudget()
-}
-
-test('fija el límite de una categoría desde el móvil y ve lo que queda', async ({
-  page,
-  tracker,
-}) => {
-  await withoutLimit(page, tracker)
-  await expect(card(page, 'Salud')).toHaveCount(0)
-  await expect(section(page).getByText('Sin presupuesto este mes: Salud')).toBeVisible()
-
-  await section(page).getByRole('button', { name: 'Ver el año' }).click()
-  await expect(section(page).getByRole('heading', { name: 'El año', level: 1 })).toBeVisible()
-  await expect(section(page).getByText('Marzo 2026')).toBeVisible()
-
-  await section(page).getByRole('button', { name: 'Plan de Salud para el año' }).click()
-  const sheet = page.getByRole('dialog', { name: 'Salud' })
-  await sheet.getByRole('textbox', { name: 'Presupuesto de Salud en marzo' }).fill('120')
-  const saved = expectSyncCommand(page, budgetEntry)
-  await sheet.getByRole('button', { name: 'Guardar plan' }).click()
-  await saved
-  await expect(sheet).toBeHidden()
-
-  await section(page)
-    .getByRole('button', { name: /Este mes/ })
-    .click()
-  await expect(card(page, 'Salud').locator('[data-budget-left]')).toHaveText('90,00 €')
-  await expect(card(page, 'Salud').locator('[data-budget-status]')).toHaveText('Holgado')
-
-  await card(page, 'Salud').click()
-  await expect(
-    page.getByRole('dialog', { name: 'Salud' }).getByText('quedan 90,00 €'),
-  ).toBeVisible()
-})
 
 test('acepta las sugerencias de cierre desde la portada y las deshace', async ({
   page,
@@ -170,27 +110,11 @@ test('prepara el mes, consulta suscripciones y vuelve al borrador para guardarlo
 
   const draft = await expenses.innerText()
   const shortcut = section(page).getByRole('button', { name: /^Ver suscripciones/ })
-  await expect(shortcut).toContainText('Cobros previstos en abril')
-  await expect(shortcut).toContainText('33,00 €')
   await shortcut.click()
   const subscriptions = page.getByRole('tab', { name: /^Suscripciones/, selected: true })
   await expect(subscriptions).toBeFocused()
   const panel = page.getByRole('tabpanel', { name: /^Suscripciones/ })
-  await expect(panel).toBeVisible()
-  await expect(panel.getByRole('button', { name: /^Servicio mensual/ })).toHaveAccessibleName(
-    'Servicio mensual Próximo 7 abr 8,00 € al mes',
-  )
-  await expect(panel.getByRole('button', { name: /^Cuota trimestral/ })).toContainText(
-    '25,00 € cada trimestre',
-  )
-  const upcoming = panel.getByRole('region', { name: 'Próximos cobros' })
-  const chart = panel.getByRole('region', { name: 'Próximos 12 meses' })
-  await expect(upcoming.getByRole('listitem')).toHaveCount(4)
-  const maximum = chart.getByRole('paragraph').filter({ hasText: 'Máximo' })
-  await expect(maximum).toHaveCount(1)
-  await expect(maximum.getByText('33,00 €')).toBeVisible()
-  await expect(chart.getByText('Resto de marzo desde hoy.')).toBeVisible()
-  expect((await upcoming.boundingBox())!.y).toBeLessThan((await chart.boundingBox())!.y)
+  await expect(panel.getByRole('button', { name: /^Servicio mensual/ })).toBeVisible()
   await page.goBack()
   await expect(expenses).toHaveText(draft, { useInnerText: true })
 

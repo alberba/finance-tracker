@@ -1,24 +1,16 @@
-/* New design, «neón de garaje»: token values with the final names of DESIGN.md.
-   Everything here sits under `[data-ui="neon"]` (the attribute on <html> that
-   the toggle sets), so none of it reaches the old design; the guard in
-   tests/unit/styles-guards.test.ts fails on a rule outside that scope.
-   Four themes: the unmarked block is «oscuro suave», the default; the others
-   are picked with `data-theme`, which the pre-paint script and the controller
+/* «Neón de garaje»: the app's tokens, with the names of DESIGN.md. Four
+   themes: the unmarked block is «oscuro suave», the default; the others are
+   picked with `data-theme`, which the pre-paint script and the controller
    (src/lib/client/neon-theme.ts) always set to one of the four names: the
    user's choice in Configuración, else «oscuro suave», or «claro melocotón»
-   if the system asks for light.
-
-   Names this file shares with the old @theme (--color-panel, --color-line,
-   --color-accent, --color-gain, --color-loss, --font-*) are redefined inside
-   the new scope, so a utility such as `bg-panel` paints the new value there
-   and the old one everywhere else. A utility whose name is new (`bg-panel2`)
-   is registered in @theme by the first ticket that uses it (the block at the
-   end). The faces Unbounded and Manrope are declared in common.css
-   (fonts.test.ts). */
+   if the system asks for light. The @theme block registers each token as a
+   utility with the default theme's value; the blocks below redefine it per
+   theme at runtime. The faces Unbounded and Manrope are declared in
+   common.css (fonts.test.ts). */
 
 @layer base {
-  [data-ui='neon'],
-  [data-ui='neon'][data-theme='oscuro-suave'] {
+  :root,
+  [data-theme='oscuro-suave'] {
     /* Colors */
     --color-bg: #1b1a18;
     --color-side: #171614;
@@ -53,7 +45,7 @@
     color-scheme: dark;
   }
 
-  [data-ui='neon'][data-theme='oscuro-fuerte'] {
+  [data-theme='oscuro-fuerte'] {
     --color-bg: #121110;
     --color-side: #0b0a09;
     --color-side-line: #2a2825;
@@ -88,7 +80,7 @@
     color-scheme: dark;
   }
 
-  [data-ui='neon'][data-theme='claro-hueso'] {
+  [data-theme='claro-hueso'] {
     --color-bg: #f1eee8;
     --color-side: #f1eee8;
     --color-side-line: #e2ddd3;
@@ -123,7 +115,7 @@
     color-scheme: light;
   }
 
-  [data-ui='neon'][data-theme='claro-melocoton'] {
+  [data-theme='claro-melocoton'] {
     --color-bg: #f7ebe2;
     --color-side: #f7ebe2;
     --color-side-line: #ebd8cb;
@@ -158,7 +150,7 @@
     color-scheme: light;
   }
 
-  [data-ui='neon'] {
+  :root {
     /* Typography — Font Families */
     --font-display: 'Unbounded', ui-sans-serif, system-ui, sans-serif;
     --font-sans: 'Manrope', ui-sans-serif, system-ui, sans-serif;
@@ -257,7 +249,7 @@
    proportions of a wide screen. Phones keep 1. Zoom also shrinks viewport
    units, so a full-height box uses `--ui-dvh`. */
 @layer base {
-  [data-ui='neon'] {
+  :root {
     --ui-zoom: 1;
     --ui-dvh: calc(100dvh / var(--ui-zoom));
     /* eslint-disable-next-line css/use-baseline -- Chrome and Safari for years, Firefox since 126 (May 2024). */
@@ -265,75 +257,93 @@
   }
 
   @media (min-width: 61.3125rem) {
-    [data-ui='neon'] {
+    :root {
       --ui-zoom: 0.72;
     }
   }
 
   @media (min-width: 1440px) {
-    [data-ui='neon'] {
+    :root {
       --ui-zoom: 0.78;
     }
   }
 
   @media (min-width: 1600px) {
-    [data-ui='neon'] {
+    :root {
       --ui-zoom: 0.85;
     }
   }
 
   @media (min-width: 1760px) {
-    [data-ui='neon'] {
+    :root {
       --ui-zoom: 0.92;
     }
   }
 
   @media (min-width: 1920px) {
-    [data-ui='neon'] {
+    :root {
       --ui-zoom: 1;
     }
   }
 }
 
-/* Page base of the new design: canvas, text and font. Scoped, so the old
-   body rule keeps painting the old design. */
+/* Page base: canvas, text and font. Headings keep the weights the frame was
+   drawn with; a page title asks for Unbounded with its class. */
 @layer base {
-  [data-ui='neon'] body {
+  body {
     background: var(--color-bg);
     color: var(--color-text);
     font-family: var(--font-sans);
     font-size: var(--text-body);
     line-height: var(--leading-body);
+    -webkit-font-smoothing: antialiased;
+    transition:
+      background-color 0.3s ease,
+      color 0.3s ease;
   }
 
-  /* The old base sets h1 and h2 in its display face; here a block title is
-     Manrope (DESIGN.md) and a page title asks for Unbounded with its class. */
-  [data-ui='neon'] h1,
-  [data-ui='neon'] h2 {
-    font-family: inherit;
-    letter-spacing: inherit;
+  h1,
+  h2 {
+    font-weight: 800;
+  }
+
+  h3,
+  h4 {
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  dialog {
+    color: var(--color-text);
   }
 
   /* Tailwind 4's preflight leaves buttons with the arrow; every control that
      acts shows the hand, unless it is disabled. A utility (`cursor-not-allowed`,
      `cursor-text`) still wins: this sits in the base layer. */
-  [data-ui='neon'] button:not(:disabled):not([aria-disabled='true']),
-  [data-ui='neon'] a[href]:not([aria-disabled='true']),
-  [data-ui='neon'] [role='button']:not([aria-disabled='true']),
-  [data-ui='neon'] summary {
+  button:not(:disabled):not([aria-disabled='true']),
+  a[href]:not([aria-disabled='true']),
+  [role='button']:not([aria-disabled='true']),
+  summary {
     cursor: pointer;
   }
 }
 
-/* Utilities with names the old design doesn't have (bg-side, text-soft,
-   rounded-pill…), registered by the frame ticket, the first to use them. The
-   values are the default theme's; `[data-ui="neon"]` above redefines them per
-   theme at runtime. `--breakpoint-frame` is the one media query of the frame:
-   sidebar from here up, bars below (same width as the old `desk`). Names the
-   old @theme also has (--color-panel, --color-line, --color-accent…) are not
-   repeated here: the guard in style-isolation.test.ts forbids it. */
+/* Every token as a utility (bg-panel, text-soft, rounded-pill…), with the
+   default theme's values; `:root` above redefines the colors per theme at
+   runtime. `--breakpoint-frame` is the one media query of the frame: sidebar
+   from here up, bars below. */
 @theme {
   --breakpoint-frame: 61.3125rem;
+
+  --font-display: 'Unbounded', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --color-panel: #232220;
+  --color-line: #33312e;
+  --color-accent: #e8703f;
+  --color-gain: #86cfa5;
+  --color-loss: #e99383;
 
   --color-bg: #1b1a18;
   --color-side: #171614;
@@ -397,6 +407,9 @@
   --text-figure-hero--line-height: 1.05;
   --text-figure-hero--letter-spacing: -0.035em;
 
+  --radius-sm: 7px;
+  --radius-md: 11px;
+  --radius-lg: 18px;
   --radius-ticker: 8px;
   --radius-tile: 18px;
   --radius-sheet: 28px;
@@ -539,7 +552,7 @@
    the accent ring the other controls carry (DESIGN.md, Foco). In the utilities
    layer and more specific than `focus-visible:outline-2`, so it wins there. */
 @layer utilities {
-  [data-ui='neon']
+  :root
     :is(
       input:not(
         [type='checkbox'],
@@ -562,41 +575,41 @@
    on every box. Safari reads the -webkit- pseudo-elements instead. */
 @layer base {
   @supports (scrollbar-color: auto) {
-    [data-ui='neon'] {
+    :root {
       scrollbar-color: var(--color-ctrl-line) transparent;
     }
 
     @media (hover: hover) and (pointer: fine) {
-      [data-ui='neon'] *:hover {
+      :root *:hover {
         scrollbar-color: var(--color-muted) transparent;
       }
     }
   }
 
   @supports (scrollbar-width: thin) {
-    [data-ui='neon'],
-    [data-ui='neon'] * {
+    :root,
+    :root * {
       scrollbar-width: thin;
     }
   }
 
-  [data-ui='neon'] ::-webkit-scrollbar {
+  :root ::-webkit-scrollbar {
     width: 10px;
     height: 10px;
     background: transparent;
   }
 
-  [data-ui='neon'] ::-webkit-scrollbar-thumb {
+  :root ::-webkit-scrollbar-thumb {
     border: 3px solid transparent;
     border-radius: 999px;
     background: var(--color-ctrl-line) padding-box;
   }
 
-  [data-ui='neon'] ::-webkit-scrollbar-thumb:hover {
+  :root ::-webkit-scrollbar-thumb:hover {
     background-color: var(--color-muted);
   }
 
-  [data-ui='neon'] ::-webkit-scrollbar-corner {
+  :root ::-webkit-scrollbar-corner {
     background: transparent;
   }
 }
@@ -607,29 +620,29 @@
    top and clipped by the group, so neither list stretches while the ledger
    eases to its new height. */
 /* eslint-disable css/use-baseline -- same-document View Transitions: Chrome 111, Safari 18, Firefox 144 (October 2025); without them the list changes at once. */
-[data-ui='neon']::view-transition-old(root),
-[data-ui='neon']::view-transition-new(root) {
+:root::view-transition-old(root),
+:root::view-transition-new(root) {
   animation: none;
 }
 
-[data-ui='neon']::view-transition-group(tx-ledger) {
+:root::view-transition-group(tx-ledger) {
   overflow: clip;
   animation-duration: 320ms;
   animation-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
 }
 
-[data-ui='neon']::view-transition-old(tx-ledger),
-[data-ui='neon']::view-transition-new(tx-ledger) {
+:root::view-transition-old(tx-ledger),
+:root::view-transition-new(tx-ledger) {
   block-size: auto;
   object-fit: none;
   object-position: top;
 }
 
-[data-ui='neon']::view-transition-old(tx-ledger) {
+:root::view-transition-old(tx-ledger) {
   animation: neon-ledger-out 160ms ease-out both;
 }
 
-[data-ui='neon']::view-transition-new(tx-ledger) {
+:root::view-transition-new(tx-ledger) {
   animation: neon-ledger-in 320ms cubic-bezier(0.23, 1, 0.32, 1) both;
 }
 /* eslint-enable css/use-baseline */

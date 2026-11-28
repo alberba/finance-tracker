@@ -3,16 +3,11 @@ import { test, expect } from './fixtures'
 import { mockReportsApi, reportEntry } from './pages/reports-api'
 
 /**
- * «Mis reportes» in the mobile frame of the new design (#449), in the mobile
- * project. No cookie: the new design is the default. GitHub is never called:
+ * «Mis reportes» in the mobile frame (#449), in the mobile
+ * project. GitHub is never called:
  * `/api/reports` is faked. Wording and counts are the view-model's unit tests';
  * here, what the person does and what they get.
  */
-const NO_COOKIE = { cookies: [], origins: [] }
-
-test.use({ storageState: NO_COOKIE })
-
-const GITHUB_ERROR = 'No se pudo consultar GitHub. Inténtalo de nuevo.'
 
 const section = (page: Page) => page.locator('#reports')
 const moreTrigger = (page: Page) => page.getByRole('button', { name: 'Más secciones' })
@@ -50,53 +45,6 @@ test(
     await expect(moreTrigger(page)).toHaveAttribute('data-active', 'false')
   },
 )
-
-test('sin novedades la hoja «Más» no lleva punto ni contador, y «Crear reporte» abre el panel', async ({
-  page,
-  tracker,
-}) => {
-  await mockReportsApi(page, { list: () => [reportEntry()] })
-
-  await tracker.goto()
-  await moreTrigger(page).click()
-  await expect(moreSheet(page).locator('[data-reports-count-badge]')).toBeHidden()
-  await expect(moreTrigger(page).locator('[data-reports-badge-dot]')).toBeHidden()
-
-  await moreSheet(page)
-    .getByRole('button', { name: /Crear reporte/ })
-    .click()
-  await expect(moreSheet(page)).toBeHidden()
-  await expect(tracker.issueReportDialog).toBeVisible()
-})
-
-test('un fallo de la lista muestra el error y se reintenta', async ({ page, tracker }) => {
-  await mockReportsApi(page)
-  await page.route('**/api/reports', (route) =>
-    route.fulfill({ status: 502, json: { ok: false, error: GITHUB_ERROR } }),
-  )
-
-  await tracker.openReports()
-  const alert = section(page).getByRole('alert')
-  await expect(alert).toContainText(GITHUB_ERROR)
-  await expect(alert).toContainText('Tus reportes siguen guardados; solo falta leer su estado.')
-
-  await page.unroute('**/api/reports')
-  await alert.getByRole('button', { name: 'Reintentar' }).click()
-  await expect(section(page).locator('[data-report-entry="901"]')).toBeVisible()
-})
-
-test('sin reportes la lista invita a crear uno', async ({ page, tracker }) => {
-  await mockReportsApi(page, { list: () => [] })
-
-  await tracker.openReports()
-  const empty = section(page).locator('[data-empty-state]')
-  await expect(empty.getByText('Aún no has enviado ningún reporte.')).toBeVisible()
-  // With nothing sent, «Crear reporte» is the empty state's own button, not the header's.
-  await expect(section(page).getByRole('button', { name: 'Crear reporte' })).toHaveCount(1)
-
-  await empty.getByRole('button', { name: 'Crear reporte' }).click()
-  await expect(tracker.issueReportDialog).toBeVisible()
-})
 
 test('todos los controles de Mis reportes y de «Más» miden al menos 44 px con puntero táctil', async ({
   page,

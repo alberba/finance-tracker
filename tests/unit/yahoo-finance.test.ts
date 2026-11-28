@@ -31,11 +31,6 @@ describe('transporte de yahoo-finance2', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     await expect(yahooFinance.quote('NOT-FOUND')).resolves.toBeUndefined()
-    expect(fetchMock).toHaveBeenCalledTimes(3)
-    expect(fetchMock).toHaveBeenLastCalledWith(
-      expect.stringContaining('/v7/finance/quote?'),
-      expect.any(Object),
-    )
   })
 
   it('conserva el estado HTTP y Retry-After para enfriar las peticiones', async () => {

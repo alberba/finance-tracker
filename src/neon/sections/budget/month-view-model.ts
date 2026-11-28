@@ -4,7 +4,7 @@ import { ALL_MONTHS, asMonth, atMonth, type Month } from '../../../lib/month'
 import { round2 } from '../../../lib/number'
 import type { Transaction } from '../../../scripts/types'
 
-// «Este mes», the cover of the new Presupuesto (artboard «Presupuesto · 2560 px»,
+// «Este mes», the cover of Presupuesto (artboard «Presupuesto · 2560 px»,
 // #433): what is left of each expense budget this month and at what pace, the
 // month's spending day by day against the month before, and one category month
 // by month. Pure functions over the shared budget view-model.

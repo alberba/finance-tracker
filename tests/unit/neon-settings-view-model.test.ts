@@ -7,13 +7,11 @@ import {
   openingBalanceText,
   assetMeta,
   assetsTable,
-  liabilitiesTable,
   mobileIndex,
   parseAmount,
   parseCurrency,
   parseYear,
   partCounts,
-  ruleMeta,
   rulesTable,
 } from '../../src/neon/sections/settings/view-model'
 import type { RecurringRule } from '../../src/scripts/types'
@@ -148,17 +146,6 @@ describe('tabla de activos', () => {
     expect(alertsLabel(0)).toBe('')
     expect(alertsLabel(1)).toBe('1 aviso en Activos')
     expect(alertsLabel(3)).toBe('3 avisos en Activos')
-  })
-})
-
-describe('tabla de pasivos', () => {
-  it('suma la deuda de partida', () => {
-    const table = liabilitiesTable([
-      { id: 'a', name: 'Tarjeta', openingBalance: 0 },
-      { id: 'b', name: 'Préstamo', openingBalance: 1200.25 },
-    ])
-    expect(table.total).toBe(1200.25)
-    expect(table.rows).toHaveLength(2)
   })
 })
 
@@ -298,10 +285,5 @@ describe('filas móviles', () => {
       'VWCE · Revisar 2 movimientos',
     )
     expect(assetMeta({ ...row, symbol: '', provider: '' })).toBe('Sin cotización')
-  })
-
-  it('pone la frecuencia y el próximo vencimiento de una regla', () => {
-    const { rows } = rulesTable([rule({})], [])
-    expect(ruleMeta(rows[0])).toBe(`${rows[0].frequency} · ${rows[0].next}`)
   })
 })
