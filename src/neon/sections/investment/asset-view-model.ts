@@ -1,16 +1,13 @@
 import type { InvestmentEntryPreset } from '../../../composables/useEntrySheet'
+import { returnPercent } from '../../../domain/investment/return-percent'
 import type { PositionEvolution } from '../../../domain/investment/position-evolution'
-import type {
-  AccountPosition,
-  UninstrumentedHolding,
-} from '../../../domain/investment/positions'
+import type { AccountPosition, UninstrumentedHolding } from '../../../domain/investment/positions'
 import type {
   InvestmentAccount,
   InvestmentDashboardViewModel,
 } from '../../../domain/investment/view-model'
 import { movementBelongsToInvestmentAsset } from '../../../lib/finance-core'
 import {
-  formatDayMonth,
   formatDecimal,
   formatMoney,
   formatNumber,
@@ -18,8 +15,10 @@ import {
   formatShortDate,
   formatSignedMoney,
 } from '../../../lib/format'
+import { round2 } from '../../../lib/number'
 import type { State, Transaction } from '../../../scripts/types'
-import { signedPct, sparkPath, toneOf, type Tone } from './view-model'
+import { groupByYear, isOperation, newestFirst, type AssetYear } from './movements'
+import { resultFigures, signedPct, sparkPath, toneOf, UNPRICED_NOTE, type Tone } from './view-model'
 
 // The detail of an asset in Inversión (artboard «Inversión · detalle de
 // activo (VWCE) · 2560 px», #439): what it is worth and how it did, its price
@@ -93,28 +92,6 @@ export interface AssetPosition {
     weight: string
     label: string
   }
-}
-
-export interface AssetMovementRow {
-  id: string
-  /** «15 feb». */
-  day: string
-  side: 'buy' | 'sell' | null
-  /** «Compra», «Venta» or, for a movement without operation, its description. */
-  operation: string
-  fee: string
-  /** A fee was charged: «Sin comisión» is not worth a line of its own. */
-  feeCharged: boolean
-  /** «10 × 120,00 €». */
-  quantity: string
-  total: string
-}
-
-export interface AssetYear {
-  year: string
-  /** «Comprado 2.200,00 € · Vendido +300,00 €». */
-  sum: string
-  rows: AssetMovementRow[]
 }
 
 /** One position of the account: an instrument and what is held of it. */
@@ -204,17 +181,7 @@ const COMPACT: ChartFrame = {
 const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
 
 const round1 = (value: number) => Math.round(value * 10) / 10
-const round2 = (value: number) => Math.round(value * 100) / 100
 const share = (value: number, total: number) => Math.round((value / total) * 10000) / 100
-
-export function isOperation(tx: Transaction): boolean {
-  return !!tx.side && Number(tx.units) > 0
-}
-
-/** Newest first: by date, then by time. */
-export function newestFirst(a: Transaction, b: Transaction): number {
-  return b.date.localeCompare(a.date) || String(b.time ?? '').localeCompare(String(a.time ?? ''))
-}
 
 /** The asset's movements, newest first. */
 function assetMovements(state: State, position: InvestmentAccount): Transaction[] {
@@ -227,60 +194,6 @@ function assetMovements(state: State, position: InvestmentAccount): Transaction[
         movementBelongsToInvestmentAsset(tx, asset, state.investmentAssets, state.instruments),
     )
     .sort(newestFirst)
-}
-
-function movementRow(tx: Transaction): AssetMovementRow {
-  const operation = isOperation(tx)
-  const sell = tx.side === 'sell'
-  const amount = Math.abs(Number(tx.amount) || 0)
-  const fee = Number(tx.fee) || 0
-  const units = Number(tx.units)
-  const title = operation ? (sell ? 'Venta' : 'Compra') : tx.description || 'Movimiento'
-  const total = sell ? `+${formatMoney(amount)}` : formatMoney(amount)
-  const day = formatDayMonth(tx.date)
-  return {
-    id: tx.id,
-    day,
-    side: operation ? (sell ? 'sell' : 'buy') : null,
-    operation: title,
-    fee: operation ? (fee > 0 ? `Comisión ${formatMoney(fee)}` : 'Sin comisión') : '',
-    feeCharged: operation && fee > 0,
-    quantity: operation
-      ? `${formatDecimal(units)} × ${formatMoney(Number(tx.unitPrice) || 0)}`
-      : '',
-    total,
-  }
-}
-
-function yearSum(movements: readonly Transaction[]): string {
-  let bought = 0
-  let sold = 0
-  for (const tx of movements) {
-    const amount = Math.abs(Number(tx.amount) || 0)
-    if (tx.side === 'sell') sold += amount
-    else bought += amount
-  }
-  return [
-    bought > 0 ? `Comprado ${formatMoney(round2(bought))}` : '',
-    sold > 0 ? `Vendido +${formatMoney(round2(sold))}` : '',
-  ]
-    .filter(Boolean)
-    .join(' · ')
-}
-
-export function groupByYear(movements: readonly Transaction[]): AssetYear[] {
-  const years: Array<{ year: string; movements: Transaction[] }> = []
-  for (const tx of movements) {
-    const year = tx.date.slice(0, 4)
-    const last = years.at(-1)
-    if (last?.year === year) last.movements.push(tx)
-    else years.push({ year, movements: [tx] })
-  }
-  return years.map(({ year, movements: group }) => ({
-    year,
-    sum: yearSum(group),
-    rows: group.map(movementRow),
-  }))
 }
 
 function parseDay(isoDate: string): number {
@@ -439,9 +352,7 @@ function positionLine(position: AccountPosition, evolution: PositionEvolution[])
     averagePrice: position.averagePrice === null ? '—' : formatMoney(position.averagePrice),
     value: formatMoney(position.value),
     invested: formatMoney(position.invested),
-    gain: formatSignedMoney(position.gain),
-    ret: position.invested > 0 ? signedPct(position.returnPct) : '',
-    tone: toneOf(position.gain),
+    ...resultFigures(position),
     weight: formatPercent(position.weight, { digits: 1 }),
     weightPct: position.weight,
     estimated: !position.priced,
@@ -455,14 +366,17 @@ function uninstrumentedLine(holding: UninstrumentedHolding | undefined): Uninstr
   return {
     value: formatMoney(holding.value),
     invested: formatMoney(holding.invested),
-    gain: formatSignedMoney(gain),
-    ret: holding.invested > 0 ? signedPct((gain / holding.invested) * 100) : '',
-    tone: toneOf(gain),
+    ...resultFigures({
+      gain,
+      invested: holding.invested,
+      returnPct: returnPercent(gain, holding.invested),
+    }),
   }
 }
 
 function assetPosition(position: InvestmentAccount, average: number | null): AssetPosition {
   const weight = formatPercent(position.weight, { digits: 1 })
+  const figures = resultFigures(position)
   const rows: AssetFact[] = []
   if (average !== null) {
     rows.push({
@@ -476,8 +390,8 @@ function assetPosition(position: InvestmentAccount, average: number | null): Ass
     {
       label: 'Resultado',
       value: formatSignedMoney(position.gain),
-      note: position.invested > 0 ? signedPct(position.returnPct) : '',
-      tone: toneOf(position.gain),
+      note: figures.ret,
+      tone: figures.tone,
     },
     { label: 'Has puesto', value: formatMoney(position.invested), note: '', tone: 'neutral' },
   )
@@ -500,10 +414,7 @@ export function assetDetail(
   state: State,
   vm: InvestmentDashboardViewModel,
   positionId: string,
-  {
-    compact = false,
-    evolution = [],
-  }: { compact?: boolean; evolution?: PositionEvolution[] } = {},
+  { compact = false, evolution = [] }: { compact?: boolean; evolution?: PositionEvolution[] } = {},
 ): AssetDetail | null {
   const position = vm.accounts.find((candidate) => candidate.id === positionId)
   if (!position) return null
@@ -511,6 +422,7 @@ export function assetDetail(
   const single = positions.length === 1 ? positions[0] : null
   const average = single?.averagePrice ?? null
   const movements = assetMovements(state, position)
+  const result = resultFigures(position)
   const operationCount = movements.length
   const last = movements.find(isOperation) ?? movements[0]
 
@@ -521,17 +433,15 @@ export function assetDetail(
     uninstrumented: uninstrumentedLine(
       vm.uninstrumented.find((holding) => holding.accountId === position.id),
     ),
-    unpricedNote: positions.some((held) => !held.priced)
-      ? 'Sin cotización: el valor es la parte que le toca del valor de la cuenta.'
-      : null,
+    unpricedNote: positions.some((held) => !held.priced) ? UNPRICED_NOTE : null,
     figures: [
       { key: 'value', label: 'Vale hoy', value: formatMoney(position.value), tone: 'neutral' },
       {
         key: 'result',
         label: 'Resultado',
         value: formatSignedMoney(position.gain),
-        note: position.invested > 0 ? signedPct(position.returnPct) : '',
-        tone: toneOf(position.gain),
+        note: result.ret,
+        tone: result.tone,
       },
       {
         key: 'invested',

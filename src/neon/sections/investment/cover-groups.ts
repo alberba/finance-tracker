@@ -5,9 +5,9 @@ import {
   type InstrumentGroup,
 } from '../../../domain/investment/grouping'
 import type { InvestmentDashboardViewModel } from '../../../domain/investment/view-model'
-import { formatMoney, formatPercent, formatSignedMoney } from '../../../lib/format'
+import { formatMoney, formatPercent } from '../../../lib/format'
 import type { InvestmentGrouping } from '../../../lib/investment-grouping'
-import { signedPct, toneOf, type SortDirection, type SortKey, type Tone } from './view-model'
+import { resultFigures, type SortDirection, type SortKey, type Tone } from './view-model'
 
 // The cover of Inversión grouped by instrument or by type (#562). By account
 // is `accountRows`. A row here is an instrument summed over its accounts and
@@ -77,21 +77,28 @@ const TITLE: Record<InvestmentGrouping, string> = {
 /** The heading of the list for a grouping. */
 export const groupingTitle = (grouping: InvestmentGrouping): string => TITLE[grouping]
 
+/** The figures a row and a section of a type share: weight, value and result. */
+function groupFigures(
+  group: Pick<InstrumentGroup, 'weight' | 'value' | 'gain' | 'invested' | 'returnPct'>,
+) {
+  return {
+    weight: formatPercent(group.weight, { digits: 1 }),
+    weightPct: group.weight,
+    value: formatMoney(group.value),
+    ...resultFigures(group),
+    gainValue: group.gain,
+  }
+}
+
 function toRow(group: InstrumentGroup): InstrumentRow {
   return {
     id: group.instrumentId,
     name: group.symbol,
     typeLabel: INSTRUMENT_TYPE_LABEL[group.instrumentType],
     holdings: `${group.accounts} ${group.accounts === 1 ? 'cuenta' : 'cuentas'}`,
-    weight: formatPercent(group.weight, { digits: 1 }),
-    weightPct: group.weight,
-    value: formatMoney(group.value),
-    gain: formatSignedMoney(group.gain),
-    ret: signedPct(group.returnPct),
-    tone: toneOf(group.gain),
+    ...groupFigures(group),
     estimated: !group.priced,
     openLabel: `Ver ${group.symbol}`,
-    gainValue: group.gain,
   }
 }
 
@@ -105,15 +112,7 @@ export function typeSections(vm: InvestmentDashboardViewModel): TypeSection[] {
   return groupByType(vm.positions).map((group) => ({
     id: group.type,
     title: INSTRUMENT_TYPE_LABEL[group.type],
-    summary: {
-      weight: formatPercent(group.weight, { digits: 1 }),
-      weightPct: group.weight,
-      value: formatMoney(group.value),
-      gain: formatSignedMoney(group.gain),
-      ret: signedPct(group.returnPct),
-      tone: toneOf(group.gain),
-      gainValue: group.gain,
-    },
+    summary: groupFigures(group),
     rows: group.instruments.map(toRow),
   }))
 }

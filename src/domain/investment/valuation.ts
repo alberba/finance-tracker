@@ -1,5 +1,5 @@
 import type { Instrument, Quote, State, Transaction } from '../../scripts/types'
-import { round2 } from '../../lib/number'
+import { round2, round8 } from '../../lib/number'
 import { symbolsMatchInstrument } from './symbol-matching'
 
 export interface InstrumentValuation {
@@ -175,6 +175,3 @@ function calculateWeightedChange(valuations: InstrumentValuation[]): number | nu
   )
 }
 
-function round8(value: number): number {
-  return Math.round((Number(value) || 0) * 100_000_000) / 100_000_000
-}

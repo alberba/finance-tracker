@@ -18,7 +18,7 @@
  * `src/scripts/utils.ts` merely re-export it. New code should import
  * `round2` from `src/lib/number.ts` directly.
  *
- * `round8` (crypto-unit rounding in `src/domain/investment/valuation.ts`)
+ * `round8` (crypto-unit rounding in `src/lib/number.ts`)
  * is a distinct, float-based display concern and is intentionally NOT
  * unified with this integer-minimal-unit layer.
  */

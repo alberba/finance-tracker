@@ -37,6 +37,23 @@ export function toneOf(value: number): Tone {
   return value > 0.005 ? 'gain' : value < -0.005 ? 'loss' : 'neutral'
 }
 
+/**
+ * The result of a holding as text: the gain in euros, its return over what
+ * went in (blank when nothing went in: there is no return to speak of) and the
+ * tone. One formatter for every list that shows a result.
+ */
+export function resultFigures(figures: { gain: number; invested: number; returnPct: number }) {
+  return {
+    gain: formatSignedMoney(figures.gain),
+    ret: figures.invested > 0 ? signedPct(figures.returnPct) : '',
+    tone: toneOf(figures.gain),
+  }
+}
+
+/** Said under a list of positions when some have no quote. */
+export const UNPRICED_NOTE =
+  'Sin cotización: el valor es la parte que le toca del valor de la cuenta.'
+
 /** The text colour of each tone. */
 export const TONE_TEXT: Record<Tone, string> = {
   gain: 'text-gain',

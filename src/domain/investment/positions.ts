@@ -1,9 +1,10 @@
-import { round2 } from '../../lib/number'
+import { round2, round8 } from '../../lib/number'
 import { movementBelongsToInvestmentAsset, type Entity } from '../../lib/finance-core'
 import type { MonthOrStart } from '../../lib/month'
 import type { Instrument, InstrumentType, State, Transaction } from '../../scripts/types'
 import { computeInvestmentValue } from './calculations'
 import { symbolsMatchInstrument } from './symbol-matching'
+import { returnPercent } from './return-percent'
 import { quoteUnitPrice } from './valuation'
 
 // Posiciones (ADR 0011): lo que se tiene de un instrumento en una cuenta de
@@ -72,8 +73,6 @@ interface Holding {
   lastMovementDate: string
 }
 
-const round8 = (value: number): number => Math.round(value * 1e8) / 1e8
-
 /**
  * The investment account a movement belongs to: its explicit destination
  * account, then its instrument's account, then its category (legacy). The rule
@@ -127,7 +126,8 @@ function collectMovements(state: State, month: MonthOrStart): AccountMovements {
     .filter((tx) => tx.type === 'investment' && Number(tx.month) <= month)
     .map((tx) => ({ tx, accountId: accountOfMovement(state, tx) }))
   for (const { tx, accountId } of owned) {
-    if (accountId) invested.set(accountId, (invested.get(accountId) ?? 0) + (Number(tx.amount) || 0))
+    if (accountId)
+      invested.set(accountId, (invested.get(accountId) ?? 0) + (Number(tx.amount) || 0))
   }
 
   const holdings = new Map<string, Holding>()
@@ -163,10 +163,6 @@ function collectMovements(state: State, month: MonthOrStart): AccountMovements {
     holdings: [...holdings.values()].filter((holding) => round8(holding.units) > 0),
     invested,
   }
-}
-
-function toReturnPct(gain: number, invested: number): number {
-  return invested <= 0 ? 0 : (gain / invested) * 100
 }
 
 interface AccountBreakdown {
@@ -241,7 +237,7 @@ function breakdownAccounts(
         value: round2(value),
         priced,
         gain,
-        returnPct: toReturnPct(gain, holding.invested),
+        returnPct: returnPercent(gain, holding.invested),
         weight: 0,
         lastMovementDate: holding.lastMovementDate,
       }
