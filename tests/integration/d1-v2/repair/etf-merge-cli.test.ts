@@ -3,7 +3,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import Database from 'better-sqlite3'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { parseMerges, runMergeAccountsCli } from '../../../../scripts/merge-accounts-into-instruments'
+import {
+  parseMerges,
+  runMergeAccountsCli,
+} from '../../../../scripts/merge-accounts-into-instruments'
 import { openLocalV2Db } from '../../../../scripts/lib/local-v2-db'
 import { USER, seedEtfAccounts } from './etf-merge-fixtures'
 
@@ -52,13 +55,21 @@ describe('db:merge-accounts', () => {
   })
 
   it('con --execute deja una copia de la base y fusiona; repetirlo no cambia nada', async () => {
-    const first = await runMergeAccountsCli([`--v2-sqlite=${dbPath}`, `--user-id=${USER}`, '--execute'])
+    const first = await runMergeAccountsCli([
+      `--v2-sqlite=${dbPath}`,
+      `--user-id=${USER}`,
+      '--execute',
+    ])
 
     expect(first.report).toMatchObject({ accountsArchived: 5, movementsReassigned: 7 })
     expect(count(dbPath, ARCHIVED)).toBe(5)
     expect(count(first.backupPath!, ARCHIVED)).toBe(0)
 
-    const second = await runMergeAccountsCli([`--v2-sqlite=${dbPath}`, `--user-id=${USER}`, '--execute'])
+    const second = await runMergeAccountsCli([
+      `--v2-sqlite=${dbPath}`,
+      `--user-id=${USER}`,
+      '--execute',
+    ])
     expect(second.plan.accounts).toEqual([])
     expect(second.report).toMatchObject({ accountsArchived: 0 })
     expect(count(dbPath, ARCHIVED)).toBe(5)
@@ -86,7 +97,9 @@ describe('db:merge-accounts', () => {
   it('no crea una base vacía si la ruta no existe', async () => {
     const missing = join(dir, 'no-existe.sqlite')
 
-    await expect(runMergeAccountsCli([`--v2-sqlite=${missing}`, `--user-id=${USER}`])).rejects.toThrow(/no existe/)
+    await expect(
+      runMergeAccountsCli([`--v2-sqlite=${missing}`, `--user-id=${USER}`]),
+    ).rejects.toThrow(/no existe/)
     expect(existsSync(missing)).toBe(false)
   })
 })

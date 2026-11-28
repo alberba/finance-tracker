@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
 import { computeInvestmentValue } from '../../src/domain/investment/calculations'
-import { buildAccountPositions, buildUninstrumentedHoldings } from '../../src/domain/investment/positions'
+import {
+  buildAccountPositions,
+  buildUninstrumentedHoldings,
+} from '../../src/domain/investment/positions'
 import type { Month } from '../../src/lib/month'
 import { normalizeState } from '../../src/scripts/state'
 import type { State } from '../../src/scripts/types'

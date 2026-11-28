@@ -23,7 +23,7 @@
  * unified with this integer-minimal-unit layer.
  */
 
-import Decimal from "decimal.js";
+import Decimal from 'decimal.js'
 
 /**
  * Number of decimal digits a currency's minor unit represents, keyed by
@@ -39,17 +39,17 @@ const MINOR_UNIT_EXPONENTS: Record<string, number> = {
   KWD: 3,
   BTC: 8,
   ETH: 8,
-};
+}
 
-const DEFAULT_MINOR_UNIT_EXPONENT = 2;
+const DEFAULT_MINOR_UNIT_EXPONENT = 2
 
 /**
  * Returns how many decimal digits the given ISO currency's minor unit has
  * (e.g. 2 for EUR cents, 0 for JPY, 8 for BTC-style high-precision assets).
  */
 export function minorUnitExponent(currency: string): number {
-  const code = currency.trim().toUpperCase();
-  return MINOR_UNIT_EXPONENTS[code] ?? DEFAULT_MINOR_UNIT_EXPONENT;
+  const code = currency.trim().toUpperCase()
+  return MINOR_UNIT_EXPONENTS[code] ?? DEFAULT_MINOR_UNIT_EXPONENT
 }
 
 /**
@@ -64,9 +64,11 @@ export function minorUnitExponent(currency: string): number {
  * at this app's scale.
  */
 export function toMinorUnits(amount: number | string, currency: string): number {
-  const exponent = minorUnitExponent(currency);
-  const minor = new Decimal(amount).times(new Decimal(10).pow(exponent)).toDecimalPlaces(0, Decimal.ROUND_HALF_UP);
-  return minor.toNumber();
+  const exponent = minorUnitExponent(currency)
+  const minor = new Decimal(amount)
+    .times(new Decimal(10).pow(exponent))
+    .toDecimalPlaces(0, Decimal.ROUND_HALF_UP)
+  return minor.toNumber()
 }
 
 /**
@@ -75,6 +77,6 @@ export function toMinorUnits(amount: number | string, currency: string): number 
  * inverse of `toMinorUnits`.
  */
 export function fromMinorUnits(minor: number, currency: string): number {
-  const exponent = minorUnitExponent(currency);
-  return new Decimal(minor).dividedBy(new Decimal(10).pow(exponent)).toNumber();
+  const exponent = minorUnitExponent(currency)
+  return new Decimal(minor).dividedBy(new Decimal(10).pow(exponent)).toNumber()
 }

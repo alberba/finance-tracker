@@ -40,14 +40,20 @@ function insertAccount(
  * held at Trade Republic, plus «Acciones» that must not be touched. Months with gaps (SXRS has
  * no close after January, AGED none in January) exercise the carried-forward balances.
  */
-export function seedEtfAccounts(sqlite: Database.Database, options: { brokerExists?: boolean } = {}) {
+export function seedEtfAccounts(
+  sqlite: Database.Database,
+  options: { brokerExists?: boolean } = {},
+) {
   sqlite
-    .prepare(`INSERT INTO users (id, email, created_at, updated_at) VALUES (?, 'etf@example.com', ?, ?)`)
+    .prepare(
+      `INSERT INTO users (id, email, created_at, updated_at) VALUES (?, 'etf@example.com', ?, ?)`,
+    )
     .run(USER, STAMP, STAMP)
   insertAccount(sqlite, 'acc-checking', 'Cuenta corriente', 'cash')
   insertAccount(sqlite, 'acc-acciones', 'Acciones', 'investment')
   for (const [id, name, , opening] of ETFS) insertAccount(sqlite, id, name, 'investment', opening)
-  if (options.brokerExists) insertAccount(sqlite, 'acc-trade-republic', 'Trade Republic', 'investment', 10000)
+  if (options.brokerExists)
+    insertAccount(sqlite, 'acc-trade-republic', 'Trade Republic', 'investment', 10000)
 
   for (const [id, name] of [...ETFS.map(([i, n]) => [i, n]), ['acc-acciones', 'Acciones']]) {
     sqlite
@@ -58,7 +64,11 @@ export function seedEtfAccounts(sqlite: Database.Database, options: { brokerExis
   }
 
   const instruments: Array<[string, string, string]> = [
-    ...ETFS.map(([id, , symbol]): [string, string, string] => [`inst-${symbol.toLowerCase()}`, symbol, id]),
+    ...ETFS.map(([id, , symbol]): [string, string, string] => [
+      `inst-${symbol.toLowerCase()}`,
+      symbol,
+      id,
+    ]),
     ['inst-acciones', 'AAPL', 'acc-acciones'],
   ]
   for (const [instrumentId, symbol, accountId] of instruments) {

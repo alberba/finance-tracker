@@ -94,7 +94,10 @@ const brokerOptions = computed(() =>
   investmentStore.accounts.map((account) => ({ value: account.id, label: account.name })),
 )
 const investmentAccountOptions = computed(() =>
-  financialStateStore.activeInvestmentAssets.map((asset) => ({ value: asset.id, label: asset.name })),
+  financialStateStore.activeInvestmentAssets.map((asset) => ({
+    value: asset.id,
+    label: asset.name,
+  })),
 )
 const categoryOptions = computed(() =>
   (isBitvavo.value ? ['Crypto'] : investmentStore.investmentCategories).map((name) => ({

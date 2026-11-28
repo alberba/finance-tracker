@@ -183,26 +183,26 @@ const COLUMNS =
           <span class="text-soft text-note text-end font-bold tabular-nums">{{ line.weight }}</span>
           <span class="flex justify-end">
             <svg
-          v-if="line.evolution"
-          :viewBox="`0 0 ${SPARK_WIDTH} ${SPARK_HEIGHT}`"
-          preserveAspectRatio="none"
-          class="block overflow-visible"
-          :class="'h-7 w-full max-w-28'"
-          role="img"
-          :aria-label="line.evolution.label"
-          :data-position-evolution="line.symbol"
-        >
-          <path
-            :d="line.evolution.path"
-            fill="none"
-            :stroke="TONE_STROKE[line.tone]"
-            stroke-width="2"
-            stroke-linejoin="round"
-            stroke-linecap="round"
-            :stroke-dasharray="line.evolution.approximate ? '3 3' : undefined"
-            vector-effect="non-scaling-stroke"
-          />
-        </svg>
+              v-if="line.evolution"
+              :viewBox="`0 0 ${SPARK_WIDTH} ${SPARK_HEIGHT}`"
+              preserveAspectRatio="none"
+              class="block overflow-visible"
+              :class="'h-7 w-full max-w-28'"
+              role="img"
+              :aria-label="line.evolution.label"
+              :data-position-evolution="line.symbol"
+            >
+              <path
+                :d="line.evolution.path"
+                fill="none"
+                :stroke="TONE_STROKE[line.tone]"
+                stroke-width="2"
+                stroke-linejoin="round"
+                stroke-linecap="round"
+                :stroke-dasharray="line.evolution.approximate ? '3 3' : undefined"
+                vector-effect="non-scaling-stroke"
+              />
+            </svg>
           </span>
         </li>
         <li

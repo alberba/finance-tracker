@@ -6,14 +6,44 @@ function bootstrap(): SyncV2Bootstrap {
   return {
     revision: 7,
     settings: { currency: 'USD' },
-    accounts: [{ id: 'server-account', legacyId: 'local-account', name: 'Cuenta', kind: 'cash', openingBalance: 250 }],
-    categories: [{ id: 'server-category', legacyId: 'income:Nómina', name: 'Nómina', kind: 'income', sortOrder: 0 }],
-    transactions: [{
-      id: 'server-transaction', legacyId: 'local-transaction', accountId: 'server-account',
-      categoryId: 'server-category', type: 'income', date: '2026-01-10', description: 'Nómina', amount: 1500,
-    }],
-    subscriptions: [], recurringRules: [], pendingMovements: [], budgetEntries: [], goals: [],
-    wealthSnapshots: [], contributions: [], userInstruments: [],
+    accounts: [
+      {
+        id: 'server-account',
+        legacyId: 'local-account',
+        name: 'Cuenta',
+        kind: 'cash',
+        openingBalance: 250,
+      },
+    ],
+    categories: [
+      {
+        id: 'server-category',
+        legacyId: 'income:Nómina',
+        name: 'Nómina',
+        kind: 'income',
+        sortOrder: 0,
+      },
+    ],
+    transactions: [
+      {
+        id: 'server-transaction',
+        legacyId: 'local-transaction',
+        accountId: 'server-account',
+        categoryId: 'server-category',
+        type: 'income',
+        date: '2026-01-10',
+        description: 'Nómina',
+        amount: 1500,
+      },
+    ],
+    subscriptions: [],
+    recurringRules: [],
+    pendingMovements: [],
+    budgetEntries: [],
+    goals: [],
+    wealthSnapshots: [],
+    contributions: [],
+    userInstruments: [],
   }
 }
 
@@ -24,16 +54,35 @@ describe('projectSyncV2State', () => {
     expect(state.currency).toBe('USD')
     expect(state.accounts).toEqual([{ id: 'local-account', name: 'Cuenta', openingBalance: 250 }])
     expect(state.incomeCategories).toEqual(['Nómina'])
-    expect(state.transactions).toEqual([expect.objectContaining({
-      id: 'local-transaction', accountId: 'local-account', category: 'Nómina', month: 1,
-    })])
+    expect(state.transactions).toEqual([
+      expect.objectContaining({
+        id: 'local-transaction',
+        accountId: 'local-account',
+        category: 'Nómina',
+        month: 1,
+      }),
+    ])
   })
 
   it('marks an archived investment account but keeps it, so its history still resolves', () => {
     const b = bootstrap()
     b.accounts.push(
-      { id: 'server-etf', legacyId: 'etf', name: 'ETF', kind: 'investment', openingBalance: 0, isArchived: true },
-      { id: 'server-tr', legacyId: 'tr', name: 'Trade Republic', kind: 'investment', openingBalance: 0, isArchived: false },
+      {
+        id: 'server-etf',
+        legacyId: 'etf',
+        name: 'ETF',
+        kind: 'investment',
+        openingBalance: 0,
+        isArchived: true,
+      },
+      {
+        id: 'server-tr',
+        legacyId: 'tr',
+        name: 'Trade Republic',
+        kind: 'investment',
+        openingBalance: 0,
+        isArchived: false,
+      },
     )
 
     const state = projectSyncV2State(b)
@@ -70,9 +119,27 @@ describe('projectSyncV2State', () => {
 
   it('projects pending movements including investment operation fields and investment accounts', () => {
     const b = bootstrap()
-    b.accounts.push({ id: 'server-asset', legacyId: 'local-asset', name: 'Broker', kind: 'investment', openingBalance: 0 })
-    b.categories.push({ id: 'server-inv-cat', legacyId: 'investment:Acciones', name: 'Acciones', kind: 'investment', sortOrder: 0 })
-    b.recurringRules.push({ id: 'server-rule', legacyId: 'local-rule', name: 'Regla', type: 'investment', frequency: 'monthly' })
+    b.accounts.push({
+      id: 'server-asset',
+      legacyId: 'local-asset',
+      name: 'Broker',
+      kind: 'investment',
+      openingBalance: 0,
+    })
+    b.categories.push({
+      id: 'server-inv-cat',
+      legacyId: 'investment:Acciones',
+      name: 'Acciones',
+      kind: 'investment',
+      sortOrder: 0,
+    })
+    b.recurringRules.push({
+      id: 'server-rule',
+      legacyId: 'local-rule',
+      name: 'Regla',
+      type: 'investment',
+      frequency: 'monthly',
+    })
     b.pendingMovements = [
       {
         id: 'server-pm-inv',
@@ -95,19 +162,21 @@ describe('projectSyncV2State', () => {
 
     const state = projectSyncV2State(b)
     expect(state.pendingMovements).toHaveLength(1)
-    expect(state.pendingMovements[0]).toEqual(expect.objectContaining({
-      id: 'local-pm-inv',
-      ruleId: 'local-rule',
-      type: 'investment',
-      accountId: 'local-asset',
-      category: 'Acciones',
-      symbol: 'AAPL',
-      side: 'buy',
-      units: 3,
-      unitPrice: 166.66,
-      fee: 0.02,
-      time: '14:30',
-      status: 'pending',
-    }))
+    expect(state.pendingMovements[0]).toEqual(
+      expect.objectContaining({
+        id: 'local-pm-inv',
+        ruleId: 'local-rule',
+        type: 'investment',
+        accountId: 'local-asset',
+        category: 'Acciones',
+        symbol: 'AAPL',
+        side: 'buy',
+        units: 3,
+        unitPrice: 166.66,
+        fee: 0.02,
+        time: '14:30',
+        status: 'pending',
+      }),
+    )
   })
 })

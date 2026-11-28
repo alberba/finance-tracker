@@ -114,7 +114,9 @@ describe('buildPositionEvolution', () => {
       ],
     })
 
-    const evolution = buildPositionEvolution(state, 'crypto', 3, { 'i-btc': [900, 1100, 2500, 2600] })
+    const evolution = buildPositionEvolution(state, 'crypto', 3, {
+      'i-btc': [900, 1100, 2500, 2600],
+    })
 
     expect(valuesOf(evolution, 'BTC')).toEqual([0, 1100, 2500, 0])
   })

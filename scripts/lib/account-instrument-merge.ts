@@ -38,7 +38,12 @@ import * as marketRepository from '../../src/db/repositories/market'
 import * as transactionsRepository from '../../src/db/repositories/transactions'
 import * as wealthRepository from '../../src/db/repositories/wealth'
 import { nowIso, runInTransaction, type Db } from '../../src/db/repositories/shared'
-import { normalizeName, publishSyncChange, resolveActiveAccountByName, sameName } from './repair-shared'
+import {
+  normalizeName,
+  publishSyncChange,
+  resolveActiveAccountByName,
+  sameName,
+} from './repair-shared'
 import { normalizeSymbol } from '../../src/domain/investment/symbol-matching'
 import { buildBootstrapPayload } from '../../src/lib/server/bootstrap-payload'
 import { projectSyncV2State, type SyncV2Bootstrap } from '../../src/lib/client/v2-state-projection'
@@ -189,7 +194,9 @@ function resolveMerges(rows: readonly AccountRow[], merges: readonly AccountMerg
       target = { broker, brokerName: merge.brokerName.trim(), legacy: [] }
       brokers.set(key, target)
     }
-    if (legacy.currency !== (target.broker?.currency ?? target.legacy[0]?.currency ?? legacy.currency)) {
+    if (
+      legacy.currency !== (target.broker?.currency ?? target.legacy[0]?.currency ?? legacy.currency)
+    ) {
       blockers.push(
         `La cuenta '${legacy.name}' está en ${legacy.currency}, distinta de la de '${target.brokerName}'.`,
       )
@@ -257,7 +264,8 @@ export async function buildAccountMergePlan(
     .where(eq(userInstruments.userId, userId))
   const legacyOfAlias = (alias: string | null): AccountRow | undefined =>
     alias
-      ? ([...legacyById.values()].find((row) => row.id === alias || row.legacyId === alias) ?? undefined)
+      ? ([...legacyById.values()].find((row) => row.id === alias || row.legacyId === alias) ??
+        undefined)
       : undefined
   const instrumentsOf = new Map<string, MergedInstrument[]>()
   for (const row of trackedRows) {
@@ -343,7 +351,9 @@ export async function buildAccountMergePlan(
           accountName: legacy.name,
           balanceMinor: toMinorUnits(valueOf(legacy.name, snapshot.month), currency),
         }))
-        const own = group.broker ? toMinorUnits(valueOf(group.broker.name, snapshot.month), currency) : 0
+        const own = group.broker
+          ? toMinorUnits(valueOf(group.broker.name, snapshot.month), currency)
+          : 0
         const existing = group.broker
           ? balanceRows.find(
               (row) => row.snapshotId === snapshot.id && row.accountId === group.broker!.id,
@@ -370,7 +380,10 @@ export async function buildAccountMergePlan(
     .where(eq(contributions.userId, userId))
     .orderBy(asc(contributions.date), asc(contributions.id))
   const allocationRows = contributionRows.length
-    ? await db.select().from(contributionAllocations).where(eq(contributionAllocations.userId, userId))
+    ? await db
+        .select()
+        .from(contributionAllocations)
+        .where(eq(contributionAllocations.userId, userId))
     : []
   for (const contribution of contributionRows) {
     const own = allocationRows.filter((row) => row.contributionId === contribution.id)
@@ -378,7 +391,12 @@ export async function buildAccountMergePlan(
       const merged = group.legacy.flatMap((legacy) => {
         const amounts = own.filter((row) => row.accountId === legacy.id)
         return amounts.length
-          ? [{ accountName: legacy.name, amountMinor: amounts.reduce((sum, row) => sum + row.amountMinor, 0) }]
+          ? [
+              {
+                accountName: legacy.name,
+                amountMinor: amounts.reduce((sum, row) => sum + row.amountMinor, 0),
+              },
+            ]
           : []
       })
       if (merged.length === 0) continue
@@ -416,7 +434,12 @@ export async function buildAccountMergePlan(
     .leftJoin(investmentTradeDetails, eq(investmentTradeDetails.transactionId, transactions.id))
     .where(and(eq(transactions.userId, userId), eq(transactions.type, 'investment')))
     .orderBy(asc(transactions.date), asc(transactions.id))
-  const ownerOf = legacyOwnerResolver(accountRows, [...legacyById.values()], trackedRows, categoryById)
+  const ownerOf = legacyOwnerResolver(
+    accountRows,
+    [...legacyById.values()],
+    trackedRows,
+    categoryById,
+  )
   for (const movement of movementRows) {
     const legacy = ownerOf(movement)
     if (!legacy) continue
@@ -455,7 +478,11 @@ function legacyOwnerResolver(
 ) {
   const clientId = (row: AccountRow) => row.legacyId || row.id
   const clientIdOf = new Map(accountRows.map((row) => [row.id, clientId(row)]))
-  const asEntity = (row: AccountRow): Entity => ({ id: clientId(row), name: row.name, openingBalance: 0 })
+  const asEntity = (row: AccountRow): Entity => ({
+    id: clientId(row),
+    name: row.name,
+    openingBalance: 0,
+  })
   const assets = accountRows.filter((row) => row.kind === 'investment').map(asEntity)
   const links = tracked.map((row) => ({
     id: row.instrumentId,
@@ -469,13 +496,16 @@ function legacyOwnerResolver(
     instrumentId: string | null
   }): AccountRow | null => {
     const tx = {
-      category: (movement.categoryId && categoryById.get(movement.categoryId)?.name) || 'Sin categoría',
+      category:
+        (movement.categoryId && categoryById.get(movement.categoryId)?.name) || 'Sin categoría',
       instrumentId: movement.instrumentId ?? undefined,
       destinationAccountId:
-        (movement.destinationAccountId && clientIdOf.get(movement.destinationAccountId)) || undefined,
+        (movement.destinationAccountId && clientIdOf.get(movement.destinationAccountId)) ||
+        undefined,
     }
     return (
-      legacy.find(({ asset }) => movementBelongsToInvestmentAsset(tx, asset, assets, links))?.row ?? null
+      legacy.find(({ asset }) => movementBelongsToInvestmentAsset(tx, asset, assets, links))?.row ??
+      null
     )
   }
 }
@@ -493,19 +523,24 @@ export function formatAccountMergePlan(plan: AccountMergePlan): string {
   }
   lines.push(`Cuentas a fusionar y archivar: ${plan.accounts.length}`)
   for (const account of plan.accounts) {
-    const instruments = account.instruments.map((item) => item.symbol).join(', ') || 'sin instrumento'
+    const instruments =
+      account.instruments.map((item) => item.symbol).join(', ') || 'sin instrumento'
     lines.push(`  ${account.name} → ${account.brokerName} · instrumentos: ${instruments}`)
   }
   lines.push(`Cierres mensuales afectados: ${plan.closes.length}`)
   for (const close of plan.closes) {
-    const detail = close.merged.map((item) => `${item.accountName} ${money(item.balanceMinor)}`).join(' + ')
+    const detail = close.merged
+      .map((item) => `${item.accountName} ${money(item.balanceMinor)}`)
+      .join(' + ')
     lines.push(
       `  ${close.date} · ${close.brokerName}: ${close.brokerBalanceMinor.from === null ? 'sin saldo' : money(close.brokerBalanceMinor.from)} → ${money(close.brokerBalanceMinor.to)} (${detail})`,
     )
   }
   lines.push(`Aportes afectados: ${plan.allocations.length}`)
   for (const allocation of plan.allocations) {
-    const detail = allocation.merged.map((item) => `${item.accountName} ${money(item.amountMinor)}`).join(' + ')
+    const detail = allocation.merged
+      .map((item) => `${item.accountName} ${money(item.amountMinor)}`)
+      .join(' + ')
     lines.push(
       `  ${allocation.date} · ${allocation.brokerName}: ${money(allocation.brokerAmountMinor.to)} (${detail})`,
     )
@@ -573,9 +608,15 @@ export async function measureMergeInvariants(db: Db, userId: string): Promise<Me
 }
 
 /** Compara el antes y el después; el mensaje lista cada diferencia. */
-export function describeInvariantDifferences(before: MergeInvariants, after: MergeInvariants): string[] {
+export function describeInvariantDifferences(
+  before: MergeInvariants,
+  after: MergeInvariants,
+): string[] {
   const differences: string[] = []
-  const months = new Set([...Object.keys(before.netWorthMinor), ...Object.keys(after.netWorthMinor)])
+  const months = new Set([
+    ...Object.keys(before.netWorthMinor),
+    ...Object.keys(after.netWorthMinor),
+  ])
   for (const month of [...months].sort()) {
     if (before.netWorthMinor[month] !== after.netWorthMinor[month]) {
       differences.push(
@@ -608,7 +649,9 @@ export async function applyAccountMergePlan(
   options: AccountMergeOptions,
 ): Promise<AccountMergeReport> {
   if (plan.blockers.length > 0) {
-    throw new Error(`El plan no se puede ejecutar:\n${plan.blockers.map((item) => `  - ${item}`).join('\n')}`)
+    throw new Error(
+      `El plan no se puede ejecutar:\n${plan.blockers.map((item) => `  - ${item}`).join('\n')}`,
+    )
   }
   const report: AccountMergeReport = {
     accountsArchived: 0,
@@ -678,7 +721,12 @@ export async function applyAccountMergePlan(
             version: sql`${userInstruments.version} + 1`,
             updatedAt: now,
           })
-          .where(and(eq(userInstruments.userId, userId), eq(userInstruments.id, instrument.userInstrumentId)))
+          .where(
+            and(
+              eq(userInstruments.userId, userId),
+              eq(userInstruments.id, instrument.userInstrumentId),
+            ),
+          )
         touched.userInstruments.add(instrument.userInstrumentId)
         report.instrumentsMoved++
       }
@@ -699,7 +747,12 @@ export async function applyAccountMergePlan(
       const [existing] = await db
         .select({ id: snapshotBalances.id })
         .from(snapshotBalances)
-        .where(and(eq(snapshotBalances.snapshotId, close.snapshotId), eq(snapshotBalances.accountId, target)))
+        .where(
+          and(
+            eq(snapshotBalances.snapshotId, close.snapshotId),
+            eq(snapshotBalances.accountId, target),
+          ),
+        )
       if (existing) {
         await db
           .update(snapshotBalances)
@@ -767,7 +820,9 @@ export async function applyAccountMergePlan(
       await db
         .update(contributions)
         .set({ version: sql`${contributions.version} + 1`, updatedAt: now })
-        .where(and(eq(contributions.userId, userId), eq(contributions.id, allocation.contributionId)))
+        .where(
+          and(eq(contributions.userId, userId), eq(contributions.id, allocation.contributionId)),
+        )
       touched.contributions.add(allocation.contributionId)
       report.allocationsMerged++
     }
@@ -812,7 +867,10 @@ export async function applyAccountMergePlan(
       report.accountsArchived++
     }
 
-    const differences = describeInvariantDifferences(before, await measureMergeInvariants(db, userId))
+    const differences = describeInvariantDifferences(
+      before,
+      await measureMergeInvariants(db, userId),
+    )
     if (differences.length > 0) {
       throw new Error(
         `La fusión cambiaría el patrimonio o el capital aportado; no se ha escrito nada:\n${differences.map((item) => `  - ${item}`).join('\n')}`,
@@ -842,7 +900,11 @@ async function publishChanges(
     await publish('account', id, await runWithDb(db, accountsRepository.get(userId, id)))
   }
   for (const id of touched.userInstruments) {
-    await publish('userInstrument', id, await runWithDb(db, marketRepository.getUserInstrument(userId, id)))
+    await publish(
+      'userInstrument',
+      id,
+      await runWithDb(db, marketRepository.getUserInstrument(userId, id)),
+    )
   }
   for (const id of touched.snapshots) {
     const snapshot = await runWithDb(db, wealthRepository.get(userId, id))
@@ -851,12 +913,18 @@ async function publishChanges(
   }
   for (const id of touched.contributions) {
     const contribution = await runWithDb(db, contributionsRepository.get(userId, id))
-    const allocations = await runWithDb(db, contributionsRepository.listAllocationsByContribution(userId, id))
+    const allocations = await runWithDb(
+      db,
+      contributionsRepository.listAllocationsByContribution(userId, id),
+    )
     await publish('contribution', id, { ...contribution, allocations })
   }
   for (const id of touched.transactions) {
     const transaction = await runWithDb(db, transactionsRepository.get(userId, id))
-    const tradeDetail = await runWithDb(db, transactionsRepository.getTradeDetailByTransaction(userId, id))
+    const tradeDetail = await runWithDb(
+      db,
+      transactionsRepository.getTradeDetailByTransaction(userId, id),
+    )
     await publish('transaction', id, { ...transaction, tradeDetail })
   }
 }

@@ -54,7 +54,10 @@ describe('reparación de vínculos de instrumento', () => {
         date: '2026-01-09',
         description: 'Compra ETH',
         symbol: 'ETH',
-        instrument: { from: { id: 'inst-btc', symbol: 'BTC' }, to: { id: 'inst-eth', symbol: 'ETH' } },
+        instrument: {
+          from: { id: 'inst-btc', symbol: 'BTC' },
+          to: { id: 'inst-eth', symbol: 'ETH' },
+        },
         account: {
           from: { id: 'acc-checking', name: 'Cuenta corriente' },
           to: { id: 'acc-bitvavo', name: 'Bitvavo' },
@@ -65,7 +68,10 @@ describe('reparación de vínculos de instrumento', () => {
         date: '2026-01-23',
         description: 'Compra ETH',
         symbol: 'ETH',
-        instrument: { from: { id: 'inst-btc', symbol: 'BTC' }, to: { id: 'inst-eth', symbol: 'ETH' } },
+        instrument: {
+          from: { id: 'inst-btc', symbol: 'BTC' },
+          to: { id: 'inst-eth', symbol: 'ETH' },
+        },
         account: {
           from: { id: 'acc-checking', name: 'Cuenta corriente' },
           to: { id: 'acc-bitvavo', name: 'Bitvavo' },
@@ -76,7 +82,10 @@ describe('reparación de vínculos de instrumento', () => {
         date: '2026-02-06',
         description: 'Compra ETH',
         symbol: 'ETH',
-        instrument: { from: { id: 'inst-btc', symbol: 'BTC' }, to: { id: 'inst-eth', symbol: 'ETH' } },
+        instrument: {
+          from: { id: 'inst-btc', symbol: 'BTC' },
+          to: { id: 'inst-eth', symbol: 'ETH' },
+        },
       },
       {
         transactionId: 'btc-august',
@@ -158,7 +167,9 @@ describe('reparación de vínculos de instrumento', () => {
   it('rechaza un plan cuyo movimiento cambió desde que se calculó, sin escribir nada', async () => {
     const plan = await buildInstrumentLinkRepairPlan(testDb.db, USER, { accountMoves: MOVES })
     testDb.sqlite
-      .prepare(`UPDATE investment_trade_details SET instrument_id = 'inst-eth' WHERE transaction_id = 'eth-january-9'`)
+      .prepare(
+        `UPDATE investment_trade_details SET instrument_id = 'inst-eth' WHERE transaction_id = 'eth-january-9'`,
+      )
       .run()
     const before = snapshotOfTables(testDb)
 
