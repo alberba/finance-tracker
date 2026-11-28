@@ -415,7 +415,7 @@ describe('valoración de cartera', () => {
     const buy = (id: string, units: number, instrumentId?: string) => ({
       id,
       date: '2026-01-01',
-      month: 1,
+      month: 1 as const,
       type: 'investment' as const,
       accountId: 'bitvavo',
       category: 'Crypto',
