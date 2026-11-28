@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'finance-tracker-v6'
+const CACHE_VERSION = 'finance-tracker-v7'
 // The self-hosted faces are part of the shell: once installed, the app keeps
 // Unbounded and Manrope offline even before the page requests them.
 const APP_SHELL = [
