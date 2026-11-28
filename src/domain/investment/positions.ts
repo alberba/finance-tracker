@@ -42,6 +42,12 @@ export interface PositionOptions {
   /** Value positions with the instruments' quotes. Quotes are today's: leave it off for a past month. */
   quotes?: boolean
   fxRates?: Record<string, number>
+  /**
+   * What one unit of an instrument was worth, in the base currency, by
+   * instrument id. It takes the place of the quote, for the instruments it names,
+   * so a past month can be valued at its own close.
+   */
+  unitPrices?: Record<string, number>
 }
 
 interface Holding {
@@ -152,16 +158,18 @@ export function buildAccountPositions(
     const own = holdings.filter((holding) => holding.accountId === account.id)
     if (!own.length) continue
 
-    const unitPrices = own.map((holding) =>
-      options.quotes
+    const unitPrices = own.map((holding) => {
+      const given = options.unitPrices?.[holding.instrument.id]
+      if (given !== undefined) return given
+      return options.quotes
         ? quoteUnitPrice(
             state.quotes[holding.instrument.id],
             holding.instrument,
             baseCurrency,
             options.fxRates,
           )
-        : null,
-    )
+        : null
+    })
     const quotedValue = own.reduce(
       (sum, holding, index) => sum + holding.units * (unitPrices[index] ?? 0),
       0,
