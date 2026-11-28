@@ -52,6 +52,17 @@ describe('Bitvavo account history', () => {
     expect(http).toHaveBeenCalledTimes(1)
   })
 
+  it('asks for manual redirects, which workerd supports, and refuses to follow one', async () => {
+    const http = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        new Response(null, { status: 302, headers: { Location: 'https://example.com' } }),
+      )
+    await expect(history(credentials, range, http)).rejects.toThrow('redirigió')
+    expect(http).toHaveBeenCalledTimes(1)
+    expect(http.mock.calls[0][1]?.redirect).toBe('manual')
+  })
+
   it('honors Retry-After before retrying a rate-limited page', async () => {
     vi.useFakeTimers()
     const http = vi

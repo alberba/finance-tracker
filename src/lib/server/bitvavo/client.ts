@@ -90,7 +90,8 @@ const requestPage = Effect.fnUntraced(function* (
     try: async (signal) => {
       const response = await http.request(`https://api.bitvavo.com${path}`, {
         method: 'GET',
-        redirect: 'error',
+        // workerd rejects `redirect: 'error'`; a redirect is refused below instead.
+        redirect: 'manual',
         signal,
         headers: {
           'Bitvavo-Access-Key': credentials.apiKey,
@@ -99,6 +100,8 @@ const requestPage = Effect.fnUntraced(function* (
           'Bitvavo-Access-Window': '10000',
         },
       })
+      if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400))
+        throw new ProviderError({ message: 'Bitvavo redirigió la consulta.', retryable: false })
       if (response.status === 401 || response.status === 403)
         throw new InvalidCredential({ message: 'Comprueba la clave y su permiso de lectura.' })
       if (response.status === 429) {
