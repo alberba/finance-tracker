@@ -31,6 +31,7 @@ import * as pendingMovementsRepository from '../../../db/repositories/pending-mo
 import * as budgetEntriesRepository from '../../../db/repositories/budget-entries'
 import * as goalsRepository from '../../../db/repositories/goals'
 import { parseDashboardLayout } from '../../../lib/dashboard-layout'
+import { parseInvestmentGrouping } from '../../../lib/investment-grouping'
 import { runServer } from '../../../lib/server/runtime'
 import type { Db } from '../../../db/repositories/shared'
 import * as wealthRepository from '../../../db/repositories/wealth'
@@ -567,6 +568,10 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
             settingsRow.dashboardLayout === undefined
               ? undefined
               : parseDashboardLayout(settingsRow.dashboardLayout),
+          investmentGrouping:
+            settingsRow.investmentGrouping === undefined
+              ? undefined
+              : parseInvestmentGrouping(settingsRow.investmentGrouping),
           currency: typeof settingsRow.currency === 'string' ? settingsRow.currency : undefined,
           locale: typeof settingsRow.locale === 'string' ? settingsRow.locale : undefined,
           theme: typeof settingsRow.theme === 'string' ? settingsRow.theme : undefined,

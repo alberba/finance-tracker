@@ -278,6 +278,8 @@ Toda hoja de alta o edición en móvil crece desde el botón que la abre (el FAB
 
 **Edición de un movimiento.** En móvil el detalle de un movimiento no se despliega en la lista: abre esta misma hoja como formulario (selector Compra/Venta, fecha, títulos, precio, comisión, cuenta y nota) con el total recalculado en la cabecera. Los campos van en dos columnas, con el `gap` justo, y los botones Eliminar, Cancelar y Guardar en una sola fila; Guardar es el primario. La fecha se escribe `DD/MM/AAAA`, con ese mismo texto como ayuda y `inputmode="numeric"`. Se cierra con el botón, tocando el velo o con Escape.
 
+**Agrupación de la portada de Inversión.** Junto al orden, una píldora «Por cuenta» (`NeonChoiceMenu`, «Agrupar por») cambia entre cuenta, instrumento y tipo; la elección se recuerda y se sincroniza. Por instrumento, la tabla pasa a cinco columnas (Instrumento con su tipo debajo, Cuentas, Peso, Valor, Resultado): no hay evolución porque un instrumento sumado entre cuentas no tiene cierres propios en la portada; un valor sin cotización lleva «sin precio» debajo. Por tipo, cada tipo es un encabezado en `--color-panel` (radio de tile) con sus cifras sumadas, y debajo van sus instrumentos con las mismas filas. En móvil la píldora está en la cabecera de la hoja, fuera del arrastre, y el tipo es un encabezado fino entre las filas. Con instrumento o tipo, el orden solo ofrece peso y ganancia: el cambio del periodo es de las cuentas.
+
 **Hoja arrastrable.** La hoja que lleva una lista (Inversión) se arrastra por el borde superior: hacia arriba oculta el gráfico y los chips y deja la lista a toda altura, hacia abajo vuelve; tocar el agarre también alterna. La lista hace scroll dentro de la hoja.
 
 ### Panel de detalle

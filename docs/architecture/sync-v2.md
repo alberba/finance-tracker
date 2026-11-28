@@ -160,3 +160,9 @@ Cada elemento lleva su casilla (`id`, `col`, `row`, `w`, `h`) y, en los widgets 
 un `chart: 'end'` opcional cuando la gráfica va después de las cifras; sin él va antes.
 La cola pendiente proyecta el mismo valor antes de que lo confirme el servidor. El estado y la
 copia JSON conservan el documento, y el diseño interpreta los widgets y sus tamaños mínimos.
+
+La agrupación de la portada de Inversión (`account`, `instrument` o `type`) viaja como el ajuste
+`investmentGrouping` (`user_settings.investment_grouping`, `NULL` es `account`). Es un texto con
+esos tres valores, no un documento: el comando `settingsUpdate` lo reemplaza, la cola pendiente
+lo proyecta y la copia JSON lo conserva (un valor desconocido se guarda como `NULL`). Lo escribe
+`neon/sections/investment/grouping-store.ts`.

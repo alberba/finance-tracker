@@ -152,3 +152,25 @@ test('todos los controles de la portada miden al menos 44 px con puntero táctil
   await expect(section(page).getByRole('heading', { name: 'Movimientos' })).toBeVisible()
   expect(await tooSmall(DETAIL)).toEqual([])
 })
+
+test('agrupa la lista de la portada por instrumento y abre su detalle', async ({
+  page,
+  tracker,
+}) => {
+  await holdVwceInFondos(page)
+  await tracker.openInvestment()
+  const accounts = section(page).locator('[data-investment-accounts]')
+  await expect(accounts.getByRole('heading', { name: 'Cuentas' })).toBeVisible()
+
+  await accounts.getByRole('button', { name: 'Por cuenta' }).click()
+  await page
+    .getByRole('menu', { name: 'Agrupar por' })
+    .getByRole('menuitemradio', { name: 'Instrumento' })
+    .click()
+  await expect(accounts.getByRole('heading', { name: 'Instrumentos' })).toBeVisible()
+  await expect(accounts.locator('[data-investment-account]')).toHaveCount(0)
+
+  await accounts.getByRole('button', { name: 'Ver VWCE' }).click()
+  await expect(page).toHaveURL(/\/inversion\?instrumento=[^&]+$/)
+  await expect(section(page).getByRole('heading', { name: 'Posiciones' })).toBeVisible()
+})

@@ -531,6 +531,29 @@ describe('GET /api/data/export + POST /api/data/import', () => {
     },
   )
 
+  it('restores how the cover of Inversión is grouped, and drops a grouping that does not exist', async () => {
+    const { POST } = await import('../../../../src/pages/api/data/import')
+    const url = new URL('https://example.test/api/data/import?mode=replace')
+    const restore = (investmentGrouping: string) =>
+      POST({
+        request: postJson(url.href, { settings: { investmentGrouping } }),
+        locals: { principal },
+        url,
+      } as never)
+
+    expect((await restore('instrument')).status).toBe(200)
+    expect(
+      (await runWithDb(testDb.db, userSettingsRepository.get(principal.userId)))
+        ?.investmentGrouping,
+    ).toBe('instrument')
+
+    expect((await restore('broker')).status).toBe(200)
+    expect(
+      (await runWithDb(testDb.db, userSettingsRepository.get(principal.userId)))
+        ?.investmentGrouping,
+    ).toBeNull()
+  })
+
   it('preserves completed onboarding when replacement has no settings', async () => {
     await runWithDb(
       testDb.db,

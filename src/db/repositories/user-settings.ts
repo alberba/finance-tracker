@@ -1,6 +1,7 @@
 /** `user_settings` repository (WP6) — one row per user, currency/locale/theme prefs. */
 
 import type { DashboardLayoutPreference } from '../../lib/dashboard-layout'
+import type { InvestmentGrouping } from '../../lib/investment-grouping'
 
 import { and, eq } from 'drizzle-orm'
 import { lift } from '../database'
@@ -14,6 +15,7 @@ export interface CreateUserSettingsInput {
   locale?: string | null
   theme?: string | null
   dashboardLayout?: DashboardLayoutPreference | null
+  investmentGrouping?: InvestmentGrouping | null
   onboardingPresented?: boolean
   onboardingDismissed?: boolean
   onboardingCompleted?: boolean
@@ -29,6 +31,7 @@ export interface UpdateUserSettingsInput {
   locale?: string | null
   theme?: string | null
   dashboardLayout?: DashboardLayoutPreference | null
+  investmentGrouping?: InvestmentGrouping | null
   onboardingPresented?: boolean
   onboardingDismissed?: boolean
   onboardingCompleted?: boolean
@@ -58,6 +61,7 @@ async function createSql(
       locale: input.locale ?? null,
       theme: input.theme ?? null,
       dashboardLayout: input.dashboardLayout ?? null,
+      investmentGrouping: input.investmentGrouping ?? null,
       onboardingPresented: input.onboardingPresented ? 1 : 0,
       onboardingDismissed: input.onboardingDismissed ? 1 : 0,
       onboardingCompleted: input.onboardingCompleted ? 1 : 0,
@@ -91,6 +95,10 @@ async function updateSql(
       theme: input.theme === undefined ? existing.theme : input.theme,
       dashboardLayout:
         input.dashboardLayout === undefined ? existing.dashboardLayout : input.dashboardLayout,
+      investmentGrouping:
+        input.investmentGrouping === undefined
+          ? existing.investmentGrouping
+          : input.investmentGrouping,
       stockeventsEnabled:
         input.stockeventsEnabled === undefined
           ? existing.stockeventsEnabled
