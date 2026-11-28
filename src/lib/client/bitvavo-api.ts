@@ -16,7 +16,7 @@ export class BitvavoRequestError extends Data.TaggedError('BitvavoRequestError')
 
 export const requestBitvavo = <T>(
   body?: object,
-  method: 'GET' | 'POST' | 'PUT' = 'POST',
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'POST',
 ): Effect.Effect<T, BitvavoRequestError, ClientHttp> =>
   Effect.gen(function* () {
     const response = yield* sendRequest('/api/integrations/bitvavo', {

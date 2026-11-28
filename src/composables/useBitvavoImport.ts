@@ -1,5 +1,9 @@
 import { computed, reactive, shallowRef } from 'vue'
-import type { BitvavoPreview } from '../lib/bitvavo-types'
+import type {
+  BitvavoConnectionState,
+  BitvavoPreview,
+  BitvavoSyncCounts,
+} from '../lib/bitvavo-types'
 import { runClientHttp } from '../lib/client/runtime'
 import { requestBitvavo } from '../lib/client/bitvavo-api'
 import { useSyncStore } from '../stores/sync'
@@ -15,6 +19,7 @@ export function useBitvavoImport() {
   })
   const destinations = shallowRef<Array<{ id: string; name: string }>>([])
   const configured = shallowRef(false)
+  const connection = shallowRef<BitvavoConnectionState | null>(null)
   const busy = shallowRef(false)
   const error = shallowRef('')
   const notice = shallowRef('')
@@ -31,7 +36,7 @@ export function useBitvavoImport() {
 
   function request<T = Record<string, unknown>>(
     body?: object,
-    method: 'GET' | 'POST' | 'PUT' = 'POST',
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'POST',
   ): Promise<T> {
     return runClientHttp(requestBitvavo<T>(body, method))
   }
@@ -49,32 +54,66 @@ export function useBitvavoImport() {
       busy.value = false
     }
   }
+  async function refresh() {
+    const result = await request<{
+      configured: boolean
+      destinations?: Array<{ id: string; name: string }>
+      connection?: BitvavoConnectionState | null
+    }>(undefined, 'GET')
+    configured.value = result.configured
+    destinations.value = result.destinations || []
+    connection.value = result.connection ?? null
+    if (result.connection)
+      Object.assign(form, {
+        accountId: result.connection.accountId,
+        startDate: result.connection.startDate,
+        timeZone: result.connection.timeZone,
+      })
+  }
   async function load() {
-    await perform(async () => {
-      const result = await request<{
-        configured: boolean
-        destinations?: Array<{ id: string; name: string }>
-        connection?: { accountId: string; startDate: string; timeZone: string }
-      }>(undefined, 'GET')
-      configured.value = result.configured
-      destinations.value = result.destinations || []
-      if (result.connection)
-        Object.assign(form, {
-          accountId: result.connection.accountId,
-          startDate: result.connection.startDate,
-          timeZone: result.connection.timeZone,
-        })
-    })
+    await perform(refresh)
   }
   async function connect() {
     await perform(async () => {
       await sync.flush()
-      await request({ ...form }, 'PUT')
+      // Empty key fields keep the stored credential.
+      const { apiKey, apiSecret, ...settings } = form
+      const replacing = Boolean(apiKey || apiSecret)
+      await request({ ...settings, ...(replacing ? { apiKey, apiSecret } : {}) }, 'PUT')
       form.apiKey = ''
       form.apiSecret = ''
-      configured.value = true
       preview.value = null
-      notice.value = 'Conexión validada. Las credenciales se han cifrado en el servidor.'
+      await refresh()
+      // A zone change rewrites the local date and time of imported movements.
+      await sync.refreshFromServer()
+      notice.value = replacing
+        ? 'Conexión validada. Las credenciales se han cifrado en el servidor.'
+        : 'Configuración guardada.'
+    })
+  }
+  /** Runs a sync and always reloads the state, so a failure shows as the last attempt. */
+  async function runSync(action: 'sync' | 'retrySkipped') {
+    await perform(async () => {
+      await sync.flush()
+      try {
+        const result = await request<{ counts: BitvavoSyncCounts }>({ action })
+        await sync.refreshFromServer()
+        const { created, updated, unchanged, skipped } = result.counts
+        notice.value = `Sincronización completada: ${created} creadas, ${updated} actualizadas, ${unchanged} sin cambios y ${skipped} omitidas.`
+      } finally {
+        await refresh().catch(() => undefined)
+      }
+    })
+  }
+  const synchronize = () => runSync('sync')
+  const retrySkipped = () => runSync('retrySkipped')
+  async function disconnect() {
+    await perform(async () => {
+      await request(undefined, 'DELETE')
+      configured.value = false
+      connection.value = null
+      preview.value = null
+      notice.value = 'Bitvavo desconectado. Los movimientos importados se conservan.'
     })
   }
   async function generatePreview() {
@@ -99,12 +138,14 @@ export function useBitvavoImport() {
       await sync.refreshFromServer()
       notice.value = `${result.imported} movimientos importados. Los campos financieros están gobernados por Bitvavo.`
       preview.value = null
+      await refresh()
     })
   }
   return {
     form,
     destinations,
     configured,
+    connection,
     busy,
     error,
     notice,
@@ -115,5 +156,8 @@ export function useBitvavoImport() {
     connect,
     generatePreview,
     confirm,
+    synchronize,
+    retrySkipped,
+    disconnect,
   }
 }

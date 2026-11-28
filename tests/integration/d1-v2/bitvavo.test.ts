@@ -140,7 +140,9 @@ it('resumes a partial failure without advancing the cursor or duplicating comple
   testDb.sqlite.exec('DROP TRIGGER fail_sale')
   await runServer(testDb.db, confirmBitvavo(user.id, preview.id, []))
   expect((await runWithDb(testDb.db, buildBootstrapPayload(user.id))).transactions).toHaveLength(2)
-  expect((await runWithDb(testDb.db, bitvavo.getConnection(user.id)))?.cursor).toBe(preview.to)
+  expect((await runWithDb(testDb.db, bitvavo.getConnection(user.id)))?.cursor).toBe(
+    Date.parse('2020-01-01T00:01:00.000Z'),
+  )
   const changes = await runWithDb(testDb.db, sync.listChangesSince(user.id, 0))
   expect(changes).toHaveLength(2)
   expect(JSON.parse(changes[1].payload!).remoteOperation.fee).toBe('0.14748650471')

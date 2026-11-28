@@ -1,7 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import fixture from './fixtures/bitvavo-real-sanitized.json'
 import { Effect } from 'effect'
-import { fetchBitvavoHistory, InvalidCredential } from '../../src/lib/server/bitvavo/client'
+import {
+  fetchBitvavoHistory,
+  InvalidCredential,
+  localDateTime,
+} from '../../src/lib/server/bitvavo/client'
 import { Http } from '../../src/lib/server/http'
 
 const history = (
@@ -44,9 +48,7 @@ describe('Bitvavo account history', () => {
     const http = vi
       .fn<typeof fetch>()
       .mockResolvedValue(new Response('test-secret', { status: 401 }))
-    await expect(history(credentials, range, http)).rejects.toBeInstanceOf(
-      InvalidCredential,
-    )
+    await expect(history(credentials, range, http)).rejects.toBeInstanceOf(InvalidCredential)
     expect(http).toHaveBeenCalledTimes(1)
   })
 
@@ -92,7 +94,9 @@ describe('Bitvavo account history', () => {
       }),
     )
     const result = await history(credentials, range, http)
-    expect(result.incompatible).toEqual([{ externalId: operation.transactionId, reason }])
+    expect(result.incompatible).toEqual([
+      { externalId: operation.transactionId, executedAt: operation.executedAt, reason },
+    ])
   })
 
   it('rejects repeated external identities rather than silently closing an incomplete preview', async () => {
@@ -116,5 +120,21 @@ describe('Bitvavo account history', () => {
     )
     const localRange = { ...range, startDate: '2020-01-02' }
     expect((await history(credentials, localRange, http)).incompatible).toEqual([])
+  })
+})
+
+describe('local date and time of a remote instant', () => {
+  it.each([
+    // Midnight edge: still the previous day in New York, already the next in Madrid.
+    ['2024-01-01T04:30:00.000Z', 'America/New_York', '2023-12-31', '23:30:00'],
+    ['2023-12-31T23:30:00.000Z', 'Europe/Madrid', '2024-01-01', '00:30:00'],
+    // Spring forward in Madrid: 02:00 local does not exist, 01:00Z is 03:00 CEST.
+    ['2024-03-31T00:59:59.000Z', 'Europe/Madrid', '2024-03-31', '01:59:59'],
+    ['2024-03-31T01:00:00.000Z', 'Europe/Madrid', '2024-03-31', '03:00:00'],
+    // Fall back: the same local hour happens twice, each from its own instant.
+    ['2024-10-27T00:30:00.000Z', 'Europe/Madrid', '2024-10-27', '02:30:00'],
+    ['2024-10-27T01:30:00.000Z', 'Europe/Madrid', '2024-10-27', '02:30:00'],
+  ])('%s in %s is %s %s', (instant, zone, date, time) => {
+    expect(localDateTime(Date.parse(instant), zone)).toEqual({ date, time })
   })
 })
