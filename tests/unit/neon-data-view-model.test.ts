@@ -239,7 +239,7 @@ describe('Bitvavo preview', () => {
       operation('c', { alreadyImported: true }),
       operation('d', { candidates: [{ id: 't', description: 'Compra BTC', date: '2026-03-01' }] }),
     ],
-    [{ externalId: 'x', reason: 'Divisa no compatible' }],
+    [{ externalId: 'x', executedAt: null, reason: 'Divisa no compatible' }],
   )
 
   it('splits what is found into new, duplicate and to resolve', () => {

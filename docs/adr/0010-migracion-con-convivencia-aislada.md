@@ -19,7 +19,7 @@ solo golpe:
 - **Frontera física.** Todo lo nuevo (componentes, secciones, view-models, stores de presentación y
   estilos) vive en `src/neon/`. Lo antiguo se queda donde está, el árbol `components/` y `styles/`,
   y se trata como legacy en bloque.
-- **Frontera vigilada por lint.** `pnpm lint` falla si el árbol nuevo importa del antiguo o al
+- **Frontera vigilada por lint.** `bun run lint` falla si el árbol nuevo importa del antiguo o al
   revés, y si el código compartido (dominio, sync, stores, configuración, libs, tipos) importa de
   cualquiera de los dos. La regla vive en `scripts/lib/eslint-design-boundary.ts`.
 - **Puntos de unión con nombre.** Solo cuatro sitios pueden cruzar, y están listados en esa misma

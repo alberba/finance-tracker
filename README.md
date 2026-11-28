@@ -1,4 +1,4 @@
-# Finance Tracker (Astro + pnpm)
+# Finance Tracker (Astro + bun)
 
 Tracker financiero web para presupuestos, patrimonio, inversiones y objetivos.
 
@@ -29,11 +29,11 @@ Tracker financiero web para presupuestos, patrimonio, inversiones y objetivos.
 ## Ejecutar en OrbStack (Docker)
 
 ```sh
-pnpm local:setup
-pnpm local:up
+bun run local:setup
+bun run local:up
 ```
 
-`local:up` usa Astro en desarrollo con hot reload; `pnpm local:up:prod` prueba la compilación de producción.
+`local:up` usa Astro en desarrollo con hot reload; `bun run local:up:prod` prueba la compilación de producción.
 Abre la URL que muestra `local:up` y usa el correo y la contraseña de `.env.selfhost`.
 Cada worktree usa su propio puerto y volumen; el checkout principal usa el puerto 4321.
 SQLite se guarda en un volumen persistente. `local:up` usa el target `development`; `local:up:prod` usa la imagen de producción (Oracle).
@@ -42,12 +42,12 @@ Consulta [la guía de ejecución local y self-hosting](docs/operations/self-host
 ## Ejecutar en local (Astro)
 
 ```bash
-pnpm install
-pnpm setup:worktree
-pnpm dev
+bun install
+bun run setup:worktree
+bun run dev
 ```
 
-`pnpm setup:worktree` crea `.dev.vars` (con el atajo de autenticación de test) y aplica las
+`bun run setup:worktree` crea `.dev.vars` (con el atajo de autenticación de test) y aplica las
 migraciones D1 locales de v2. Sirve igual en el checkout principal que en un worktree.
 
 En local `http://localhost:4321` carga, pero sus llamadas a `/api/*` responden 401 sin sesión de
@@ -63,7 +63,7 @@ Configura el símbolo de cada activo en la columna «Cotización» de `Configura
 
 `MARKET_DATA_PROVIDER`, `MARKET_QUOTE_STALE_MINUTES` y `MARKET_QUOTE_CACHE_SECONDS` son variables públicas de runtime (en producción, del `.env`; en desarrollo, de `wrangler.toml`). La caché local está en 300 segundos para no consumir créditos innecesariamente en el plan gratuito. Los vencimientos de reglas se generan al abrir la aplicación y permanecen fuera de balances hasta confirmarlos.
 
-Para probar Yahoo en local, ejecuta `pnpm setup:worktree` y arranca `pnpm dev`; no hace falta configurar una API key. El símbolo visible y el ticker de consulta son independientes: puedes mostrar `BTC` y consultar `BTC-EUR`. Cada resultado y el ticker elegido tienen un enlace a su ficha de Yahoo para comprobar el activo, el mercado y la moneda antes de guardarlo. Ambos símbolos, el proveedor y los títulos manuales se sincronizan por usuario y sobreviven a las recargas.
+Para probar Yahoo en local, ejecuta `bun run setup:worktree` y arranca `bun run dev`; no hace falta configurar una API key. El símbolo visible y el ticker de consulta son independientes: puedes mostrar `BTC` y consultar `BTC-EUR`. Cada resultado y el ticker elegido tienen un enlace a su ficha de Yahoo para comprobar el activo, el mercado y la moneda antes de guardarlo. Ambos símbolos, el proveedor y los títulos manuales se sincronizan por usuario y sobreviven a las recargas.
 
 Los precios se refrescan cada cinco minutos mientras la aplicación está visible y conectada. Las peticiones se cachean y deduplican, y se conserva el último precio válido si falla el proveedor. La fecha mostrada corresponde al dato de mercado; se marca como retrasado si Yahoo declara retraso o el precio es antiguo. Yahoo es una fuente no oficial y su disponibilidad, cobertura y retraso dependen del mercado: actualizar el panel no convierte un dato retrasado en tiempo real. La licencia MIT de la librería no sustituye las condiciones de uso de los datos de Yahoo.
 
@@ -92,13 +92,13 @@ Al cambiar `src/db/schema/`, la migración v2 se escribe a mano en `migrations-v
 Aplicar migraciones:
 
 ```bash
-pnpm d1:migrate:local:v2    # v2, local (tests y E2E)
+bun run d1:migrate:local:v2    # v2, local (tests y E2E)
 ```
 
 Si cambias `wrangler.toml`, regenera tipos:
 
 ```bash
-pnpm cf:types
+bun run cf:types
 ```
 
 ### 2) Despliegue
@@ -106,8 +106,8 @@ pnpm cf:types
 Producción corre en un servidor propio (Oracle ARM) con Docker, detrás de Nginx Proxy
 Manager; la base es SQLite en un volumen. Cloudflare Workers y D1 ya no se usan en
 producción: los pasos están en [self-hosting](docs/operations/self-hosting.md#producción-en-oracle).
-El `wrangler.toml` de la raíz solo sirve ya para desarrollo, `pnpm preview` y los tests
-(workerd + D1 local); `.node-version` y `packageManager` fijan Node y pnpm.
+El `wrangler.toml` de la raíz solo sirve ya para desarrollo, `bun run preview` y los tests
+(workerd + D1 local); `.node-version` y `packageManager` fijan Node y bun (gestor de paquetes; el runtime es Node).
 
 ### 3) Autenticación integrada
 
@@ -118,8 +118,8 @@ peticiones y no existe un selector de protocolo de persistencia.
 ## Validación
 
 ```bash
-pnpm build
-pnpm check
+bun run build
+bun run check
 ```
 
 ## Sentry
@@ -159,24 +159,24 @@ de una respuesta de proveedor aunque su stack sí viaje.
 
 ```bash
 # Bucle local rápido: unitarias, componentes e integración
-pnpm test
+bun run test
 
 # Capas individuales
-pnpm test:unit
-pnpm test:component
-pnpm test:integration
+bun run test:unit
+bun run test:component
+bun run test:integration
 
 # Instalar navegador E2E (una vez)
-pnpm test:e2e:install
+bun run test:e2e:install
 
 # E2E tests
-pnpm test:e2e
+bun run test:e2e
 
 # Smoke rápido durante desarrollo
-pnpm test:e2e:smoke
+bun run test:e2e:smoke
 
 # Sincronización v2
-pnpm test:e2e:sync-v2
+bun run test:e2e:sync-v2
 ```
 
 Estructura de tests:
@@ -238,7 +238,7 @@ El alta guarda una fila de propiedad en `issue_reports` y el acuse enlaza a **Mi
 principal cuando el reporte se cierra como duplicada (hasta tres saltos) y permite añadir, editar y
 borrar aclaraciones propias con adjuntos. GitHub sigue siendo la fuente de verdad del estado; no hay
 sondeos ni caché de estado en el servidor. Un fallo al registrar la propiedad devuelve `201` con
-`tracked: false` y el reporte se recupera con `pnpm reports:backfill`.
+`tracked: false` y el reporte se recupera con `bun run reports:backfill`.
 
 La skill `create-issue` se instala con `npx skills` en `.agents/skills/create-issue/` (fijada en
 `skills-lock.json`) y OpenCode la descubre desde ahí. Para adoptar cambios de la skill, actualízala
@@ -259,7 +259,7 @@ posterior, es efímero y tiene `issues:write` en este repositorio. El cuerpo ori
 `### Reportero`) se guarda fuera del workspace y solo lo usa el script de publicación; el agente no
 lo ve. Si el agente escribe `body.md`, el script elimina cualquier `### Reportero` inyectado, añade
 al final el bloque auténtico y completa los adjuntos, imágenes y contexto que falten, de modo que
-`pnpm reports:backfill` sigue leyendo el identificador correcto. El script escapa imágenes y HTML
+`bun run reports:backfill` sigue leyendo el identificador correcto. El script escapa imágenes y HTML
 en todo el texto, también en código; solo reinserta imágenes inline exactas del cuerpo original con
 URL `user-attachments` o `assets` del repositorio, nunca referencias, y no reescribe los enlaces
 normales (incluidos `localhost`, enlaces del reportero y `user-attachments`). Las menciones se

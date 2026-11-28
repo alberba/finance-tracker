@@ -12,18 +12,18 @@ runtimes. Los tres conservan usuarios aislados y las APIs reales de inicializaci
 ## Comandos
 
 ```bash
-pnpm test:all               # Vitest + funcional + sync-v2 + auth; máximo 360 s
-pnpm test:e2e:install       # instala Chromium una vez
-pnpm test:e2e:smoke         # recorridos críticos etiquetados @smoke
-pnpm test:e2e               # funcional
-pnpm test:e2e:shuffle       # funcional, en orden aleatorio; imprime la semilla
-pnpm test:e2e:install:all   # instala también Firefox y WebKit
-pnpm test:e2e:cross-browser # smoke opcional en Firefox y WebKit
-pnpm test:e2e:webmcp       # herramientas de la app, en Chromium experimental
-pnpm test:e2e:shard 1/4    # shard funcional equilibrado por tiempos históricos
-pnpm test:e2e:sync-v2       # offline, multiusuario y comandos de sync
-pnpm test:e2e:headed        # navegador visible sobre el build Node
-pnpm test:e2e:ui            # interfaz interactiva de Playwright
+bun run test:all               # Vitest + funcional + sync-v2 + auth; máximo 360 s
+bun run test:e2e:install       # instala Chromium una vez
+bun run test:e2e:smoke         # recorridos críticos etiquetados @smoke
+bun run test:e2e               # funcional
+bun run test:e2e:shuffle       # funcional, en orden aleatorio; imprime la semilla
+bun run test:e2e:install:all   # instala también Firefox y WebKit
+bun run test:e2e:cross-browser # smoke opcional en Firefox y WebKit
+bun run test:e2e:webmcp       # herramientas de la app, en Chromium experimental
+bun run test:e2e:shard 1/4    # shard funcional equilibrado por tiempos históricos
+bun run test:e2e:sync-v2       # offline, multiusuario y comandos de sync
+bun run test:e2e:headed        # navegador visible sobre el build Node
+bun run test:e2e:ui            # interfaz interactiva de Playwright
 ```
 
 `test:all` ejecuta Vitest en el host y los navegadores en la imagen Linux oficial de Playwright,
@@ -44,24 +44,24 @@ por fase, las fases fallidas y la carga media de la máquina (al empezar y al ac
 `.scratch/test-suite/last-run.json`; los tiempos de navegador están en `browser-run.json`.
 También conserva un JSON fechado por invocación para demostrar ejecuciones consecutivas y, junto a
 él, la salida completa de cada fase (`<fecha>-<fase>.log`): un fallo se diagnostica desde ahí.
-No incluye lint/typecheck: para el gate de contribución sigue aplicando `pnpm gate`.
+No incluye lint/typecheck: para el gate de contribución sigue aplicando `bun run gate`.
 Los comandos acotados sirven para iterar.
 
 Para probar una URL ya arrancada:
 
 ```bash
-PLAYWRIGHT_BASE_URL=http://127.0.0.1:<puerto> pnpm test:e2e:smoke
+PLAYWRIGHT_BASE_URL=http://127.0.0.1:<puerto> bun run test:e2e:smoke
 ```
 
-Para buscar dependencias accidentales entre escenarios, usa `pnpm test:e2e:shuffle`. Repite el
-orden pasando la semilla que imprime Playwright: `pnpm test:e2e:shuffle 271828182`. También puedes
-acotar la comprobación a smoke: `pnpm test:e2e:smoke --shuffle 271828182`.
+Para buscar dependencias accidentales entre escenarios, usa `bun run test:e2e:shuffle`. Repite el
+orden pasando la semilla que imprime Playwright: `bun run test:e2e:shuffle 271828182`. También puedes
+acotar la comprobación a smoke: `bun run test:e2e:smoke --shuffle 271828182`.
 
 Firefox y WebKit están configurados con `default: false`: las ejecuciones habituales conservan
-Chromium y Pixel 5. Tras instalar los navegadores con `pnpm test:e2e:install:all`, selecciona uno
-con `pnpm test:e2e --project=firefox` o `pnpm test:e2e --project=webkit`. Los proyectos opcionales
+Chromium y Pixel 5. Tras instalar los navegadores con `bun run test:e2e:install:all`, selecciona uno
+con `bun run test:e2e --project=firefox` o `bun run test:e2e --project=webkit`. Los proyectos opcionales
 comparten los escenarios de desktop.
-`pnpm test:e2e --project='*'` incluye todos los proyectos.
+`bun run test:e2e --project='*'` incluye todos los proyectos.
 
 ## Estabilidad
 
@@ -84,7 +84,7 @@ comparten los escenarios de desktop.
 Si una prueba falla, abre `playwright-report/index.html`. Las trazas se inspeccionan con:
 
 ```bash
-pnpm exec playwright show-trace test-results/ruta-a-trace.zip
+bunx playwright show-trace test-results/ruta-a-trace.zip
 ```
 
 ## CI
@@ -118,7 +118,7 @@ código, configuración o contenido ejecutable requieren gate y smoke en secuenc
 Los jobs de navegador corren en `ubuntu-latest` e instalan con `playwright install --with-deps` el
 Chromium que corresponde a `@playwright/test` en el lockfile: no hay etiqueta de imagen que
 actualizar, así que un bump del paquete trae su navegador solo. Las fuentes de la interfaz se sirven
-desde `public/fonts`, así que el render no depende de las fuentes del sistema. El setup común (pnpm,
+desde `public/fonts`, así que el render no depende de las fuentes del sistema. El setup común (bun,
 Node, install con lockfile, incluido el addon SQLite precompilado, y la caché de Chromium por
 versión de Playwright) vive en `.github/actions/setup`. El job final comprueba el tiempo desde el
 inicio del workflow, incluida la preparación y espera de runners, contra el presupuesto de
@@ -130,7 +130,7 @@ en `tests/e2e/functional-durations.json` viene del CI #37229326363 (commit `b40f
 contiene milisegundos totales y número de casos. `scripts/e2e-functional-shard.ts` descubre los
 specs actuales con Playwright y estima los nuevos con la media por caso, de modo que añadir un
 spec no requiere registrarlo para que corra. Para recalibrar, combina los blob reports con
-`pnpm exec playwright merge-reports --reporter json <directorio>` y actualiza los totales por spec.
+`bunx playwright merge-reports --reporter json <directorio>` y actualiza los totales por spec.
 
 El artifact `playwright-report` combina los blob reports cuando falla funcional o sync.
 Las ejecuciones anteriores de la misma rama se cancelan y los artifacts se conservan siete días.
@@ -144,7 +144,7 @@ procesos a cada consulta y la importación hace muchas. Los recorridos de produc
 SQLite transaccional del runtime de producción; Worker/D1 sigue cubierto por sync y auth.
 Los runtimes de navegador corren en paralelo, con puertos, bases, builds y cachés independientes.
 
-Después de cambiar la infraestructura, ejecuta una vez `pnpm test:all` y una vez Browser regression
+Después de cambiar la infraestructura, ejecuta una vez `bun run test:all` y una vez Browser regression
 sobre el mismo commit. Guarda resultados, duración y enlace de CI; un retry exitoso no cuenta como
 estabilidad. Los 360 s son de reloj: ejecuta la local con la máquina libre (otra sesión corriendo
 Vitest basta para romperla) y comprueba la carga que anota el informe. Si local y CI discrepan,
@@ -154,30 +154,30 @@ repetidos, la capa de prueba y el aislamiento antes de modificar concurrencia.
 ## Worktrees
 
 - Antes de probar un worktree nuevo o después de cambiar de rama/lockfile, ejecuta
-  `pnpm setup:worktree`: sincroniza dependencias con `--frozen-lockfile`, prepara `.dev.vars`
+  `bun run setup:worktree`: sincroniza dependencias con `--frozen-lockfile`, prepara `.dev.vars`
   y aplica migraciones. El setup también sincroniza un `node_modules` que ya exista.
   Sin `TEST_AUTH_ENABLED`, las llamadas de autenticación de test no inicializan el usuario aislado.
   Las identidades de prueba no tienen privilegios especiales de propietario.
-- `pnpm test:e2e` arranca su propio servidor (`reuseExistingServer: false`) en un puerto derivado
+- `bun run test:e2e` arranca su propio servidor (`reuseExistingServer: false`) en un puerto derivado
   de la ruta del worktree. En CI usa 4321 (4322 para sync-v2). Para un servidor ya arrancado,
   pásalo con `PLAYWRIGHT_BASE_URL`.
 - Las compilaciones y las cachés Vite de los tests viven en `.scratch/`, separadas de `dist/` y
   del dev server del usuario. Las bases de datos son temporales por invocación y se borran al salir.
   D1 usa tmpfs en Linux para evitar fsync por fila al preparar datos; los contenedores reservan 1 GiB
   de memoria compartida. `PLAYWRIGHT_STORAGE_DIR` permite elegir otro directorio temporal.
-- El Worker de auth tiene su propia caché y compilación. No pares el `pnpm dev` del usuario.
+- El Worker de auth tiene su propia caché y compilación. No pares el `bun run dev` del usuario.
 
 Para saber si un fallo ya existía, lanza el spec en un worktree de `main`; `git stash` usa una
 pila compartida entre worktrees y no se toca:
 
 ```bash
-git worktree add ../baseline main && cd ../baseline && pnpm setup:worktree
-pnpm test:e2e tests/e2e/<spec>.spec.ts
+git worktree add ../baseline main && cd ../baseline && bun run setup:worktree
+bun run test:e2e tests/e2e/<spec>.spec.ts
 ```
 
-Playwright comprueba que `node_modules/.pnpm/lock.yaml` coincide con el lockfile del repositorio
-antes de lanzar tests. `pnpm check:deps` permite comprobarlo sin abrir un navegador; si falla,
-ejecuta `pnpm install --frozen-lockfile`.
+Playwright comprueba que `node_modules/.installed-bun.lock` (copia de `bun.lock` que graba el `postinstall`) coincide con el lockfile del repositorio
+antes de lanzar tests. `bun run check:deps` permite comprobarlo sin abrir un navegador; si falla,
+ejecuta `bun install --frozen-lockfile`.
 
 ## WebMCP
 
@@ -201,11 +201,11 @@ sesión, la navegación al login elimina las herramientas del documento anterior
 Con el CLI incluido en Playwright, abre la app y luego consulta sus herramientas:
 
 ```bash
-pnpm exec playwright cli open 'http://127.0.0.1:4321/dashboard?demo=1'
-pnpm exec playwright cli webmcp-list
-pnpm exec playwright cli webmcp-call search_movements --params '{"query":"comida","limit":10}'
-pnpm exec playwright cli webmcp-call get_month_totals --params '{"year":2026,"month":1}'
-pnpm exec playwright cli webmcp-call get_budget
+bunx playwright cli open 'http://127.0.0.1:4321/dashboard?demo=1'
+bunx playwright cli webmcp-list
+bunx playwright cli webmcp-call search_movements --params '{"query":"comida","limit":10}'
+bunx playwright cli webmcp-call get_month_totals --params '{"year":2026,"month":1}'
+bunx playwright cli webmcp-call get_budget
 ```
 
 Usa el puerto real de tu dev server. El MCP y CLI de Playwright habilitan WebMCP por defecto.

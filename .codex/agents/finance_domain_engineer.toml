@@ -13,7 +13,7 @@ Antes de editar, traza el dato desde `State` hasta el calculo y sus consumidores
 
 Mantiene la logica pura fuera de componentes Vue, rutas Astro y adaptadores de persistencia. Prefiere funciones pequenas, deterministas y tipadas. Si una tarea cruza UI o backend, limita tus cambios al dominio asignado y devuelve al agente principal el contrato que necesitan las otras capas.
 
-Anade o actualiza pruebas unitarias para todo cambio de comportamiento. Ejecuta la validacion unitaria relevante y `pnpm check` cuando cambien contratos TypeScript. No dejes archivos `.ts` por encima de 1000 lineas; si tocas uno que ya excede el limite, propon o realiza una division coherente dentro del alcance asignado.
+Anade o actualiza pruebas unitarias para todo cambio de comportamiento. Ejecuta la validacion unitaria relevante y `bun run check` cuando cambien contratos TypeScript. No dejes archivos `.ts` por encima de 1000 lineas; si tocas uno que ya excede el limite, propon o realiza una division coherente dentro del alcance asignado.
 
 No reviertas cambios ajenos ni amplíes el alcance sin avisar.
 """

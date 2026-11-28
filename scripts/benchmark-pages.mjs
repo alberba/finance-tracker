@@ -7,7 +7,7 @@
  * data so both reports are comparable.
  *
  * Usage:
- *   BENCHMARK_BASE_URL=http://127.0.0.1:4322 pnpm benchmark:pages
+ *   BENCHMARK_BASE_URL=http://127.0.0.1:4322 bun run benchmark:pages
  *
  * A cold context is created per iteration. The dashboard loads first, then the
  * sections are opened in order; each section is measured on its first visit so
@@ -34,7 +34,7 @@ const sections = [
 ]
 
 function median(values) {
-  const sorted = [...values].sort((left, right) => left - right)
+  const sorted = values.toSorted((left, right) => left - right)
   const middle = Math.floor(sorted.length / 2)
   return sorted.length % 2 === 0 ? (sorted[middle - 1] + sorted[middle]) / 2 : sorted[middle]
 }

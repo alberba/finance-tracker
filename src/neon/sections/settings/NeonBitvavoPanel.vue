@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed, shallowRef, watch } from 'vue'
 
 import { useBitvavoImport } from '../../../composables/useBitvavoImport'
 import {
@@ -10,17 +10,21 @@ import {
   formatTime,
 } from '../../../lib/format'
 import NeonButton from '../../ui/NeonButton.vue'
+import NeonConfirmDialog from '../../ui/NeonConfirmDialog.vue'
 import NeonDetailPanel from '../../ui/NeonDetailPanel.vue'
+import { bitvavoCounters, bitvavoStamp, bitvavoStatus, skippedWhen } from './bitvavo-status'
 
 // Bitvavo: connects the account with a read-only key, prepares a preview of
 // its purchases and sales in euros and imports them once every possible
-// duplicate is resolved.
+// duplicate is resolved. After that first import the panel synchronizes:
+// state of the last attempt, counters, skipped operations and disconnection.
 const open = defineModel<boolean>('open', { required: true })
 
 const {
   form,
   destinations,
   configured,
+  connection,
   busy,
   error,
   notice,
@@ -31,7 +35,15 @@ const {
   connect,
   generatePreview,
   confirm,
+  synchronize,
+  retrySkipped,
+  disconnect,
 } = useBitvavoImport()
+
+const imported = computed(() => Boolean(connection.value?.imported))
+const status = computed(() => (connection.value ? bitvavoStatus(connection.value) : null))
+const counters = computed(() => (connection.value ? bitvavoCounters(connection.value) : []))
+const confirmingDisconnect = shallowRef(false)
 
 const purchases = computed(
   () => preview.value?.operations.filter((op) => op.side === 'buy').length ?? 0,
@@ -64,23 +76,42 @@ const LABEL = 'text-muted grid min-w-0 gap-1.5 text-meta font-bold'
       negociación ni retiradas.
     </p>
     <form id="neon-bitvavo-form" class="grid gap-4" autocomplete="off" @submit.prevent="connect">
-      <details :open="!configured" class="grid gap-4">
+      <details :open="!configured || connection?.needsAttention" class="grid gap-4">
         <summary class="cursor-pointer text-[16px] font-bold">
-          {{ configured ? 'Actualizar conexión' : 'Conectar cuenta' }}
+          {{
+            !configured
+              ? 'Conectar cuenta'
+              : connection?.needsAttention
+                ? 'Reemplazar la clave'
+                : 'Actualizar conexión'
+          }}
         </summary>
         <fieldset :disabled="busy" class="grid gap-4 pbs-4">
           <legend class="sr-only">Configuración Bitvavo</legend>
+          <p v-if="configured" class="text-muted text-meta">
+            Deja la clave y el secreto vacíos para conservar la clave guardada.
+          </p>
           <label :class="LABEL">
             API key
-            <input v-model="form.apiKey" type="password" required :class="FIELD" />
+            <input
+              v-model="form.apiKey"
+              type="password"
+              :required="!configured || Boolean(form.apiSecret)"
+              :class="FIELD"
+            />
           </label>
           <label :class="LABEL">
             Secreto API
-            <input v-model="form.apiSecret" type="password" required :class="FIELD" />
+            <input
+              v-model="form.apiSecret"
+              type="password"
+              :required="!configured || Boolean(form.apiKey)"
+              :class="FIELD"
+            />
           </label>
           <label :class="LABEL">
             Cuenta de destino
-            <select v-model="form.accountId" required :class="FIELD">
+            <select v-model="form.accountId" required :disabled="imported" :class="FIELD">
               <option value="">Selecciona una cuenta EUR</option>
               <option v-for="account in destinations" :key="account.id" :value="account.id">
                 {{ account.name }}
@@ -91,19 +122,96 @@ const LABEL = 'text-muted grid min-w-0 gap-1.5 text-meta font-bold'
             Fecha inicial
             <input v-model="form.startDate" type="date" required :class="FIELD" />
           </label>
+          <p v-if="imported" class="text-muted text-meta">
+            La cuenta vinculada no cambia tras la primera importación. Adelantar la fecha inicial
+            trae más historial; retrasarla no borra movimientos.
+          </p>
           <label :class="LABEL">
             Zona horaria
             <input v-model="form.timeZone" required placeholder="Europe/Madrid" :class="FIELD" />
           </label>
-          <NeonButton class="justify-self-start" type="submit"
-            >Validar y guardar conexión</NeonButton
-          >
+          <NeonButton class="justify-self-start" type="submit">{{
+            configured ? 'Guardar conexión' : 'Validar y guardar conexión'
+          }}</NeonButton>
         </fieldset>
       </details>
     </form>
 
+    <section
+      v-if="connection && imported && status"
+      class="border-line grid gap-4 border-t pbs-4"
+      aria-labelledby="neon-bitvavo-sync"
+    >
+      <div class="flex flex-wrap items-baseline justify-between gap-3">
+        <h3 id="neon-bitvavo-sync" class="font-display text-[20px] font-semibold">
+          Sincronización
+        </h3>
+        <strong
+          class="text-meta font-extrabold"
+          :class="status.alert ? 'text-loss' : 'text-muted'"
+          data-bitvavo-status
+          >{{ status.label }}</strong
+        >
+      </div>
+      <p v-if="connection.lastError && status.alert" class="text-loss text-note">
+        {{ connection.lastError }}
+      </p>
+      <dl class="text-note grid grid-cols-[1fr_auto] gap-x-4 gap-y-2">
+        <dt class="text-muted">Último intento</dt>
+        <dd class="font-display text-end">{{ bitvavoStamp(connection.lastAttemptAt) }}</dd>
+        <dt class="text-muted">Última sincronización correcta</dt>
+        <dd class="font-display text-end">{{ bitvavoStamp(connection.lastSuccessAt) }}</dd>
+      </dl>
+      <p
+        id="neon-bitvavo-last-run"
+        class="text-muted text-label tracking-label font-extrabold uppercase"
+      >
+        En la última sincronización
+      </p>
+      <dl
+        class="grid grid-cols-[repeat(auto-fit,minmax(110px,1fr))] gap-3"
+        aria-labelledby="neon-bitvavo-last-run"
+      >
+        <div v-for="counter in counters" :key="counter.label" class="grid gap-0.5">
+          <dt class="text-muted text-meta font-bold">{{ counter.label }}</dt>
+          <dd class="font-display text-[22px] font-semibold">{{ counter.value }}</dd>
+        </div>
+      </dl>
+      <div class="flex flex-wrap items-center gap-2.5">
+        <NeonButton
+          variant="primary"
+          :disabled="busy || connection.needsAttention"
+          :aria-busy="busy"
+          @click="synchronize"
+        >
+          Sincronizar ahora
+        </NeonButton>
+        <NeonButton v-if="connection.skipped.length" :disabled="busy" @click="retrySkipped">
+          Reintentar omitidas
+        </NeonButton>
+      </div>
+      <section
+        v-if="connection.skipped.length"
+        class="grid gap-2"
+        aria-label="Operaciones omitidas"
+      >
+        <h4 class="text-[16px] font-bold">Omitidas pendientes ({{ connection.skipped.length }})</h4>
+        <ul class="grid gap-2">
+          <li
+            v-for="operation in connection.skipped"
+            :key="operation.externalId"
+            class="border-line text-note grid gap-0.5 border-t pbs-2"
+          >
+            <span class="font-bold">{{ skippedWhen(operation, connection.timeZone) }}</span>
+            <span class="text-muted font-mono break-all">{{ operation.externalId }}</span>
+            <span>{{ operation.reason }}</span>
+          </li>
+        </ul>
+      </section>
+    </section>
+
     <NeonButton
-      v-if="configured"
+      v-else-if="configured"
       class="justify-self-start"
       :disabled="busy"
       @click="generatePreview"
@@ -112,7 +220,7 @@ const LABEL = 'text-muted grid min-w-0 gap-1.5 text-meta font-bold'
     </NeonButton>
     <p v-if="busy" role="status" class="text-muted text-note">Consultando Bitvavo…</p>
     <p v-if="error" role="alert" class="text-loss text-note">{{ error }}</p>
-    <p v-if="notice" role="status" class="text-note">{{ notice }}</p>
+    <p v-if="notice" role="status" class="text-note" data-bitvavo-notice>{{ notice }}</p>
 
     <section v-if="preview" class="grid gap-4" aria-label="Vista previa Bitvavo">
       <h3 class="font-display text-[20px] font-semibold">
@@ -172,6 +280,25 @@ const LABEL = 'text-muted grid min-w-0 gap-1.5 text-meta font-bold'
         </li>
       </ul>
     </section>
+
+    <NeonButton
+      v-if="configured"
+      class="justify-self-start"
+      danger
+      :disabled="busy"
+      @click="confirmingDisconnect = true"
+    >
+      Desconectar Bitvavo
+    </NeonButton>
+    <NeonConfirmDialog
+      v-model:open="confirmingDisconnect"
+      title="¿Desconectar Bitvavo?"
+      confirm-label="Desconectar"
+      @confirm="disconnect"
+    >
+      Se eliminan la configuración y la clave. Los movimientos importados se conservan y una
+      reconexión los reconoce sin duplicarlos.
+    </NeonConfirmDialog>
 
     <template #footer>
       <NeonButton @click="open = false">Cerrar</NeonButton>

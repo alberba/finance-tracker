@@ -7,8 +7,8 @@ import { hashPassword } from 'better-auth/crypto'
 import { upsertEnvVar } from './dev-worktree.mjs'
 import { provisionLocalAdministrator } from './local-init.mjs'
 
-// `pnpm dev:account <correo> [export.json]`: una cuenta con contraseña en la D1 local de
-// `pnpm dev`, y opcionalmente los datos de un export JSON de la aplicación (Datos → Exportar).
+// `bun run dev:account <correo> [export.json]`: una cuenta con contraseña en la D1 local de
+// `bun run dev`, y opcionalmente los datos de un export JSON de la aplicación (Datos → Exportar).
 // Sirve para probar en local con los datos propios sin tocar producción.
 
 const D1_FOLDER = '.wrangler/state/v3/d1/miniflare-D1DatabaseObject'
@@ -74,7 +74,7 @@ function readPassword() {
 
 /** Better Auth needs a secret; `.dev.vars` copied from an older checkout may not carry one. */
 function ensureAuthSecret() {
-  if (!existsSync('.dev.vars')) throw new Error('Falta .dev.vars: ejecuta pnpm setup:worktree.')
+  if (!existsSync('.dev.vars')) throw new Error('Falta .dev.vars: ejecuta bun run setup:worktree.')
   const current = readFileSync('.dev.vars', 'utf8')
   if (/^BETTER_AUTH_SECRET=.+$/m.test(current)) return false
   const secret = randomBytes(32).toString('base64')
@@ -97,7 +97,7 @@ async function importExport(origin, email, password, file) {
       body: JSON.stringify({ email, password }),
     })
   } catch {
-    throw new Error(`No responde ${origin}: arranca pnpm dev:worktree y vuelve a ejecutarlo.`)
+    throw new Error(`No responde ${origin}: arranca bun run dev:worktree y vuelve a ejecutarlo.`)
   }
   if (!signIn.ok) throw new Error(`El inicio de sesión falló (${signIn.status}).`)
   const cookie = signIn.headers
@@ -115,11 +115,11 @@ async function importExport(origin, email, password, file) {
 }
 
 async function run([email, file]) {
-  if (!email) throw new Error('Uso: pnpm dev:account <correo> [export.json]')
+  if (!email) throw new Error('Uso: bun run dev:account <correo> [export.json]')
   if (file && !existsSync(file)) throw new Error(`No existe ${file}.`)
   const secretAdded = ensureAuthSecret()
   const path = findLocalD1()
-  if (!path) throw new Error('No hay D1 local: ejecuta pnpm setup:worktree.')
+  if (!path) throw new Error('No hay D1 local: ejecuta bun run setup:worktree.')
   const password = readPassword()
   const sqlite = new Database(path)
   let outcome

@@ -35,7 +35,7 @@ export function getOrderedCategoriesForType(state: State, type: BudgetType): str
     return acc
   }, {})
 
-  return [...categories].sort((a, b) => {
+  return categories.toSorted((a, b) => {
     const usageA = usageByCategory[a] || 0
     const usageB = usageByCategory[b] || 0
     if (usageA !== usageB) {

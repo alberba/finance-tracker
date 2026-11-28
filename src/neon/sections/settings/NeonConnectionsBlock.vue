@@ -24,8 +24,8 @@ const providers = [
     id: 'bitvavo',
     name: 'Bitvavo',
     initials: 'BV',
-    description: 'Conecta tu cuenta e importa el historial de compras y ventas en euros.',
-    action: 'Ajustes e importación',
+    description: 'Conecta tu cuenta, importa y sincroniza sus compras y ventas en euros.',
+    action: 'Ajustes y sincronización',
     open: bitvavoOpen,
   },
 ]

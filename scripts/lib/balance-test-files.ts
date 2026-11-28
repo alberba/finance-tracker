@@ -9,7 +9,7 @@ export function balanceTestFiles(files: TimedTestFile[], count: number): TimedTe
       duration: 0,
     }),
   )
-  const longestFirst = [...files].sort(
+  const longestFirst = files.toSorted(
     (a, b) => b.durationMs - a.durationMs || a.file.localeCompare(b.file),
   )
   for (const file of longestFirst) {

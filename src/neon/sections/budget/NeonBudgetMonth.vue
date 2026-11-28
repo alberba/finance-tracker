@@ -47,7 +47,7 @@ function toggleCategory(category: string): void {
 
 // Tightest first: over, out of budget, then by the share of the budget still free.
 const sortedCategories = computed(() =>
-  [...categories.value].sort((a, b) => a.left / a.plan - b.left / b.plan),
+  categories.value.toSorted((a, b) => a.left / a.plan - b.left / b.plan),
 )
 </script>
 

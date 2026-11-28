@@ -53,9 +53,9 @@ jobs:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
       - name: Lint
-        run: pnpm lint
+        run: bun run lint
       - name: Astro check
-        run: pnpm check
+        run: bun run check
 
   unit:
     needs: reuse
@@ -67,7 +67,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
       - name: Vitest unit, component and integration tests
-        run: pnpm test
+        run: bun run test
 
   build:
     needs: reuse
@@ -80,10 +80,10 @@ jobs:
       - uses: ./.github/actions/setup
       - name: Verify local D1 migrations apply cleanly
         run: |
-          pnpm d1:migrate:local:v2
+          bun run d1:migrate:local:v2
       - name: Production build
         if: ${{ github.event_name != 'push' }}
-        run: pnpm build
+        run: bun run build
       - name: Record the validated PR tree
         if: ${{ github.event_name == 'pull_request' }}
         run: git rev-parse 'HEAD^{tree}' > "$RUNNER_TEMP/validated-tree.txt"
@@ -108,16 +108,16 @@ jobs:
       - name: Enable the test auth shim
         run: printf 'TEST_AUTH_ENABLED=true\n' > .dev.vars
       - name: Run smoke E2E
-        run: pnpm test:e2e:smoke --reporter=dot,html
+        run: bun run test:e2e:smoke --reporter=dot,html
       - name: Run authentication smoke contracts
-        run: pnpm test:e2e:auth --grep @smoke --reporter=dot,html --output=test-results/auth-smoke
+        run: bun run test:e2e:auth --grep @smoke --reporter=dot,html --output=test-results/auth-smoke
         env:
           PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-report-auth-smoke
       # bitvavo.spec.ts and movement-commands.spec.ts are @smoke but live in
       # testIgnore for the desktop projects: run them here with the Worker
       # runtime that sync-v2 uses, so the PR smoke actually covers them.
       - name: Run sync smoke contracts
-        run: pnpm test:e2e:sync-v2 --grep @smoke --reporter=dot,html --output=test-results/sync-smoke
+        run: bun run test:e2e:sync-v2 --grep @smoke --reporter=dot,html --output=test-results/sync-smoke
         env:
           PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-report-sync-smoke
       - name: Upload failure report

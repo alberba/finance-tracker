@@ -10,12 +10,12 @@ const reportDir = '.scratch/test-suite'
 const logStamp = new Date().toISOString().replace(/[:.]/g, '-')
 mkdirSync(reportDir, { recursive: true })
 const commands = [
-  ['unit/component/integration', ['test']],
-  ['functional', ['exec', 'playwright', 'test', '--max-failures=0']],
-  ['sync-v2', ['test:e2e:sync-v2']],
-  ['authentication', ['test:e2e:auth']],
+  ['unit/component/integration', ['run', 'test']],
+  ['functional', ['playwright', 'test', '--max-failures=0'], 'bunx'],
+  ['sync-v2', ['run', 'test:e2e:sync-v2']],
+  ['authentication', ['run', 'test:e2e:auth']],
 ]
-async function run([name, args, executable = 'pnpm']) {
+async function run([name, args, executable = 'bun']) {
   const start = performance.now()
   const slug = name.replace(/[^a-z0-9]+/gi, '-').toLowerCase()
   const log = createWriteStream(`${reportDir}/${logStamp}-${slug}.log`)

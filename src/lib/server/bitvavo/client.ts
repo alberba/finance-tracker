@@ -1,6 +1,6 @@
 import Decimal from 'decimal.js'
 import { Data, Duration, Effect, Schedule, Schema } from 'effect'
-import type { RemoteOperation } from '../../bitvavo-types'
+import type { RemoteOperation, SkippedOperation } from '../../bitvavo-types'
 import { Http } from '../http'
 
 export class InvalidCredential extends Data.TaggedError('InvalidCredential')<{ message: string }> {}
@@ -90,7 +90,8 @@ const requestPage = Effect.fnUntraced(function* (
     try: async (signal) => {
       const response = await http.request(`https://api.bitvavo.com${path}`, {
         method: 'GET',
-        redirect: 'error',
+        // workerd rejects `redirect: 'error'`; a redirect is refused below instead.
+        redirect: 'manual',
         signal,
         headers: {
           'Bitvavo-Access-Key': credentials.apiKey,
@@ -99,6 +100,8 @@ const requestPage = Effect.fnUntraced(function* (
           'Bitvavo-Access-Window': '10000',
         },
       })
+      if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400))
+        throw new ProviderError({ message: 'Bitvavo redirigió la consulta.', retryable: false })
       if (response.status === 401 || response.status === 403)
         throw new InvalidCredential({ message: 'Comprueba la clave y su permiso de lectura.' })
       if (response.status === 429) {
@@ -146,6 +149,38 @@ const retrySchedule = Schedule.exponential('250 millis').pipe(
   ),
 )
 
+/**
+ * Local date and time of a remote UTC instant in an IANA zone. Always derived
+ * from the instant, so a zone change can rematerialize them (midnight and DST).
+ */
+export function localDateTime(instant: number, timeZone: string): { date: string; time: string } {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(instant)
+  const part = (type: string) => parts.find((p) => p.type === type)?.value
+  return {
+    date: `${part('year')}-${part('month')}-${part('day')}`,
+    time: `${part('hour')}:${part('minute')}:${part('second')}`,
+  }
+}
+
+/**
+ * Bitvavo serializes some amounts from binary floats (`9.969987463999999` for
+ * 0.0063208 × 1577.33 = 9.969987464). A relative difference below 1e-12 is that
+ * noise, far from any cent; anything larger is a real inconsistency.
+ */
+const FLOAT_NOISE = new Exact('1e-12')
+function matchesGross(gross: Decimal, expected: Decimal): boolean {
+  return gross.minus(expected).abs().lte(expected.abs().times(FLOAT_NOISE))
+}
+
 function readOperation(input: unknown, range: HistoryRange): RemoteOperation {
   const row = Schema.decodeUnknownSync(transaction)(input)
   if (row.priceCurrency !== 'EUR' || row.feesCurrency !== 'EUR')
@@ -161,7 +196,7 @@ function readOperation(input: unknown, range: HistoryRange): RemoteOperation {
   if (
     !new Exact(quantity).gt(0) ||
     !new Exact(row.priceAmount).gt(0) ||
-    !gross.eq(new Exact(quantity).times(row.priceAmount)) ||
+    !matchesGross(gross, new Exact(quantity).times(row.priceAmount)) ||
     (!buying && fee.gt(gross))
   )
     throw new ProviderError({
@@ -174,24 +209,12 @@ function readOperation(input: unknown, range: HistoryRange): RemoteOperation {
       message: 'Instante fuera del intervalo solicitado.',
       retryable: false,
     })
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: range.timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(instant)
-  const part = (type: string) => parts.find((p) => p.type === type)?.value
   return {
     provider: 'bitvavo',
     externalId: row.transactionId,
     executedAt: row.executedAt,
     timeZone: range.timeZone,
-    date: `${part('year')}-${part('month')}-${part('day')}`,
-    time: `${part('hour')}:${part('minute')}:${part('second')}`,
+    ...localDateTime(instant, range.timeZone),
     side: row.type,
     symbol,
     quantity,
@@ -202,17 +225,34 @@ function readOperation(input: unknown, range: HistoryRange): RemoteOperation {
   }
 }
 
+const TYPE_NAMES: Record<string, string> = {
+  deposit: 'Depósito',
+  withdrawal: 'Retirada',
+  staking: 'Staking',
+  rebate: 'Reembolso',
+  affiliate: 'Afiliación',
+}
+
+/** «Depósito: solo se importan compras y ventas.» for a movement that is not a trade. */
+function unsupportedType(item: unknown): string | undefined {
+  const typed = Schema.decodeUnknownOption(Schema.Struct({ type: Schema.String }))(item)
+  if (typed._tag === 'None' || typed.value.type === 'buy' || typed.value.type === 'sell')
+    return undefined
+  const name = TYPE_NAMES[typed.value.type] ?? `Tipo «${typed.value.type.slice(0, 40)}»`
+  return `${name}: solo se importan compras y ventas.`
+}
+
 export function fetchBitvavoHistory(
   credentials: BitvavoCredentials,
   range: HistoryRange,
 ): Effect.Effect<
-  { operations: RemoteOperation[]; incompatible: { externalId: string; reason: string }[] },
+  { operations: RemoteOperation[]; incompatible: SkippedOperation[] },
   ClientError,
   Http
 > {
   return Effect.gen(function* () {
     const operations: RemoteOperation[] = []
-    const incompatible: { externalId: string; reason: string }[] = []
+    const incompatible: SkippedOperation[] = []
     const seen = new Set<string>()
     let totalPages: number | undefined
     for (let page = 1; page <= 1000; page++) {
@@ -255,11 +295,12 @@ export function fetchBitvavoHistory(
             retryable: false,
           })
         seen.add(identity.value.transactionId)
+        const timestamp = Schema.decodeUnknownOption(Schema.Struct({ executedAt: Schema.String }))(
+          item,
+        )
+        const executedAt = timestamp._tag === 'Some' ? timestamp.value.executedAt : null
         if (range.startDate) {
-          const timestamp = Schema.decodeUnknownOption(
-            Schema.Struct({ executedAt: Schema.String }),
-          )(item)
-          const instant = timestamp._tag === 'Some' ? Date.parse(timestamp.value.executedAt) : NaN
+          const instant = executedAt ? Date.parse(executedAt) : NaN
           if (
             Number.isFinite(instant) &&
             new Intl.DateTimeFormat('sv-SE', { timeZone: range.timeZone }).format(instant) <
@@ -272,10 +313,11 @@ export function fetchBitvavoHistory(
         } catch (error) {
           incompatible.push({
             externalId: identity.value.transactionId,
+            executedAt: executedAt && Number.isFinite(Date.parse(executedAt)) ? executedAt : null,
             reason:
               error instanceof NonEuroOperation || error instanceof ProviderError
                 ? error.message
-                : 'Tipo o datos de operación incompatibles.',
+                : (unsupportedType(item) ?? 'Tipo o datos de operación incompatibles.'),
           })
         }
       }

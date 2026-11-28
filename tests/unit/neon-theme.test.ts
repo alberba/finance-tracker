@@ -44,8 +44,14 @@ function setup(
     options.storage ??
     fakeStorage(options.stored === undefined ? {} : { 'neon-theme': options.stored })
   const root = { dataset: {} as DOMStringMap }
-  const controller = createNeonThemeController({ storage, media: scheme.media, root })
-  return { controller, root, scheme, storage }
+  const colorSchemeMeta = { content: 'light dark' }
+  const controller = createNeonThemeController({
+    storage,
+    media: scheme.media,
+    root,
+    colorSchemeMeta,
+  })
+  return { controller, root, colorSchemeMeta, scheme, storage }
 }
 
 describe('theme controller', () => {
@@ -92,6 +98,18 @@ describe('theme controller', () => {
     scheme.change(true)
     scheme.change(false)
     expect(root.dataset.theme).toBe('oscuro-fuerte')
+  })
+
+  it('keeps <meta name="color-scheme"> on the painted theme, so native UI is not left in the other scheme', () => {
+    const { controller, colorSchemeMeta, scheme } = setup({ prefersDark: true })
+    expect(colorSchemeMeta.content).toBe('dark')
+
+    controller.setPreference('claro-hueso')
+    expect(colorSchemeMeta.content).toBe('light')
+
+    controller.setPreference('oscuro-fuerte')
+    scheme.change(false)
+    expect(colorSchemeMeta.content).toBe('dark')
   })
 
   it('still applies the choice when storage is blocked', () => {

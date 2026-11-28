@@ -69,7 +69,7 @@ function clampItem(item: LayoutItem): LayoutItem {
 /** Floats every widget up until it touches another one or the top, reading order first. */
 export function compact(items: readonly LayoutItem[]): LayoutItem[] {
   const placed: LayoutItem[] = []
-  for (const item of [...items].sort(byPosition)) {
+  for (const item of items.toSorted(byPosition)) {
     placed.push(floatUp(item, placed))
   }
   return placed
@@ -226,7 +226,7 @@ export function addItem(items: readonly LayoutItem[], id: WidgetId): LayoutItem[
 
 /** The widgets in the order they are read: row by row, left to right. Where they stack, in this order. */
 export function readingOrder(items: readonly LayoutItem[]): LayoutItem[] {
-  return [...items].sort(byPosition)
+  return items.toSorted(byPosition)
 }
 
 /** The widgets that are not on the home: what the catalog offers. */

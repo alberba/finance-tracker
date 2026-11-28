@@ -35,15 +35,36 @@ function initMobileMoreMenu(): void {
     }
   })
   closeButton?.addEventListener('click', close)
+  // Picking a destination closes the sheet; `closedby="any"` closes it from the backdrop.
   dialog.addEventListener('click', (event) => {
     if (
-      event.target === dialog ||
-      (event.target instanceof Element &&
-        event.target.closest('[data-section], [data-report-dialog-open], [data-reports-open]'))
+      event.target instanceof Element &&
+      event.target.closest('[data-section], [data-report-dialog-open], [data-reports-open]')
     ) {
       close()
     }
   })
+  if (!('closedBy' in HTMLDialogElement.prototype)) {
+    // Safari has no `closedby`: test the pointer position, not the target, since the
+    // dialog is also the target for its own padding. Press and release must both
+    // land outside, so a drag that ends on the backdrop does not dismiss.
+    const outside = (event: PointerEvent) => {
+      const rect = dialog.getBoundingClientRect()
+      return (
+        event.clientX < rect.left ||
+        event.clientX > rect.right ||
+        event.clientY < rect.top ||
+        event.clientY > rect.bottom
+      )
+    }
+    let pressedOutside = false
+    dialog.addEventListener('pointerdown', (event) => {
+      pressedOutside = outside(event)
+    })
+    dialog.addEventListener('pointerup', (event) => {
+      if (pressedOutside && outside(event)) close()
+    })
+  }
   dialog.addEventListener('toggle', () => {
     trigger.setAttribute('aria-expanded', dialog.open ? 'true' : 'false')
   })
@@ -243,7 +264,10 @@ function initSyncMenu(): void {
      * (reopening a partially confirmed pending, keeping its reconciliation
      * retry visible); the generic intent discard is only correct for links.
      */
-    const runAction = (intent: { intent: { id: string; kind: string } }, action: 'retry' | 'discard') => {
+    const runAction = (
+      intent: { intent: { id: string; kind: string } },
+      action: 'retry' | 'discard',
+    ) => {
       const target = syncStore.intents.find((view) => view.intent.id === intent.intent.id)
       if (!target) return Promise.resolve(false)
       if (isRecurringIntentKind(target.intent.kind)) {
