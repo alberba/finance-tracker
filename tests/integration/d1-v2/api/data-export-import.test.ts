@@ -480,6 +480,7 @@ describe('GET /api/data/export + POST /api/data/import', () => {
           onboardingDismissed: false,
           onboardingCompleted: true,
           onboardingStep: 6,
+          tourDesktopSeen: true,
         }),
       )
       const { POST } = await import('../../../../src/pages/api/data/import')
@@ -492,6 +493,8 @@ describe('GET /api/data/export + POST /api/data/import', () => {
             onboardingDismissed: 1,
             onboardingCompleted: 0,
             onboardingStep: 1,
+            tourDesktopSeen: 0,
+            tourMobileSeen: 1,
           },
         }),
         locals: { principal },
@@ -506,6 +509,8 @@ describe('GET /api/data/export + POST /api/data/import', () => {
         onboardingDismissed: 0,
         onboardingCompleted: 1,
         onboardingStep: 6,
+        tourDesktopSeen: 1,
+        tourMobileSeen: 0,
       })
     },
   )

@@ -41,6 +41,7 @@ export default defineConfig(
           'onboarding.spec.ts',
           'movement-commands.spec.ts',
           'subscription-charges.spec.ts',
+          'tour.spec.ts',
         ],
       })),
       {

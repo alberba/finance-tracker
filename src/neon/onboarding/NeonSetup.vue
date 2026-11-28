@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, useTemplateRef, watch } from 'vue'
 
+import { useFinanceReady } from '../../composables/useFinanceReady'
 import { SETUP_LAST_STEP, useSetup, useSetupAutoOpen } from '../../composables/useSetup'
 import { useFinancialStateStore } from '../../stores/financial-state'
 import { useUiStore } from '../../stores/ui'
@@ -16,6 +17,7 @@ useSetupAutoOpen()
 const setup = useSetup()
 const uiStore = useUiStore()
 const financial = useFinancialStateStore()
+const ready = useFinanceReady()
 
 const dialog = useTemplateRef<HTMLDialogElement>('dialog')
 const main = useTemplateRef<HTMLElement>('main')
@@ -93,15 +95,17 @@ function onCancel(event: Event): void {
   setup.dismiss()
 }
 
-/** For tests: whether the wizard has decided, and what. */
+/** For tests: whether the wizard has decided, and what (`off` in the demo or on a failed load). */
 const state = computed(() =>
-  !setup.available.value
+  !ready.value
     ? 'loading'
-    : uiStore.setupOpen
-      ? 'open'
-      : setup.completed.value
-        ? 'complete'
-        : 'available',
+    : !setup.available.value
+      ? 'off'
+      : uiStore.setupOpen
+        ? 'open'
+        : setup.completed.value
+          ? 'complete'
+          : 'available',
 )
 
 const progress = (index: number) =>

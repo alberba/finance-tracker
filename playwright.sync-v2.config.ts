@@ -19,6 +19,7 @@ export default defineConfig(
       'onboarding.spec.ts',
       'offline-sync.spec.ts',
       'subscription-charges.spec.ts',
+      'tour.spec.ts',
     ],
     projects: [
       {

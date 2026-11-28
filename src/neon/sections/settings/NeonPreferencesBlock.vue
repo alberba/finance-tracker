@@ -6,6 +6,7 @@ import { useSetup } from '../../../composables/useSetup'
 import { useToast } from '../../../composables/useToast'
 import { useSettingsStore } from '../../../stores/settings'
 import NeonButton from '../../ui/NeonButton.vue'
+import { useTour } from '../../onboarding/use-tour'
 import NeonSettingsBlock from './NeonSettingsBlock.vue'
 import NeonThemePicker from './NeonThemePicker.vue'
 import { parseCurrency, parseYear } from './view-model'
@@ -17,6 +18,7 @@ const settingsStore = useSettingsStore()
 const { showToast } = useToast()
 const { viewModel } = storeToRefs(settingsStore)
 const setup = useSetup()
+const tour = useTour()
 
 const year = ref(String(viewModel.value.year))
 const currency = ref(viewModel.value.currency)
@@ -103,6 +105,19 @@ const ROW =
         <span class="text-muted text-meta">Moneda, cuentas, fijos e inversiones, paso a paso</span>
       </div>
       <NeonButton @click="setup.reopen">Abrir</NeonButton>
+    </div>
+    <div
+      class="border-line flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t py-2.5"
+      :class="!setup.available.value && 'mbs-4'"
+    >
+      <div class="grid gap-0.5">
+        <span class="text-[16px] font-bold">Recorrido guiado</span>
+        <span class="text-muted text-meta">
+          Dónde está cada cosa
+          {{ tour.platform.value === 'desktop' ? 'en escritorio' : 'en el móvil' }}
+        </span>
+      </div>
+      <NeonButton data-tour-replay @click="tour.start">Ver el recorrido otra vez</NeonButton>
     </div>
   </NeonSettingsBlock>
 </template>
