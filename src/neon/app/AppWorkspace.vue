@@ -11,6 +11,7 @@ import { useUiStore } from '../../stores/ui'
 import NeonDashboardSection from '../dashboard/NeonDashboardSection.vue'
 import NeonReportLauncher from '../layout/NeonReportLauncher.vue'
 import NeonSetup from '../onboarding/NeonSetup.vue'
+import NeonTour from '../onboarding/NeonTour.vue'
 
 const sectionLoaders = {
   transactions: () => import('../sections/transactions/NeonTransactionsSection.vue'),
@@ -97,6 +98,7 @@ const canShow = computed(() => financeReady.value || financialStateStore.status 
 <template>
   <div class="contents" data-finance-workspace>
     <NeonSetup />
+    <NeonTour />
     <template v-if="!canShow" />
     <ReportsPage v-else-if="isReportsPage" />
     <component :is="activeSectionComponent" v-else :key="currentSection" :is-active="true" />

@@ -32,6 +32,7 @@ function search(): void {
     class="text-soft outline-accent grid size-12 place-items-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:transition-transform motion-safe:duration-160 motion-safe:ease-out motion-safe:active:scale-[0.97]"
     aria-label="Buscar movimientos"
     aria-haspopup="dialog"
+    data-search-trigger
     :aria-expanded="open"
     @click="open = true"
   >

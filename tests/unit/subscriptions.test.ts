@@ -29,6 +29,8 @@ function createState(subscription: Subscription): State {
     onboardingDismissed: false,
     onboardingCompleted: false,
     onboardingStep: 0,
+    tourDesktopSeen: false,
+    tourMobileSeen: false,
     theme: null,
     year: 2026,
     currency: 'EUR',

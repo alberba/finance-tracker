@@ -319,6 +319,8 @@ export async function syncSettingsUpdate(patch: {
   onboardingDismissed?: boolean
   onboardingCompleted?: boolean
   onboardingStep?: number
+  tourDesktopSeen?: boolean
+  tourMobileSeen?: boolean
   stockeventsEnabled?: boolean
   stockeventsTradesToCash?: boolean
   stockeventsCashMappings?: Array<{ accountId: string | null; watchlistId: string }>

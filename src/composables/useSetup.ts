@@ -80,6 +80,8 @@ export function useSetupAutoOpen(): void {
     (value) => {
       if (!value || decided) return
       decided = true
+      // Watchers run after this returns, so the tour sees the wizard already open.
+      uiStore.setupSettled = true
       if (completed.value) return
       const { onboardingPresented, onboardingDismissed } = financial.state
       if (onboardingPresented && (step.value !== SETUP_LAST_STEP || onboardingDismissed)) return

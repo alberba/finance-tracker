@@ -116,6 +116,12 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
         onboardingStep: previousSettings
           ? previousSettings.onboardingStep
           : optionalStep((body.settings as Row | undefined)?.onboardingStep),
+        tourDesktopSeen: previousSettings
+          ? previousSettings.tourDesktopSeen === 1
+          : optionalFlag((body.settings as Row | undefined)?.tourDesktopSeen),
+        tourMobileSeen: previousSettings
+          ? previousSettings.tourMobileSeen === 1
+          : optionalFlag((body.settings as Row | undefined)?.tourMobileSeen),
       }
       if (replace) {
         await runServer(tx, wipeUserData(userId))

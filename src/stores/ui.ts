@@ -37,6 +37,12 @@ export const useUiStore = defineStore('ui', () => {
   const settingsTab = ref('accounts')
   /** The setup wizard (#452) is on screen. */
   const setupOpen = ref(false)
+  /** Whether the wizard opens on this visit is decided: until then the tour waits. */
+  const setupSettled = ref(false)
+  /** The guided tour (#527) is on screen. */
+  const tourOpen = ref(false)
+  /** The tours finished or skipped on this page («desktop», «mobile»). */
+  const toursDone = ref<string[]>([])
 
   function setActiveSection(sectionId: SectionId): void {
     ui.activeSection = sectionId
@@ -55,6 +61,9 @@ export const useUiStore = defineStore('ui', () => {
     page,
     settingsTab,
     setupOpen,
+    setupSettled,
+    tourOpen,
+    toursDone,
     setActiveSection,
     setPage,
     replaceUiState,
