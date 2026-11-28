@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'finance-tracker-v7'
+const CACHE_VERSION = 'finance-tracker-v8'
 // The self-hosted faces are part of the shell: once installed, the app keeps
 // Unbounded and Manrope offline even before the page requests them.
 const APP_SHELL = [
@@ -7,6 +7,8 @@ const APP_SHELL = [
   '/icons/apple-touch-icon.png',
   '/icons/pwa-192.png',
   '/icons/pwa-512.png',
+  '/icons/pwa-maskable-192.png',
+  '/icons/pwa-maskable-512.png',
   '/fonts/unbounded-latin-wght.woff2',
   '/fonts/manrope-latin-wght.woff2',
 ]
