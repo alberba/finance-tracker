@@ -7,8 +7,9 @@ import { assetHref } from './asset-route'
 import { type AssetDetail } from './asset-view-model'
 import NeonInvestmentAssetChart from './NeonInvestmentAssetChart.vue'
 import NeonInvestmentAssetYears from './NeonInvestmentAssetYears.vue'
-import NeonInvestmentQuoteSoon from './NeonInvestmentQuoteSoon.vue'
+import NeonInvestmentQuote from './NeonInvestmentQuote.vue'
 import { TONE_TEXT } from './view-model'
+import { useMarketStore } from '../../../stores/market'
 
 // The detail of an asset in the mobile frame (artboard «Inversión · detalle de
 // activo (VWCE) · móvil · Pixel 10», #440), from the same view model as the
@@ -32,6 +33,13 @@ const emit = defineEmits<{
 }>()
 
 const RING = 2 * Math.PI * 45
+
+// With a linked symbol the chart on top is its quote; without one, the price
+// of each operation against the average buy price.
+const marketStore = useMarketStore()
+const instrument = computed(() =>
+  marketStore.instruments.find((item) => item.investmentAssetId === props.detail.id && item.active),
+)
 
 // The chart rests on today's point; a finger on it (or the arrow keys) reads another.
 const hot = ref<number | null>(null)
@@ -80,7 +88,10 @@ const PRESS =
     data-investment-asset
     data-asset-summary
   >
-    <section class="grid min-w-0 gap-2.5" aria-label="Precio y tus operaciones">
+    <section
+      class="grid min-w-0 gap-2.5"
+      :aria-label="instrument ? 'Cotización' : 'Precio y tus operaciones'"
+    >
       <p
         class="font-display text-h1-detail tracking-h1 m-0 -mbe-2 leading-[1.15] font-bold"
         data-asset-name
@@ -88,7 +99,8 @@ const PRESS =
         {{ detail.name }}
       </p>
 
-      <template v-if="detail.chart && reading">
+      <NeonInvestmentQuote v-if="instrument" :instrument="instrument" touch />
+      <template v-else-if="detail.chart && reading">
         <p
           class="text-muted text-note m-0 flex min-h-[1.6em] flex-wrap items-baseline gap-x-3.5 gap-y-0.5 font-bold tabular-nums"
           aria-live="polite"
@@ -133,8 +145,6 @@ const PRESS =
         </svg>
       </button>
     </div>
-
-    <NeonInvestmentQuoteSoon />
 
     <section class="grid min-w-0 gap-3" aria-labelledby="asset-position-title">
       <h2 id="asset-position-title" class="text-block-title m-0 font-extrabold">Tu posición</h2>

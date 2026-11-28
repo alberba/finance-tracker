@@ -101,3 +101,15 @@ function stripYahooMarketSuffix(symbol: string): string {
 function stripCryptoQuoteCurrency(symbol: string): string {
   return symbol.replace(/[-/][A-Z]{3}$/, '')
 }
+
+/**
+ * The kind of instrument a Yahoo or Morningstar ticker most likely is: a fund
+ * for an ISIN or a `0P…` id (one price a day), crypto for a pair like `BTC-EUR`,
+ * an ETF otherwise (shares and ETFs quote alike).
+ */
+export function inferInstrumentType(ticker: string): Instrument['type'] {
+  const symbol = normalizeSymbol(ticker)
+  if (/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(symbol) || /^0P[0-9A-Z]{8}(\..+)?$/.test(symbol)) return 'fund'
+  if (/^[A-Z0-9]{2,10}-(EUR|USD|USDT|GBP)$/.test(symbol)) return 'crypto'
+  return 'etf'
+}

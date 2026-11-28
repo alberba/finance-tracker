@@ -130,6 +130,8 @@ export interface AssetRow {
   kind: string
   /** The first symbol the asset trades under; empty without one. */
   symbol: string
+  /** The provider ticker it is quoted by (`XDWH.DE`, an ISIN…); empty without a quote instrument. */
+  ticker: string
   /** Where its price comes from; empty without a quote instrument. */
   provider: string
   linked: number
@@ -167,6 +169,7 @@ export function assetsTable(
       openingBalance: asset.openingBalance,
       kind: instrument ? INSTRUMENT_TYPE_LABEL[instrument.type] : '',
       symbol: asset.symbols[0] ?? '',
+      ticker: instrument ? instrument.quoteSymbol || instrument.symbol : '',
       provider: instrument ? providerLabel(instrument.provider) : '',
       linked: asset.linked,
       pending: asset.pending,

@@ -1,4 +1,5 @@
 import { useToast } from '../../../composables/useToast'
+import { inferInstrumentType } from '../../../domain/investment/symbol-matching'
 import { formatMoney } from '../../../lib/format'
 import { useFinancialStateStore } from '../../../stores/financial-state'
 import { useMarketStore } from '../../../stores/market'
@@ -86,7 +87,7 @@ export function useEntityActions(kind: EntityKind) {
       if (asset) {
         marketStore.addInstrument({
           investmentAssetId: asset.id,
-          type: 'etf',
+          type: inferInstrumentType(symbol),
           symbol,
           market: '',
           currency: financialStateStore.currency,
@@ -95,6 +96,31 @@ export function useEntityActions(kind: EntityKind) {
       }
     }
     return true
+  }
+
+  /**
+   * The ticker an asset is quoted by: changes the instrument it has, creates
+   * one if it has none, and an empty ticker unlinks it (its movements stay).
+   * The visible symbol of a new instrument is the one its movements carry.
+   */
+  function setTicker(assetId: string, ticker: string, movementSymbol: string): void {
+    const quoteSymbol = ticker.trim().toUpperCase()
+    const instrument = marketStore.instruments.find((item) => item.investmentAssetId === assetId)
+    if (instrument) {
+      if (!quoteSymbol) marketStore.removeInstrument(instrument.id)
+      else marketStore.setQuoteTicker(instrument.id, quoteSymbol)
+      return
+    }
+    if (!quoteSymbol) return
+    marketStore.addInstrument({
+      investmentAssetId: assetId,
+      type: inferInstrumentType(quoteSymbol),
+      symbol: movementSymbol.trim() || quoteSymbol,
+      quoteSymbol,
+      market: '',
+      currency: financialStateStore.currency,
+      provider: 'yahoo',
+    })
   }
 
   /** The confirmation that removes it. */
@@ -107,5 +133,5 @@ export function useEntityActions(kind: EntityKind) {
     }
   }
 
-  return { words, save, add, deletion }
+  return { words, save, add, setTicker, deletion }
 }

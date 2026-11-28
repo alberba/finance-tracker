@@ -5,13 +5,21 @@ import { formatMoney } from '../../../lib/format'
 import NeonButton from '../../ui/NeonButton.vue'
 import NeonDetailPanel from '../../ui/NeonDetailPanel.vue'
 import { useEntityActions, type EntityKind } from './entity-actions'
+import { useTickerSuggestions } from './ticker-suggestions'
 
 // The mobile sheet of Cuentas, Activos and Pasivos: what the desktop table
-// edits in place (name and starting balance) and its add row (plus the symbol
-// of a new asset). With a row it edits that one; without one it creates.
+// edits in place (name, starting balance and, for an asset, the ticker it is
+// quoted by) and its add row. With a row it edits that one; without one it creates.
 const props = defineProps<{
   kind: EntityKind
-  row: { id: string; name: string; openingBalance: number } | null
+  row: {
+    id: string
+    name: string
+    openingBalance: number
+    /** An asset's quote ticker, and the symbol its movements carry. */
+    ticker?: string
+    symbol?: string
+  } | null
 }>()
 const open = defineModel<boolean>('open', { required: true })
 
@@ -29,18 +37,29 @@ watch(
     if (!isOpen) return
     name.value = props.row?.name ?? ''
     balance.value = props.row ? formatMoney(props.row.openingBalance) : ''
-    symbol.value = ''
+    symbol.value = props.row?.ticker ?? ''
   },
   { immediate: true },
 )
 
+// An asset whose movements carry a symbol but that has none to be quoted by gets a proposal.
+const suggestions = useTickerSuggestions(() =>
+  props.kind === 'investmentAssets' && props.row && !props.row.ticker && props.row.symbol
+    ? [props.row.symbol]
+    : [],
+)
+const suggestion = computed(() => (props.row?.symbol ? suggestions.value[props.row.symbol] : ''))
+
 const title = computed(() => (props.row ? words.edit : words.fresh))
-const withSymbol = computed(() => props.kind === 'investmentAssets' && !props.row)
+const withSymbol = computed(() => props.kind === 'investmentAssets')
 
 function submit(): void {
   const done = props.row
     ? actions.save(props.row, name.value, balance.value)
     : actions.add(name.value, balance.value, symbol.value)
+  if (done && props.row && withSymbol.value && symbol.value.trim() !== (props.row.ticker ?? '')) {
+    actions.setTicker(props.row.id, symbol.value, props.row.symbol ?? '')
+  }
   if (done) open.value = false
 }
 
@@ -76,10 +95,19 @@ const labelClass = 'text-muted grid min-w-0 gap-1.5 text-meta font-bold'
         <input
           v-model="symbol"
           name="symbol"
-          placeholder="VWCE.DE"
+          placeholder="VWCE.DE, BTC-EUR o ISIN"
           autocapitalize="characters"
           :class="fieldClass"
         />
+        <button
+          v-if="suggestion && !symbol.trim()"
+          type="button"
+          class="text-accent-text outline-accent justify-self-start rounded-xs font-bold underline underline-offset-2 focus-visible:outline-2"
+          data-ticker-suggestion
+          @click="symbol = suggestion"
+        >
+          Usar {{ suggestion }}
+        </button>
       </label>
     </form>
 

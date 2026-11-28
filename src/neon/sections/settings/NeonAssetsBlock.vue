@@ -8,16 +8,21 @@ import type { PendingDeletion } from './deletion'
 import { useEntityActions } from './entity-actions'
 import NeonSettingsBlock from './NeonSettingsBlock.vue'
 import NeonSettingsField from './NeonSettingsField.vue'
+import { useTickerSuggestions } from './ticker-suggestions'
 import { DATA_ROW, HEAD_ROW, PLAIN_ROW, TABLE_SCROLL, TOTAL_FIGURE } from './table-styles'
 import { parseAmount, type AssetRow, type AssetsTable } from './view-model'
 
 // Activos: the starting value of each investment grouping, where its price
 // comes from and how it reaches Stock Events. Name and value are edited in place.
-defineProps<{ table: AssetsTable }>()
+const props = defineProps<{ table: AssetsTable }>()
 const emit = defineEmits<{ ask: [deletion: PendingDeletion] }>()
 
 const settingsStore = useSettingsStore()
 const actions = useEntityActions('investmentAssets')
+// A proposal for each asset whose movements carry a symbol but that has none to be quoted by.
+const suggestions = useTickerSuggestions(() =>
+  props.table.rows.filter((row) => !row.ticker && row.symbol).map((row) => row.symbol),
+)
 const COLUMNS = 'grid-cols-[minmax(0,1.5fr)_minmax(0,0.9fr)_130px_minmax(0,1.3fr)_190px_112px]'
 
 function rename(row: AssetRow, name: string): void {
@@ -77,17 +82,26 @@ function add(): void {
             />
             <span v-if="row.kind" class="text-muted text-note px-2.5">{{ row.kind }}</span>
           </span>
-          <span role="cell" class="grid min-w-0 justify-items-start ps-2.5">
-            <span
-              v-if="row.symbol"
-              class="bg-panel2 rounded-ticker px-2 py-0.5 font-mono text-[13px] font-bold tracking-[0.04em]"
-            >
-              {{ row.symbol }}
-            </span>
-            <span v-else class="text-muted text-[15px]">—</span>
-            <span v-if="row.provider" class="text-muted text-meta truncate">{{
+          <span role="cell" class="grid min-w-0">
+            <NeonSettingsField
+              :model-value="row.ticker"
+              :label="`Símbolo de cotización de ${row.name}`"
+              placeholder="Sin símbolo"
+              @commit="actions.setTicker(row.id, $event, row.symbol)"
+            />
+            <span v-if="row.provider" class="text-muted text-meta truncate px-2.5">{{
               row.provider
             }}</span>
+            <button
+              v-else-if="suggestions[row.symbol]"
+              type="button"
+              class="text-accent-text text-meta outline-accent justify-self-start rounded-xs px-2.5 font-bold underline underline-offset-2 focus-visible:outline-2"
+              :aria-label="`Usar ${suggestions[row.symbol]} como símbolo de cotización de ${row.name}`"
+              data-ticker-suggestion
+              @click="actions.setTicker(row.id, suggestions[row.symbol], row.symbol)"
+            >
+              Usar {{ suggestions[row.symbol] }}
+            </button>
           </span>
           <span role="cell" class="text-soft text-[15px]">
             <span class="font-display text-text font-semibold">{{ row.linked }}</span> vinculados
