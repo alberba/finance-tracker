@@ -394,11 +394,15 @@ function morphKeyframes(
   const zoom = Number(getComputedStyle(element).getPropertyValue('--ui-zoom')) || 1
   const inset = (distance: number) => `${distance / zoom}px`
   const start = `inset(${inset(from.top - box.top)} ${inset(box.right - from.right)} ${inset(box.bottom - from.bottom)} ${inset(from.left - box.left)} round ${radius}px)`
-  const end = sheet.value
-    ? `inset(0px 0px 0px 0px round ${surfaceRadius}px ${surfaceRadius}px 0px 0px)`
-    : `inset(0px 0px 0px 0px round ${surfaceRadius}px)`
+  const end = `inset(0px 0px 0px 0px round ${surfaceRadius}px ${surfaceRadius}px 0px 0px)`
+  // The mini modal opens beside its opener, not over it: there is nothing of it
+  // under the button to clip, so it grows from the button's rectangle by moving
+  // and scaling (from the top left corner, see `.entry-mini`).
+  const grow = `translate(${(from.left - box.left) / zoom}px, ${(from.top - box.top) / zoom}px) scale(${from.width / box.width}, ${from.height / box.height})`
   return {
-    shape: [{ clipPath: start }, { clipPath: end }],
+    shape: sheet.value
+      ? [{ clipPath: start }, { clipPath: end }]
+      : [{ transform: grow }, { transform: 'none' }],
     // Linear, apart from the shape's easing: the colour turns while it grows.
     colour: [
       { backgroundColor: colour },
@@ -418,9 +422,14 @@ function stopMorph(): void {
 function morphIn(element: HTMLElement): boolean {
   stopMorph()
   if (reducedMotion()) return false
-  const frames = morphKeyframes(element)
-  if (!frames) return false
+  // Marked first so that the sheet's own slide-up animation (`animate-sheet-in`)
+  // is off when the box is measured: it would offset it by 48px.
   element.setAttribute('data-morph', '')
+  const frames = morphKeyframes(element)
+  if (!frames) {
+    element.removeAttribute('data-morph')
+    return false
+  }
   const duration = MORPH_MS[sheet.value ? 'sheet' : 'mini'].in
   morphing = [
     element.animate(frames.shape, { duration, easing: MORPH_EASE }),
@@ -529,10 +538,12 @@ function present(): void {
   if (timing.value) timing.value.open = false
   element.removeAttribute('data-morph')
   stopMorph()
-  if (!sheet.value) placeMiniModal()
-  // Without an opener the mini modal fades in centred (`data-entering`).
-  if (!morphIn(element) && !sheet.value) element.setAttribute('data-entering', '')
   void nextTick(() => {
+    // The form was just reset: measure once the DOM shows it (classes and
+    // height of the new presentation), not the previous one.
+    if (!sheet.value) placeMiniModal()
+    // Without an opener the mini modal fades in centred (`data-entering`).
+    if (!morphIn(element) && !sheet.value) element.setAttribute('data-entering', '')
     // The keypad needs no field: the focus rests on the amount, and no system
     // keyboard opens.
     if (isPad.value) return amountOutput.value?.focus({ preventScroll: true })
@@ -1258,6 +1269,7 @@ const labelClass = ENTRY_LABEL_CLASS
   inline-size: min(372px, calc((100vw - 24px) / var(--ui-zoom, 1)));
   max-block-size: var(--entry-max-height, 80dvb);
   margin: 0;
+  transform-origin: 0 0;
 }
 .entry-mini summary::-webkit-details-marker {
   display: none;
