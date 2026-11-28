@@ -152,8 +152,9 @@ const PRESS =
     </div>
 
     <NeonInvestmentAssetPositions
-      v-if="detail.positions.length"
+      v-if="detail.positions.length || detail.uninstrumented"
       :positions="detail.positions"
+      :uninstrumented="detail.uninstrumented"
       :note="detail.unpricedNote"
       stacked
       @open="emit('openInstrument', $event)"

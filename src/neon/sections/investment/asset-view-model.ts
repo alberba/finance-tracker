@@ -1,6 +1,9 @@
 import type { InvestmentEntryPreset } from '../../../composables/useEntrySheet'
 import type { PositionEvolution } from '../../../domain/investment/position-evolution'
-import type { AccountPosition } from '../../../domain/investment/positions'
+import type {
+  AccountPosition,
+  UninstrumentedHolding,
+} from '../../../domain/investment/positions'
 import type {
   InvestmentAccount,
   InvestmentDashboardViewModel,
@@ -148,11 +151,24 @@ export interface PositionEvolutionLine {
   approximate: boolean
 }
 
+/** What the account holds with no instrument: movements without units and the opening balance. */
+export interface UninstrumentedLine {
+  value: string
+  invested: string
+  /** «−20,00 €». */
+  gain: string
+  /** «−10,0 %». */
+  ret: string
+  tone: Tone
+}
+
 export interface AssetDetail {
   id: string
   name: string
   /** What the account holds, by value. */
   positions: PositionLine[]
+  /** The «Sin instrumento» row of the positions; null when it is negligible. */
+  uninstrumented: UninstrumentedLine | null
   /** Some position has no quote: its value is its share of the account's. */
   unpricedNote: string | null
   figures: AssetFigure[]
@@ -433,6 +449,18 @@ function positionLine(position: AccountPosition, evolution: PositionEvolution[])
   }
 }
 
+function uninstrumentedLine(holding: UninstrumentedHolding | undefined): UninstrumentedLine | null {
+  if (!holding) return null
+  const gain = round2(holding.value - holding.invested)
+  return {
+    value: formatMoney(holding.value),
+    invested: formatMoney(holding.invested),
+    gain: formatSignedMoney(gain),
+    ret: holding.invested > 0 ? signedPct((gain / holding.invested) * 100) : '',
+    tone: toneOf(gain),
+  }
+}
+
 function assetPosition(position: InvestmentAccount, average: number | null): AssetPosition {
   const weight = formatPercent(position.weight, { digits: 1 })
   const rows: AssetFact[] = []
@@ -490,6 +518,9 @@ export function assetDetail(
     id: position.id,
     name: position.name,
     positions: positions.map((held) => positionLine(held, evolution)),
+    uninstrumented: uninstrumentedLine(
+      vm.uninstrumented.find((holding) => holding.accountId === position.id),
+    ),
     unpricedNote: positions.some((held) => !held.priced)
       ? 'Sin cotización: el valor es la parte que le toca del valor de la cuenta.'
       : null,

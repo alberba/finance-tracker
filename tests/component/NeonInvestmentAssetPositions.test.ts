@@ -147,4 +147,36 @@ describe('NeonInvestmentAssetPositions', () => {
       expect(wrapper.emitted('open')).toEqual([['i-eth']])
     },
   )
+
+  it.each([false, true])(
+    'añade «Sin instrumento» con su valor y lo invertido, sin enlace (apilada: %s)',
+    (stacked) => {
+      const { positions, unpricedNote } = cryptoDetail()
+      const uninstrumented = {
+        value: '180,00\u00a0€',
+        invested: '200,00\u00a0€',
+        gain: '−20,00\u00a0€',
+        ret: '−10,0\u00a0%',
+        tone: 'loss' as const,
+      }
+      const wrapper = mount(NeonInvestmentAssetPositions, {
+        props: { positions, note: unpricedNote, uninstrumented, stacked },
+      })
+
+      const row = wrapper.get('[data-asset-uninstrumented]')
+      expect(row.text()).toContain('Sin instrumento')
+      expect(row.text()).toContain('180,00')
+      expect(row.text()).toContain('200,00')
+      expect(row.find('a').exists()).toBe(false)
+    },
+  )
+
+  it('sin capital sin instrumento no añade la fila', () => {
+    const { positions, unpricedNote } = cryptoDetail()
+    const wrapper = mount(NeonInvestmentAssetPositions, {
+      props: { positions, note: unpricedNote, uninstrumented: null },
+    })
+
+    expect(wrapper.find('[data-asset-uninstrumented]').exists()).toBe(false)
+  })
 })

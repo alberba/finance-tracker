@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { computeInvestmentValue } from '../../src/domain/investment/calculations'
-import { buildAccountPositions } from '../../src/domain/investment/positions'
+import { buildAccountPositions, buildUninstrumentedHoldings } from '../../src/domain/investment/positions'
 import type { Month } from '../../src/lib/month'
 import { normalizeState } from '../../src/scripts/state'
 import type { State } from '../../src/scripts/types'
@@ -345,5 +345,41 @@ describe('cuenta de inversión destino del movimiento', () => {
     ])
 
     expect(computeInvestmentValue(state, 'crypto', 3)).toBe(100)
+  })
+})
+
+describe('buildUninstrumentedHoldings', () => {
+  const legacy = (amount: number, accountId = 'crypto') => ({
+    id: `legacy-${accountId}-${amount}`,
+    date: '2026-02-20',
+    month: 2,
+    type: 'investment',
+    accountId: 'cash',
+    destinationAccountId: accountId,
+    category: 'Crypto',
+    description: 'Aportación por importe',
+    amount,
+  })
+
+  it('da lo que una cuenta tiene sin instrumento: el importe de esos movimientos y la parte de su valor', () => {
+    const state = crypto({ transactions: [...crypto().transactions, legacy(500)] })
+
+    expect(buildUninstrumentedHoldings(state, 3)).toEqual([
+      { accountId: 'crypto', invested: 500, value: 500 },
+    ])
+  })
+
+  it('incluye una cuenta que solo tiene movimientos sin instrumento', () => {
+    const state = crypto({ transactions: [...crypto().transactions, legacy(200, 'oro')] })
+
+    expect(buildUninstrumentedHoldings(state, 3)).toEqual([
+      { accountId: 'oro', invested: 200, value: 200 },
+    ])
+  })
+
+  it('no lista un importe despreciable ni una cuenta cuyas posiciones lo explican todo', () => {
+    expect(buildUninstrumentedHoldings(crypto(), 3)).toEqual([])
+    const dust = crypto({ transactions: [...crypto().transactions, legacy(0.2)] })
+    expect(buildUninstrumentedHoldings(dust, 3)).toEqual([])
   })
 })
