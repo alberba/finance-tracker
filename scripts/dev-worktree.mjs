@@ -11,6 +11,12 @@ export function upsertEnvVar(content, key, value) {
   return `${content}${content === '' || content.endsWith('\n') ? '' : '\n'}${line}\n`
 }
 
+/** The port a launcher asked for through `PORT`, or null when it is unset or not a valid port. */
+export function requestedPort(value) {
+  const port = Number(value)
+  return Number.isInteger(port) && port >= 1 && port <= 65535 ? port : null
+}
+
 /** Better Auth valida origen, cookies y passkeys contra esta URL: debe coincidir con el puerto. */
 function writeAuthUrl(port) {
   const devVars = resolve('.dev.vars')
@@ -22,12 +28,12 @@ function writeAuthUrl(port) {
 
 async function run(extraArgs) {
   const checkout = realpathSync(process.cwd())
+  const own = preferredPort(checkout, primaryCheckout(checkout))
+  // `--sync-url` (pnpm setup:worktree) solo fija la URL con el puerto propio del worktree: no
+  // arranca nada, ignora `PORT` y no la cambia por un puerto ocupado de un servidor en marcha.
+  if (extraArgs[0] === '--sync-url') return writeAuthUrl(own)
   // `PORT` lo fija quien lanza el servidor (la vista previa de `.claude/launch.json` con autoPort).
-  const preferred = Number(process.env.PORT) || preferredPort(checkout, primaryCheckout(checkout))
-  // `--sync-url` (pnpm setup:worktree) solo fija la URL con el puerto preferido del worktree: no
-  // arranca nada ni cambia la URL por un puerto ocupado de un servidor que ya esté en marcha.
-  if (extraArgs[0] === '--sync-url') return writeAuthUrl(preferred)
-  const port = await availablePort(preferred)
+  const port = await availablePort(requestedPort(process.env.PORT) ?? own)
   writeAuthUrl(port)
   console.log(`Servidor de desarrollo en http://localhost:${port}`)
   const child = spawn('pnpm', ['dev', '--port', String(port), '--strictPort', ...extraArgs], {
