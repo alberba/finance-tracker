@@ -71,6 +71,26 @@ export class FinanceTrackerPage {
     return this.page.locator('#investment')
   }
 
+  /** The cover's list of accounts, instruments or types, according to the chosen grouping. */
+  get investmentAccounts(): Locator {
+    return this.investmentSection.locator('[data-investment-accounts]')
+  }
+
+  /** The instrument rows of the cover, in the by-instrument and by-type groupings. */
+  get investmentInstrumentRows(): Locator {
+    return this.investmentAccounts.locator('[data-investment-instrument]')
+  }
+
+  /** The total of an instrument's detail, across accounts. */
+  get instrumentTotal(): Locator {
+    return this.investmentSection.locator('[data-instrument-total]')
+  }
+
+  /** The row that closes an account's positions with the movements that have no instrument. */
+  get uninstrumentedPosition(): Locator {
+    return this.investmentSection.locator('[data-asset-uninstrumented]')
+  }
+
   get issueReportDialog(): Locator {
     return this.page.getByRole('dialog', { name: 'Crear reporte' })
   }

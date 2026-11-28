@@ -104,6 +104,21 @@ describe('buildAssetsViewModel', () => {
     })
   })
 
+  it('does not list an archived asset but still lets it own its symbols', () => {
+    const vm = buildAssetsViewModel(
+      state({
+        investmentAssets: [
+          { id: 'fund', name: 'Fondo', openingBalance: 0 },
+          { id: 'old', name: 'Viejo', openingBalance: 0, archived: true },
+        ],
+        instruments: [instrument({ id: 'vwce', symbol: 'VWCE', investmentAssetId: 'old' })],
+      }),
+    )
+
+    expect(vm.assets.map((asset) => asset.id)).toEqual(['fund'])
+    expect(vm.orphanSymbols).toEqual([])
+  })
+
   it('counts a movement without symbol as pending when its category is the asset', () => {
     const vm = buildAssetsViewModel(
       state({

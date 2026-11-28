@@ -12,13 +12,11 @@ import { Effect } from 'effect'
 
 import type { PriceHistory, PricePoint, PriceRange } from '../../domain/investment/price-history'
 import { yahooQuoteSymbol } from '../../domain/investment/symbol-matching'
-import type { Instrument } from '../../scripts/types'
+import type { InstrumentQuoteSource } from '../../scripts/types'
 import { Http } from './http'
 import { MarketQuoteError } from './market-data'
 import { fetchMorningstarCloses, morningstarId } from './morningstar'
 import { yahooFinance } from './yahoo-finance'
-
-type HistoryInstrument = Pick<Instrument, 'symbol' | 'quoteSymbol' | 'type' | 'currency'>
 
 interface RangeSpec {
   interval: '5m' | '30m' | '1d' | '1wk'
@@ -41,7 +39,7 @@ const RANGE_SPECS: Record<PriceRange, RangeSpec> = {
 const cache = new Map<string, { expiresAt: number; history: PriceHistory }>()
 
 export function loadPriceHistory(
-  instrument: HistoryInstrument,
+  instrument: InstrumentQuoteSource,
   range: PriceRange,
   now: Date = new Date(),
 ): Effect.Effect<PriceHistory, MarketQuoteError, Http> {

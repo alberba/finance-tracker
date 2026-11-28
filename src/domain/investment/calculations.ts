@@ -4,6 +4,7 @@ import {
   computeInvestmentValue as coreInvestmentValue,
   getWealthByMonth as coreWealthByMonth,
   matchesInvestmentAsset,
+  movementBelongsToInvestmentAsset,
   type Entity,
   type Snapshot,
   type Transaction,
@@ -42,8 +43,18 @@ export function computeInvestmentValue(state: State, assetId: string, month: Mon
   )
 }
 
-export function computeAccountBalance(state: State, accountId: string, month: MonthOrStart): number {
-  return coreAccountBalance(accountId, month, accounts(state), transactions(state), snapshots(state))
+export function computeAccountBalance(
+  state: State,
+  accountId: string,
+  month: MonthOrStart,
+): number {
+  return coreAccountBalance(
+    accountId,
+    month,
+    accounts(state),
+    transactions(state),
+    snapshots(state),
+  )
 }
 
 export function wealthByMonth(state: State, month: MonthOrStart): WealthSnapshot {
@@ -94,7 +105,11 @@ export function computeInvestedCapital(state: State, month: Month): number {
   return round2(openingCapital + contributions)
 }
 
-export function computeInvestedCapitalByAsset(state: State, assetId: string, month: MonthOrStart): number {
+export function computeInvestedCapitalByAsset(
+  state: State,
+  assetId: string,
+  month: MonthOrStart,
+): number {
   const asset = state.investmentAssets.find((item) => item.id === assetId)
   if (!asset) {
     return 0
@@ -103,7 +118,8 @@ export function computeInvestedCapitalByAsset(state: State, assetId: string, mon
   const contributions = state.transactions.reduce((sum, item) => {
     if (item.type !== 'investment') return sum
     if (Number(item.month) > month) return sum
-    if (!matchesInvestmentAsset(item.category, asset as Entity, item.instrumentId, state.instruments)) return sum
+    if (!movementBelongsToInvestmentAsset(item, asset as Entity, assets(state), state.instruments))
+      return sum
     return sum + Number(item.amount || 0)
   }, 0)
   return round2(openingCapital + contributions)

@@ -104,6 +104,106 @@ la API REST (nunca el buscador) y se salta, listándolas al final, las que no ti
 `### Reportero`, lo tienen modificado o cuyo `Identificador` no corresponde a ninguna cuenta. Se
 lanza una sola vez tras el despliegue; las altas posteriores se registran solas.
 
+## Reparar los vínculos de inversión (BTC y ETH)
+
+`bun run db:repair-links` (#558) vincula cada movimiento de inversión sin instrumento al instrumento
+del usuario con ese símbolo, corrige los que apuntan a un instrumento de otro símbolo (las tres
+compras de ETH de enero y febrero que apuntaban a BTC) y pasa a Bitvavo las compras de ETH que
+constan con otra cuenta. La correspondencia símbolo → cuenta es el argumento `--move=ETH=Bitvavo`
+(es el valor por defecto; repetible). Los movimientos con símbolo que no casan con ningún
+instrumento del usuario, o con varios, se listan como saltados y no se tocan.
+
+Por defecto **solo simula**: imprime cada movimiento con su antes y su después y no escribe nada.
+`--execute` aplica exactamente ese plan en una sola transacción, tras dejar una copia de la base
+(`<base>.antes-vinculos-<fecha>`), y aborta sin escribir si un movimiento cambió desde que se
+calculó el plan. Cada movimiento reparado sube su versión y entra en `sync_changes`, así que los
+demás dispositivos lo reciben. Es idempotente: sobre datos ya reparados el plan sale vacío.
+
+La app en Docker no lleva `bun`, así que se lanza sobre una copia de la base y se devuelve al volumen
+con el mismo procedimiento que la restauración de copias:
+
+```sh
+# 1) Copia de producción y simulación (la app puede seguir en marcha). Revisa el plan: los
+#    movimientos de BTC y ETH sin instrumento, las tres compras de ETH que apuntan a BTC y las
+#    compras de ETH que no constan en Bitvavo; nada más.
+scp servidor:/var/backups/finance/<última copia>.gz . && gunzip -c <última copia>.gz > finance.sqlite
+bun run db:repair-links --v2-sqlite=./finance.sqlite --email=<email>
+
+# 2) Ventana de mantenimiento: parar la app, copiar la base del volumen y repararla.
+ssh servidor 'cd ~/finance-prod && docker compose stop'
+#    Copia la base del volumen y simula otra vez sobre esa copia: el plan debe seguir
+#    siendo el revisado.
+ssh servidor 'docker run --rm -v finance-data:/data -v "$PWD":/out alpine cp /data/finance.sqlite /out/finance.sqlite'
+scp servidor:finance.sqlite ./finance.sqlite
+bun run db:repair-links --v2-sqlite=./finance.sqlite --email=<email>
+bun run db:repair-links --v2-sqlite=./finance.sqlite --email=<email> --execute
+
+# 3) Comprobar que repetirlo no cambia nada (plan vacío) y devolver la base al volumen:
+#    propietario UID 1000, borrar finance.sqlite-wal y -shm, y arrancar.
+bun run db:repair-links --v2-sqlite=./finance.sqlite --email=<email>
+scp ./finance.sqlite servidor:finance.sqlite
+ssh servidor 'docker run --rm -v finance-data:/data -v "$PWD":/in alpine sh -c "cp /in/finance.sqlite /data/finance.sqlite && rm -f /data/finance.sqlite-wal /data/finance.sqlite-shm && chown 1000:1000 /data/finance.sqlite"'
+ssh servidor 'cd ~/finance-prod && docker compose up -d'
+```
+
+Mientras la app está parada nadie escribe, así que la base reparada no pierde datos. Si algo sale
+mal, restaura la copia diaria como se indica en «Copias». Después, en Inversión, las unidades de BTC
+y de ETH deben ser la suma de todas sus compras y ETH debe figurar en Bitvavo.
+
+## Convertir las cuentas-ETF en instrumentos de Trade Republic
+
+`bun run db:merge-accounts` (#564) fusiona las cuentas heredadas «ETF XDWH», «ETF IQQI», «ETF AGED»,
+«ETF SXRS» y «ETF Plata» en una única cuenta de inversión «Trade Republic» (la crea si falta, ADR
+0011). Para cada cuenta heredada:
+
+- suma lo que valía en cada cierre mensual (saldo arrastrado y movimientos incluidos) y su saldo
+  inicial en Trade Republic;
+- pasa su instrumento (el que apunta a ella) a Trade Republic;
+- reasigna sus movimientos: cuenta destino Trade Republic y, si no lo tenían, su instrumento;
+- pasa su parte de cada aporte a Trade Republic;
+- la **archiva**, sin borrarla, con saldo inicial 0.
+
+La correspondencia cuenta heredada → cuenta de inversión es el argumento repetible
+`--merge=<cuenta>=<cuenta de inversión>`; por defecto, las cinco cuentas «ETF …» → Trade Republic.
+«Acciones», «Oro» y «Fondos Indexados» no se tocan mientras no se indique su broker. Una cuenta sin
+instrumento (no tiene símbolo en Ajustes) bloquea la ejecución: se lista como `BLOQUEO` en el plan.
+
+Por defecto **solo simula**: imprime las cuentas, los cierres, los aportes y los movimientos afectados
+y no escribe nada. `--execute` aplica exactamente ese plan en una sola transacción, tras dejar una
+copia de la base (`<base>.antes-fusion-cuentas-<fecha>`). Antes de confirmar comprueba que el
+patrimonio de cada mes (calculado como el cliente) y el capital aportado total son idénticos a antes;
+si no lo son, o si los datos cambiaron desde la simulación, aborta sin escribir nada. Cada fila tocada
+sube su versión y entra en `sync_changes`, así que los demás dispositivos la reciben. Es idempotente:
+sobre datos ya fusionados el plan sale sin cuentas (las ya fusionadas se listan como tales).
+
+Se lanza con el mismo procedimiento que la reparación de vínculos (la app en Docker no lleva `bun`):
+sobre una copia de la base, con la app parada, y devolviéndola al volumen.
+
+```sh
+# 1) Copia de producción y simulación (la app puede seguir en marcha). Revisa el plan: las cinco
+#    cuentas, un cierre por mes con su saldo en Trade Republic y los movimientos reasignados.
+scp servidor:/var/backups/finance/<última copia>.gz . && gunzip -c <última copia>.gz > finance.sqlite
+bun run db:merge-accounts --v2-sqlite=./finance.sqlite --email=<email>
+
+# 2) Ventana de mantenimiento: parar la app, copiar la base del volumen y fusionar.
+ssh servidor 'cd ~/finance-prod && docker compose stop'
+ssh servidor 'docker run --rm -v finance-data:/data -v "$PWD":/out alpine cp /data/finance.sqlite /out/finance.sqlite'
+scp servidor:finance.sqlite ./finance.sqlite
+bun run db:merge-accounts --v2-sqlite=./finance.sqlite --email=<email>            # el plan revisado
+bun run db:merge-accounts --v2-sqlite=./finance.sqlite --email=<email> --execute  # lo aplica
+
+# 3) Comprobar que repetirlo no cambia nada (plan sin cuentas) y devolver la base al volumen:
+#    propietario UID 1000, borrar finance.sqlite-wal y -shm, y arrancar.
+bun run db:merge-accounts --v2-sqlite=./finance.sqlite --email=<email>
+scp ./finance.sqlite servidor:finance.sqlite
+ssh servidor 'docker run --rm -v finance-data:/data -v "$PWD":/in alpine sh -c "cp /in/finance.sqlite /data/finance.sqlite && rm -f /data/finance.sqlite-wal /data/finance.sqlite-shm && chown 1000:1000 /data/finance.sqlite"'
+ssh servidor 'cd ~/finance-prod && docker compose up -d'
+```
+
+Mientras la app está parada nadie escribe. Si algo sale mal, restaura la copia diaria como se indica
+en «Copias». Después, en Inversión, el detalle de Trade Republic debe mostrar los cinco instrumentos
+y el patrimonio de cada mes debe ser el mismo que antes. Ejecútalo después de `db:repair-links`.
+
 ## Diferencia con preview
 
 `bun run preview` prueba la compilación de Cloudflare mediante workerd. Este despliegue

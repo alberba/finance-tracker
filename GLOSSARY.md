@@ -46,7 +46,7 @@ _Avoid_: trade suelto, detalle
 
 **Plantilla de movimiento**:
 El conjunto de datos que describe qué movimiento hay que crear: tipo, importe, categoría,
-descripción, cuenta y, si es de inversión, la operación o, si es de ahorro, la cuenta destino. Una regla recurrente es una plantilla
+descripción, cuenta y, si es de inversión, la operación y la cuenta de inversión destino o, si es de ahorro, la cuenta destino. Una regla recurrente es una plantilla
 más un calendario; un movimiento pendiente es una plantilla más una fecha; un movimiento es una
 plantilla ya ocurrida.
 _Avoid_: borrador, payload
@@ -67,7 +67,8 @@ _Avoid_: meta de ahorro, objetivo ligado a una cuenta
 
 **Cuenta**:
 Un sitio donde hay dinero, con un tipo: efectivo, inversión o pasivo. Las tres listas de la
-interfaz son vistas filtradas de lo mismo.
+interfaz son vistas filtradas de lo mismo. Una cuenta de inversión (Trade Republic, Bitvavo…)
+contiene posiciones, no es un activo ni lleva símbolo.
 _Avoid_: activo de inversión y pasivo como entidades propias
 
 **Cursor de sincronización**:
@@ -104,9 +105,18 @@ Un gasto periódico que se registra para analizar el gasto fijo. No genera movim
 misma.
 _Avoid_: regla recurrente, cargo fijo
 
+**Instrumento**:
+Lo que se compra y se vende: BTC, ETH, XDWH… Tiene un símbolo, un tipo (acción, ETF, fondo o
+cripto) y una cotización. No es un sitio donde haya dinero: eso es una cuenta, y por eso una
+cuenta no lleva símbolo (ADR 0011).
+_Avoid_: activo, valor, ticker (es el símbolo con el que cotiza)
+
 **Posición**:
-Lo que se tiene ahora de un activo: títulos, valor, capital invertido y peso en la cartera.
-_Avoid_: holding, activo (a secas)
+Lo que se tiene de un instrumento en una cuenta de inversión: títulos, precio medio de compra,
+valor, capital invertido, ganancia y peso dentro de la cuenta. Su clave es la pareja cuenta ×
+instrumento; una posición sin títulos no existe y los movimientos sin instrumento o sin títulos
+suman a la cuenta pero no forman posición.
+_Avoid_: holding, activo (a secas), posición de una cuenta (la cuenta tiene posiciones, no es una)
 
 **Cierre**:
 Un punto de valoración de la cartera en una fecha. Sale de un snapshot de patrimonio o se añade

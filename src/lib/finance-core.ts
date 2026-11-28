@@ -11,6 +11,7 @@ export interface Transaction {
   month: Month
   type: TxType
   accountId: string
+  /** A saving's cash account, or the investment account an investment lands in. */
   destinationAccountId?: string
   category: string
   description?: string
@@ -23,6 +24,13 @@ export interface Entity {
   id: string
   name: string
   openingBalance: number
+  /** Retired: kept so its history resolves, never offered for new movements. */
+  archived?: boolean
+}
+
+/** The accounts still offered for new movements: the archived ones stay out. */
+export function activeEntities<T extends Pick<Entity, 'archived'>>(entities: readonly T[]): T[] {
+  return entities.filter((entity) => !entity.archived)
 }
 
 export interface Snapshot {
@@ -172,6 +180,24 @@ export function matchesInvestmentAsset(
   )
 }
 
+/**
+ * Whether an investment movement belongs to an investment account. The rule:
+ * the explicit destination account first (ADR 0007), then the instrument's
+ * account, then the category (legacy). A destination that is no longer one of
+ * the accounts does not decide, so the movement is not orphaned by it.
+ */
+export function movementBelongsToInvestmentAsset(
+  tx: Pick<Transaction, 'category' | 'instrumentId' | 'destinationAccountId'>,
+  asset: Entity,
+  assets: Entity[],
+  instruments?: InstrumentAssetLink[],
+): boolean {
+  if (tx.destinationAccountId && assets.some((item) => item.id === tx.destinationAccountId)) {
+    return tx.destinationAccountId === asset.id
+  }
+  return matchesInvestmentAsset(tx.category, asset, tx.instrumentId, instruments)
+}
+
 export function computeInvestmentValue(
   assetId: string,
   month: MonthOrStart,
@@ -202,7 +228,7 @@ export function computeInvestmentValue(
     if (txMonth <= startMonth || txMonth > month) {
       return
     }
-    if (!matchesInvestmentAsset(item.category, asset, item.instrumentId, instruments)) {
+    if (!movementBelongsToInvestmentAsset(item, asset, assets, instruments)) {
       return
     }
     value += Number(item.amount || 0)

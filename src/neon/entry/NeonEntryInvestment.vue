@@ -39,6 +39,11 @@ function nowTime(): string {
   return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
 }
 
+/** The id when it is an investment account still offered for new movements. */
+function activeInvestmentAccountId(id: string | undefined): string | undefined {
+  return financialStateStore.activeInvestmentAssets.find((asset) => asset.id === id)?.id
+}
+
 const form = reactive({
   side: (props.preset?.side ?? 'buy') as InvestmentSide,
   symbol: props.preset?.symbol ?? '',
@@ -46,6 +51,15 @@ const form = reactive({
   accountId:
     investmentStore.accounts.find((account) => account.id === props.preset?.accountId)?.id ??
     investmentStore.accounts[0]?.id ??
+    '',
+  investmentAccountId:
+    activeInvestmentAccountId(props.preset?.destinationAccountId) ??
+    activeInvestmentAccountId(
+      props.preset?.symbol
+        ? investmentStore.defaultInvestmentAccountId(props.preset.symbol)
+        : undefined,
+    ) ??
+    financialStateStore.activeInvestmentAssets[0]?.id ??
     '',
   units: '',
   unitPrice: '',
@@ -57,11 +71,33 @@ const form = reactive({
   toCash: false,
 })
 
+// The investment account follows the instrument of the typed symbol until the
+// user picks one; a symbol with no instrument leaves what was there.
+let investmentAccountPicked = false
+watch(
+  () => form.symbol,
+  (symbol) => {
+    if (investmentAccountPicked) return
+    const account = activeInvestmentAccountId(investmentStore.defaultInvestmentAccountId(symbol))
+    if (account) form.investmentAccountId = account
+  },
+)
+function pickInvestmentAccount(accountId: string): void {
+  investmentAccountPicked = true
+  form.investmentAccountId = accountId
+}
+
 const isBitvavo = computed(() => investmentStore.isBitvavoBrokerAccount(form.accountId))
 const canSync = computed(() => stockEventsStore.canSyncSymbol(form.symbol))
 
 const brokerOptions = computed(() =>
   investmentStore.accounts.map((account) => ({ value: account.id, label: account.name })),
+)
+const investmentAccountOptions = computed(() =>
+  financialStateStore.activeInvestmentAssets.map((asset) => ({
+    value: asset.id,
+    label: asset.name,
+  })),
 )
 const categoryOptions = computed(() =>
   (isBitvavo.value ? ['Crypto'] : investmentStore.investmentCategories).map((name) => ({
@@ -124,6 +160,7 @@ function save(): boolean {
     fee: asInput(form.fee) || '0',
     movementCurrency: form.movementCurrency,
     accountId: form.accountId,
+    destinationAccountId: form.investmentAccountId || undefined,
     declared: form.declared,
     toCash: canSync.value && form.toCash,
   })
@@ -227,6 +264,13 @@ const numberClass = `${ENTRY_FIELD_CLASS} font-display text-end tabular-nums`
     :icon="ACCOUNT_ICON"
     label="Broker"
     :options="brokerOptions"
+  />
+  <NeonEntryPicker
+    :model-value="form.investmentAccountId"
+    :icon="ACCOUNT_ICON"
+    label="Cuenta de inversión"
+    :options="investmentAccountOptions"
+    @update:model-value="pickInvestmentAccount"
   />
   <NeonEntryPicker
     v-model="form.category"

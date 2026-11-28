@@ -121,6 +121,7 @@ async function seedFullDataset(db: TestDatabase['db'], userId: string): Promise<
     transactionsRepository.create(userId, {
       legacyId: 'tx-1',
       accountId: account.id,
+      destinationAccountId: account.id,
       categoryId: category.id,
       type: 'investment',
       date: '2026-03-02',
@@ -530,6 +531,29 @@ describe('GET /api/data/export + POST /api/data/import', () => {
     },
   )
 
+  it('restores how the cover of Inversión is grouped, and drops a grouping that does not exist', async () => {
+    const { POST } = await import('../../../../src/pages/api/data/import')
+    const url = new URL('https://example.test/api/data/import?mode=replace')
+    const restore = (investmentGrouping: string) =>
+      POST({
+        request: postJson(url.href, { settings: { investmentGrouping } }),
+        locals: { principal },
+        url,
+      } as never)
+
+    expect((await restore('instrument')).status).toBe(200)
+    expect(
+      (await runWithDb(testDb.db, userSettingsRepository.get(principal.userId)))
+        ?.investmentGrouping,
+    ).toBe('instrument')
+
+    expect((await restore('broker')).status).toBe(200)
+    expect(
+      (await runWithDb(testDb.db, userSettingsRepository.get(principal.userId)))
+        ?.investmentGrouping,
+    ).toBeNull()
+  })
+
   it('preserves completed onboarding when replacement has no settings', async () => {
     await runWithDb(
       testDb.db,
@@ -578,7 +602,10 @@ describe('GET /api/data/export + POST /api/data/import', () => {
     ])
     // Both nested relations and the export's own `operation` projection are
     // present; the raw bootstrap `tradeDetail` must not leak into the backup.
-    const investment = exported.transactions.find((transaction: Row) => transaction.legacyId === 'tx-1')
+    const investment = exported.transactions.find(
+      (transaction: Row) => transaction.legacyId === 'tx-1',
+    )
+    expect(investment.destinationAccountId).toEqual(expect.any(String))
     expect(investment.operation).toEqual({
       instrumentId: expect.any(String),
       symbol: 'VWCE',
@@ -587,16 +614,14 @@ describe('GET /api/data/export + POST /api/data/import', () => {
       unitPrice: 100,
       fee: 0.5,
     })
-    expect(
-      exported.transactions.every((transaction: Row) => !('tradeDetail' in transaction)),
-    ).toBe(true)
+    expect(exported.transactions.every((transaction: Row) => !('tradeDetail' in transaction))).toBe(
+      true,
+    )
     // An array matcher also fixes the length: exactly one balance / allocation.
     expect(exported.wealthSnapshots[0].balances).toMatchObject([
       { balance: 1234.56, currency: 'EUR' },
     ])
-    expect(exported.contributions[0].allocations).toMatchObject([
-      { amount: 300, currency: 'EUR' },
-    ])
+    expect(exported.contributions[0].allocations).toMatchObject([{ amount: 300, currency: 'EUR' }])
     // The export has no year scope: the 2025 movement travels in the backup.
     expect(
       exported.transactions.some((transaction: Row) => transaction.legacyId === 'tx-2025'),

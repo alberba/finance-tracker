@@ -58,8 +58,8 @@ describe('buildInvestmentDashboardViewModel · posiciones', () => {
   it('lista las posiciones con valor, de mayor a menor, con peso sobre el total', () => {
     const vm = buildInvestmentDashboardViewModel(portfolio(), 3, 'simple')
 
-    expect(vm.positions.map((position) => position.id)).toEqual(['fondos', 'oro'])
-    const [fondos, oro] = vm.positions
+    expect(vm.accounts.map((position) => position.id)).toEqual(['fondos', 'oro'])
+    const [fondos, oro] = vm.accounts
     expect(fondos).toMatchObject({ name: 'Fondos', value: 2200, invested: 2200, gain: 0 })
     expect(oro).toMatchObject({ name: 'Oro', value: 200, invested: 200 })
     expect(fondos.weight).toBeCloseTo((2200 / 2400) * 100)
@@ -90,21 +90,22 @@ describe('buildInvestmentDashboardViewModel · posiciones', () => {
     })
 
     const vm = buildInvestmentDashboardViewModel(state, 2, 'simple')
-    expect(vm.positions).toHaveLength(1)
-    expect(vm.positions[0]).toMatchObject({
+    expect(vm.accounts).toHaveLength(1)
+    expect(vm.accounts[0]).toMatchObject({
       id: 'acciones',
       value: 100,
       invested: 100,
-      units: 1,
-      symbol: 'AAPL',
     })
+    expect(vm.positions.map((position) => [position.accountId, position.symbol])).toEqual([
+      ['acciones', 'AAPL'],
+    ])
   })
 
   it('omite los activos sin valor en el mes', () => {
     const vm = buildInvestmentDashboardViewModel(portfolio(), 1, 'simple')
 
-    expect(vm.positions.map((position) => position.id)).toEqual(['fondos'])
-    expect(vm.positions[0].weight).toBe(100)
+    expect(vm.accounts.map((position) => position.id)).toEqual(['fondos'])
+    expect(vm.accounts[0].weight).toBe(100)
   })
 
   it('calcula resultado y rentabilidad con el valor del snapshot', () => {
@@ -118,89 +119,33 @@ describe('buildInvestmentDashboardViewModel · posiciones', () => {
       'simple',
     )
 
-    const fondos = vm.positions.find((position) => position.id === 'fondos')!
+    const fondos = vm.accounts.find((position) => position.id === 'fondos')!
     expect(fondos.gain).toBe(220)
     expect(fondos.returnPct).toBeCloseTo(10)
     expect(vm.gain).toBe(vm.portfolioValue - vm.investedCapital)
   })
 
-  it('da el detalle de cada posición: instrumento, títulos, precio medio y último movimiento', () => {
-    const vm = buildInvestmentDashboardViewModel(portfolio(), 7, 'simple')
-
-    const oro = vm.positions.find((position) => position.id === 'oro')!
-    expect(oro.symbol).toBe('SGLN')
-    expect(oro.units).toBe(6)
-    expect(oro.averagePrice).toBeCloseTo((4 * 50 + 2 * 60) / 6)
-    expect(oro.lastMovementDate).toBe('2026-05-02')
-  })
-
-  it('solo cuenta los movimientos hasta el mes de análisis', () => {
-    const vm = buildInvestmentDashboardViewModel(portfolio(), 3, 'simple')
-
-    const oro = vm.positions.find((position) => position.id === 'oro')!
-    expect(oro.units).toBe(4)
-    expect(oro.lastMovementDate).toBe('2026-02-20')
-  })
-
-  it('prefiere el símbolo del instrumento vinculado al activo', () => {
-    const vm = buildInvestmentDashboardViewModel(
-      portfolio({
-        instruments: [
-          {
-            id: 'i-oro',
-            investmentAssetId: 'oro',
-            type: 'etf',
-            symbol: 'SGLN.L',
-            market: 'LSE',
-            currency: 'EUR',
-            provider: 'yahoo',
-            active: true,
-          },
-        ],
-      }),
-      7,
-      'simple',
-    )
-
-    expect(vm.positions.find((position) => position.id === 'oro')!.symbol).toBe('SGLN.L')
-  })
-
-  it('las ventas restan títulos y no cuentan para el precio medio', () => {
-    const state = portfolio()
-    state.transactions.push({
-      ...state.transactions[0],
-      id: 't5',
-      date: '2026-03-01',
-      month: 3,
-      side: 'sell',
-      units: 5,
-      unitPrice: 150,
-      amount: -750,
+  it('expone las posiciones de cada cuenta junto a las cuentas', () => {
+    const state = portfolio({
+      instruments: [
+        {
+          id: 'i-vwce',
+          investmentAssetId: 'fondos',
+          type: 'etf',
+          symbol: 'VWCE',
+          market: 'XETRA',
+          currency: 'EUR',
+          provider: 'yahoo',
+          active: true,
+        },
+      ],
     })
 
-    const fondos = buildInvestmentDashboardViewModel(state, 3, 'simple').positions.find(
-      (position) => position.id === 'fondos',
-    )!
-    expect(fondos.units).toBe(15)
-    expect(fondos.averagePrice).toBeCloseTo(110)
-  })
+    const vm = buildInvestmentDashboardViewModel(state, 3, 'simple')
 
-  it('deja sin detalle las posiciones sin operaciones con títulos', () => {
-    const vm = buildInvestmentDashboardViewModel(
-      portfolio({
-        transactions: [],
-        investmentAssets: [{ id: 'fondos', name: 'Fondos', openingBalance: 1000 }],
-      }),
-      1,
-      'simple',
-    )
-
-    expect(vm.positions[0]).toMatchObject({
-      symbol: null,
-      units: null,
-      averagePrice: null,
-      lastMovementDate: null,
-    })
+    expect(
+      vm.positions.map((position) => [position.accountId, position.symbol, position.units]),
+    ).toEqual([['fondos', 'VWCE', 20]])
   })
 })
 
@@ -224,7 +169,7 @@ describe('buildInvestmentDashboardViewModel · series', () => {
   it('cada posición trae su serie de rentabilidad con los mismos puntos', () => {
     const vm = buildInvestmentDashboardViewModel(portfolio(), 3, 'simple')
 
-    expect(vm.positions[0].series.values).toHaveLength(vm.chartLabels.length)
+    expect(vm.accounts[0].series.values).toHaveLength(vm.chartLabels.length)
   })
 
   it('fecha el valor de la cartera al cierre del mes de análisis', () => {

@@ -204,6 +204,29 @@ export async function assertSavingAccounts(
 }
 
 /**
+ * The destination of an investment movement is one of the user's investment
+ * accounts: the account the instrument lands in (ADR 0007, ADR 0011).
+ */
+export async function assertInvestmentDestination(
+  db: Db,
+  userId: string,
+  destinationAccountId: string,
+): Promise<void> {
+  const [account] = await db
+    .select({ kind: schema.accounts.kind })
+    .from(schema.accounts)
+    .where(and(eq(schema.accounts.id, destinationAccountId), eq(schema.accounts.userId, userId)))
+  if (!account) {
+    throw new RejectedCommandError('La cuenta indicada no existe o no pertenece al usuario.')
+  }
+  if (account.kind !== 'investment') {
+    throw new RejectedCommandError(
+      'La cuenta destino de una inversión debe ser una cuenta de inversión.',
+    )
+  }
+}
+
+/**
  * Cross-tenant FK-ownership guard (WP10 security fix).
  *
  * `accountId`/`categoryId` columns on `transactions`, `subscriptions`,

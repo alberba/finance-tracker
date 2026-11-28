@@ -1,4 +1,5 @@
 import { parseDashboardLayout } from '../lib/dashboard-layout'
+import { DEFAULT_INVESTMENT_GROUPING, parseInvestmentGrouping } from '../lib/investment-grouping'
 import { remoteOperationSchema } from '../lib/bitvavo-types'
 import { asMonth } from '../lib/month'
 import { FINANCE_TRACKER_SEED } from '../data/seed'
@@ -57,6 +58,7 @@ export const EMPTY_STATE_SEED = {
   tourMobileSeen: false,
   theme: null,
   dashboardLayout: null,
+  investmentGrouping: DEFAULT_INVESTMENT_GROUPING,
   currency: 'EUR',
   twrLiquidityAccountIds: [],
   accounts: [],
@@ -168,6 +170,8 @@ export function normalizeState(candidate: unknown): State {
     tourMobileSeen: input?.tourMobileSeen === true,
     theme: typeof input?.theme === 'string' && input.theme ? input.theme : null,
     dashboardLayout: parseDashboardLayout(input?.dashboardLayout),
+    investmentGrouping:
+      parseInvestmentGrouping(input?.investmentGrouping) ?? DEFAULT_INVESTMENT_GROUPING,
     twrLiquidityAccountIds,
     accounts,
     investmentAssets: normalizeEntities(input?.investmentAssets || base.investmentAssets || []),
@@ -272,6 +276,7 @@ function normalizeEntities(list: unknown): Entity[] {
         id: slug(rawItem.id || rawItem.name || uid('item')),
         name: String(rawItem.name || rawItem.id || 'Item'),
         openingBalance: round2(parseFloatSafe(rawItem.openingBalance, 0)),
+        ...(rawItem.archived === true ? { archived: true } : {}),
       }
     })
     .filter((item) => item.name)
@@ -606,7 +611,7 @@ function normalizeTransactions(list: unknown): Transaction[] {
         .slice(0, 3)
       if (movementCurrency) safe.movementCurrency = movementCurrency
 
-      if (type === 'saving') {
+      if (type === 'saving' || type === 'investment') {
         const destinationAccountId = String(rawItem.destinationAccountId || '').trim()
         if (destinationAccountId) safe.destinationAccountId = destinationAccountId
       }

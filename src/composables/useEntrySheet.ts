@@ -8,6 +8,8 @@ export interface InvestmentEntryPreset {
   symbol: string
   category: string
   accountId?: string
+  /** The investment account the asset is: where the operation lands. */
+  destinationAccountId?: string
   currency?: string
 }
 

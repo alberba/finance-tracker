@@ -3,17 +3,25 @@ import { computed, ref } from 'vue'
 
 import { useMediaQuery } from '../../../composables/useMediaQuery'
 import type { ReturnMode } from '../../../domain/investment/view-model'
+import type { InvestmentGrouping } from '../../../lib/investment-grouping'
 import NeonChoiceMenu, { type ChoiceGroup } from '../../ui/NeonChoiceMenu.vue'
 import NeonDetailPanel from '../../ui/NeonDetailPanel.vue'
 import NeonEmptyState from '../../ui/NeonEmptyState.vue'
 import { listSheetGesture, releaseVelocity } from '../../ui/sheet-drag'
+import {
+  groupingMenu,
+  groupingTitle,
+  type CoverList,
+  type InstrumentRow,
+  type TypeSection,
+} from './cover-groups'
 import NeonInvestmentCardRows from './NeonInvestmentCardRows.vue'
 import NeonInvestmentCompactChart from './NeonInvestmentCompactChart.vue'
 import {
   type Card,
   type CompactChart,
   type LeadFigure,
-  type PositionRow,
+  type AccountRow,
   type QuoteNotice,
   TONE_TEXT,
   type Tone,
@@ -28,7 +36,8 @@ import {
 // height, dragging it down brings them back, and a tap on the grip does the
 // same. At the foot of the sheet, the worst fall and the fees, each in its own
 // panel. «Nueva operación» is the frame's «Apuntar» button, so there is none
-// here.
+// here. The sheet's list follows the grouping the user chose (#562): accounts,
+// instruments, or instruments under a heading per type.
 const props = defineProps<{
   empty: boolean
   notice: QuoteNotice | null
@@ -40,7 +49,7 @@ const props = defineProps<{
   method: ReturnMode
   /** Today's return under each method, for the method menu. */
   returns: Record<ReturnMode, { text: string; tone: Tone }>
-  rows: readonly PositionRow[]
+  list: CoverList
   cards: readonly Card[]
   /** The cover is coming in: the rows follow the sheet (see the section). */
   entering: boolean
@@ -53,6 +62,7 @@ const rowAt = (index: number) => 100 + Math.min(index, 8) * 25
 const emit = defineEmits<{
   open: [id: string]
   method: [method: ReturnMode]
+  group: [grouping: InvestmentGrouping]
 }>()
 
 const hot = ref<number | null>(null)
@@ -84,8 +94,27 @@ const methodGroups = computed<ChoiceGroup<ReturnMode>[]>(() => [
   },
 ])
 
+// What the sheet lists: rows, and for the type grouping a heading before each type's rows.
+type Row = AccountRow | InstrumentRow
+type Item =
+  { kind: 'heading'; id: string; section: TypeSection } | { kind: 'row'; id: string; row: Row }
+const items = computed<Item[]>(() => {
+  const list = props.list
+  const asRow = (row: Row): Item => ({ kind: 'row', id: row.id, row })
+  if (list.grouping !== 'type') return list.rows.map(asRow)
+  return list.sections.flatMap((section) => [
+    { kind: 'heading' as const, id: `type:${section.id}`, section },
+    ...section.rows.map(asRow),
+  ])
+})
+
 // The short weight bar of each row, against the largest position.
-const maxWeight = computed(() => Math.max(1, ...props.rows.map((row) => row.weightPct)))
+const maxWeight = computed(() =>
+  Math.max(1, ...items.value.flatMap((item) => (item.kind === 'row' ? [item.row.weightPct] : []))),
+)
+
+const menu = computed(() => groupingMenu(props.list.grouping))
+const typeLabel = (row: Row): string | null => ('typeLabel' in row ? row.typeLabel : null)
 
 // Each card at the foot of the sheet reads as one figure: its first row, with
 // the last one under it («Recuperación · 3 meses»). A card of a single row
@@ -285,8 +314,8 @@ const BLEED = '-mx-[clamp(16px,2.6vw,40px)]'
     <section
       class="bg-panel rounded-t-sheet motion-safe:animate-rise flex min-h-0 flex-1 flex-col px-4 pbe-3.5 motion-safe:[animation-delay:100ms]"
       :class="BLEED"
-      aria-labelledby="investment-positions-title"
-      data-investment-positions
+      aria-labelledby="investment-accounts-title"
+      data-investment-accounts
     >
       <!-- The whole head drags the sheet; the grip is its button. -->
       <div
@@ -301,70 +330,100 @@ const BLEED = '-mx-[clamp(16px,2.6vw,40px)]'
           type="button"
           class="outline-accent grid min-h-11 w-full place-items-center rounded-full focus-visible:outline-2 focus-visible:-outline-offset-2"
           :aria-expanded="expanded"
-          :aria-label="
-            expanded ? 'Reducir la lista de posiciones' : 'Ampliar la lista de posiciones'
-          "
+          :aria-label="expanded ? 'Reducir la lista' : 'Ampliar la lista'"
           data-sheet-grip
           @click="onGripClick"
         >
           <span class="bg-ctrl-line rounded-pill block h-1 w-9" aria-hidden="true"></span>
         </button>
-        <h2 id="investment-positions-title" class="text-block-title m-0 font-extrabold">
-          Posiciones
-        </h2>
+        <div class="flex items-center justify-between gap-3">
+          <h2 id="investment-accounts-title" class="text-block-title m-0 font-extrabold">
+            {{ groupingTitle(list.grouping) }}
+          </h2>
+          <!-- The menu is not part of the drag: a press on it does not move the sheet. -->
+          <div @pointerdown.stop @pointerup.stop @pointermove.stop @pointercancel.stop>
+            <NeonChoiceMenu
+              :text="menu.text"
+              label="Agrupar por"
+              :groups="menu.groups"
+              data-investment-grouping-menu
+              @select="(_, value) => emit('group', value)"
+            />
+          </div>
+        </div>
       </div>
       <ul
         class="m-0 min-h-0 flex-1 [scrollbar-width:none] list-none overflow-y-auto overscroll-contain p-0"
       >
-        <li
-          v-for="(row, index) in rows"
-          :key="row.id"
-          class="border-line border-bs last:border-be"
-          :class="entering && 'motion-safe:animate-row'"
-          :style="entering ? { animationDelay: `${rowAt(index)}ms` } : undefined"
-        >
-          <button
-            type="button"
-            class="outline-accent grid min-h-16 w-full grid-cols-[minmax(0,1fr)_auto_3.6rem] items-baseline gap-x-2.5 gap-y-1 py-2.5 text-start focus-visible:outline-2 focus-visible:-outline-offset-2 motion-safe:transition-transform motion-safe:duration-160 motion-safe:ease-out motion-safe:active:scale-[0.99]"
-            :aria-label="row.openLabel"
-            :data-investment-position="row.id"
-            @click="emit('open', row.id)"
+        <template v-for="(item, index) in items" :key="item.id">
+          <li
+            v-if="item.kind === 'heading'"
+            class="border-line flex items-baseline justify-between gap-3 border-bs pbs-3 pbe-1"
+            :data-investment-type="item.section.id"
           >
-            <span class="text-row min-w-0 truncate font-bold">{{ row.name }}</span>
-            <span
-              class="font-display text-figure-row col-span-2 text-end font-semibold whitespace-nowrap tabular-nums"
-            >
-              {{ row.value }}
+            <h3 class="text-muted text-label tracking-label m-0 font-extrabold uppercase">
+              {{ item.section.title }}
+            </h3>
+            <span class="text-meta flex items-baseline gap-2 font-bold whitespace-nowrap">
+              <span class="text-soft tabular-nums">{{ item.section.summary.weight }}</span>
+              <span class="font-display tabular-nums">{{ item.section.summary.value }}</span>
+              <span class="tabular-nums" :class="TONE_TEXT[item.section.summary.tone]">
+                {{ item.section.summary.gain }}
+              </span>
             </span>
-            <span class="text-meta flex min-w-0 items-center gap-2">
+          </li>
+          <li
+            v-else
+            class="border-line border-bs last:border-be"
+            :class="entering && 'motion-safe:animate-row'"
+            :style="entering ? { animationDelay: `${rowAt(index)}ms` } : undefined"
+          >
+            <button
+              type="button"
+              class="outline-accent grid min-h-16 w-full grid-cols-[minmax(0,1fr)_auto_3.6rem] items-baseline gap-x-2.5 gap-y-1 py-2.5 text-start focus-visible:outline-2 focus-visible:-outline-offset-2 motion-safe:transition-transform motion-safe:duration-160 motion-safe:ease-out motion-safe:active:scale-[0.99]"
+              :aria-label="item.row.openLabel"
+              :data-investment-account="list.grouping === 'account' ? item.row.id : undefined"
+              :data-investment-instrument="list.grouping === 'account' ? undefined : item.row.id"
+              @click="emit('open', item.row.id)"
+            >
+              <span class="text-row min-w-0 truncate font-bold">
+                {{ item.row.name }}
+                <span v-if="typeLabel(item.row)" class="text-muted text-meta font-bold">
+                  {{ typeLabel(item.row) }}
+                </span>
+              </span>
               <span
-                v-if="row.symbol"
-                class="text-muted font-mono text-[12px] font-bold tracking-[0.04em]"
+                class="font-display text-figure-row col-span-2 text-end font-semibold whitespace-nowrap tabular-nums"
               >
-                {{ row.symbol }}
+                {{ item.row.value }}
               </span>
-              <span class="bg-line rounded-pill h-[3px] w-11 flex-none" aria-hidden="true">
-                <span
-                  class="bg-neutral-bar rounded-pill block h-full"
-                  :style="{ inlineSize: `${(row.weightPct / maxWeight) * 100}%` }"
-                ></span>
+              <span class="text-meta flex min-w-0 items-center gap-2">
+                <span v-if="item.row.holdings" class="text-muted font-bold">
+                  {{ item.row.holdings }}
+                </span>
+                <span class="bg-line rounded-pill h-[3px] w-11 flex-none" aria-hidden="true">
+                  <span
+                    class="bg-neutral-bar rounded-pill block h-full"
+                    :style="{ inlineSize: `${(item.row.weightPct / maxWeight) * 100}%` }"
+                  ></span>
+                </span>
+                <span class="text-soft font-extrabold">{{ item.row.weight }}</span>
               </span>
-              <span class="text-soft font-extrabold">{{ row.weight }}</span>
-            </span>
-            <span
-              class="text-meta text-end font-extrabold whitespace-nowrap tabular-nums"
-              :class="TONE_TEXT[row.tone]"
-            >
-              {{ row.gain }}
-            </span>
-            <span
-              class="text-meta text-end font-bold whitespace-nowrap tabular-nums"
-              :class="TONE_TEXT[row.tone]"
-            >
-              {{ row.ret }}
-            </span>
-          </button>
-        </li>
+              <span
+                class="text-meta text-end font-extrabold whitespace-nowrap tabular-nums"
+                :class="TONE_TEXT[item.row.tone]"
+              >
+                {{ item.row.gain }}
+              </span>
+              <span
+                class="text-meta text-end font-bold whitespace-nowrap tabular-nums"
+                :class="TONE_TEXT[item.row.tone]"
+              >
+                {{ item.row.ret }}
+              </span>
+            </button>
+          </li>
+        </template>
       </ul>
       <!-- The worst fall and the fees, one figure each; a tap opens its panel. -->
       <div class="grid flex-none grid-cols-2 gap-2 pbs-2.5">

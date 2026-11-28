@@ -6,6 +6,7 @@ import { nextTick } from 'vue'
 import { useEntrySheet } from '../../src/composables/useEntrySheet'
 import NeonEntrySheet from '../../src/neon/entry/NeonEntrySheet.vue'
 import { useFinancialStateStore } from '../../src/stores/financial-state'
+import { useUiStore } from '../../src/stores/ui'
 
 const showToast = vi.hoisted(() => vi.fn())
 vi.mock('../../src/scripts/toast', () => ({ showToast }))
@@ -110,5 +111,109 @@ describe('NeonEntrySheet', () => {
     expect((wrapper.get('[name="amount"]').element as HTMLInputElement).value).toBe('')
     expect((wrapper.get('[name="description"]').element as HTMLInputElement).value).toBe('')
     expect(wrapper.get('[data-entry-type="expense"]').attributes('aria-checked')).toBe('true')
+  })
+})
+
+describe('NeonEntrySheet: compra desde Inversión', () => {
+  beforeEach(() => {
+    useFinancialStateStore().patchState((draft) => {
+      draft.investmentAssets = [
+        { id: 'crypto', name: 'Crypto', openingBalance: 0 },
+        { id: 'bitvavo', name: 'Bitvavo', openingBalance: 0 },
+      ]
+      draft.instruments = [
+        {
+          id: 'i-eth',
+          investmentAssetId: 'crypto',
+          type: 'crypto',
+          symbol: 'ETH',
+          market: 'CRYPTO',
+          currency: 'EUR',
+          provider: 'yahoo',
+          active: true,
+        },
+      ]
+    })
+    useUiStore().ui.activeSection = 'investment'
+  })
+
+  const picker = (wrapper: Awaited<ReturnType<typeof openSheet>>, label: string) =>
+    wrapper
+      .findAllComponents({ name: 'NeonEntryPicker' })
+      .find((item) => (item.props() as { label: string }).label === label)
+
+  async function fillPurchase(wrapper: Awaited<ReturnType<typeof openSheet>>, symbol: string) {
+    await wrapper.get('[name="symbol"]').setValue(symbol)
+    await wrapper.get('[name="units"]').setValue('2')
+    await wrapper.get('[name="unitPrice"]').setValue('100')
+  }
+
+  it('pide la cuenta de inversión y propone la del instrumento del símbolo', async () => {
+    const wrapper = await openSheet()
+    await fillPurchase(wrapper, 'eth')
+
+    expect(picker(wrapper, 'Cuenta de inversión')?.props('modelValue')).toBe('crypto')
+
+    await wrapper.get('form').trigger('submit')
+
+    expect(transactions()[0]).toMatchObject({
+      type: 'investment',
+      symbol: 'ETH',
+      instrumentId: 'i-eth',
+      destinationAccountId: 'crypto',
+    })
+  })
+
+  it('guarda la cuenta de inversión que el usuario elige', async () => {
+    const wrapper = await openSheet()
+    await fillPurchase(wrapper, 'ETH')
+
+    // happy-dom has no popover API: choosing an option closes its panel with it.
+    Object.assign(HTMLElement.prototype, { hidePopover() {} })
+    const choice = picker(wrapper, 'Cuenta de inversión')!
+    const bitvavo = choice
+      .findAll('[data-picker-option]')
+      .find((option) => option.text() === 'Bitvavo')!
+    await bitvavo.trigger('click')
+    await wrapper.get('form').trigger('submit')
+    delete (HTMLElement.prototype as { hidePopover?: () => void }).hidePopover
+
+    expect(transactions()[0]).toMatchObject({
+      instrumentId: 'i-eth',
+      destinationAccountId: 'bitvavo',
+    })
+  })
+})
+
+describe('NeonEntrySheet: cuentas de inversión archivadas', () => {
+  beforeEach(() => {
+    useFinancialStateStore().patchState((draft) => {
+      draft.investmentAssets = [
+        { id: 'etf', name: 'ETF', openingBalance: 0, archived: true },
+        { id: 'tr', name: 'Trade Republic', openingBalance: 0 },
+      ]
+    })
+    useUiStore().ui.activeSection = 'investment'
+  })
+
+  const picker = (wrapper: Awaited<ReturnType<typeof openSheet>>) =>
+    wrapper
+      .findAllComponents({ name: 'NeonEntryPicker' })
+      .find((item) => (item.props() as { label: string }).label === 'Cuenta de inversión')!
+
+  it('no ofrece la cuenta archivada y arranca en la primera activa aunque el símbolo no tenga instrumento', async () => {
+    const wrapper = await openSheet()
+
+    expect((picker(wrapper).props() as { options: { value: string }[] }).options).toEqual([
+      expect.objectContaining({ value: 'tr' }),
+    ])
+    expect(picker(wrapper).props('modelValue')).toBe('tr')
+
+    await wrapper.get('[name="symbol"]').setValue('XYZ')
+    await wrapper.get('[name="units"]').setValue('2')
+    await wrapper.get('[name="unitPrice"]').setValue('100')
+    await wrapper.get('form').trigger('submit')
+
+    expect(transactions()[0]).toMatchObject({ symbol: 'XYZ', destinationAccountId: 'tr' })
   })
 })

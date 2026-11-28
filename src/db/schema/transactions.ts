@@ -67,7 +67,7 @@ export const transactions = sqliteTable(
  * 1:1 extension of an investment-type transaction with trade-specific
  * fields. `quantity` is stored as a decimal string (not `REAL`/`INTEGER`)
  * since fractional share/crypto units are not minimal-unit money amounts —
- * `src/domain/investment/valuation.ts`'s `round8` remains the float-based
+ * `src/lib/number.ts`'s `round8` remains the float-based
  * display concern for these, per WP2's scope note.
  */
 export const investmentTradeDetails = sqliteTable(

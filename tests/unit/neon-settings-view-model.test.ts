@@ -213,6 +213,24 @@ describe('contadores del índice', () => {
   })
 })
 
+describe('contadores del índice con cuentas archivadas', () => {
+  it('no cuenta los activos archivados', () => {
+    const counts = partCounts({
+      accounts: [],
+      investmentAssets: [
+        { id: 'tr', name: 'Trade Republic', openingBalance: 0 },
+        { id: 'etf', name: 'ETF', openingBalance: 0, archived: true },
+      ],
+      liabilities: [],
+      incomeCategories: [],
+      expenseCategories: [],
+      investmentCategories: [],
+      recurringRules: [],
+    })
+    expect(counts.activos).toBe(1)
+  })
+})
+
 describe('índice móvil', () => {
   const counts = {
     cuentas: 5,

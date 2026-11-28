@@ -1,4 +1,4 @@
-import type { Instrument } from '../../scripts/types'
+import type { Instrument, InstrumentQuoteSource } from '../../scripts/types'
 
 export function symbolsMatchInstrument(
   transactionSymbol: unknown,
@@ -63,9 +63,7 @@ export function normalizeSymbol(value: unknown): string {
     .toUpperCase()
 }
 
-export function yahooQuoteSymbol(
-  instrument: Pick<Instrument, 'symbol' | 'quoteSymbol' | 'type' | 'currency'>,
-): string {
+export function yahooQuoteSymbol(instrument: InstrumentQuoteSource): string {
   const symbol = normalizeSymbol(instrument.quoteSymbol || instrument.symbol)
   if (instrument.type !== 'crypto') return symbol
   if (symbol.includes('-')) return symbol

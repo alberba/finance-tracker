@@ -244,7 +244,27 @@ export const useSettingsStore = defineStore('settings', () => {
       .join(', ')
   }
 
+  /** What keeps an investment account as the destination of purchases and sales, in words. */
+  function investmentDestinationUse(accountId: string): string {
+    const count = financialStateStore.state.transactions.filter(
+      (tx) => tx.type === 'investment' && tx.destinationAccountId === accountId,
+    ).length
+    return count > 0
+      ? `${count} ${count === 1 ? 'movimiento de inversión' : 'movimientos de inversión'}`
+      : ''
+  }
+
   function removeEntity(key: EntityKey, id: string): void {
+    if (key === 'investmentAssets') {
+      const use = investmentDestinationUse(id)
+      if (use) {
+        const name = financialStateStore.state.investmentAssets.find((item) => item.id === id)?.name
+        showToast(
+          `No se puede eliminar${name ? ` «${name}»` : ''}: es la cuenta destino de ${use}.`,
+        )
+        return
+      }
+    }
     if (key === 'accounts') {
       const use = savingDestinationUse(id)
       if (use) {

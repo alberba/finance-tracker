@@ -13,9 +13,9 @@ import {
   maxDrawdown,
   periodFigures,
   portfolioChart,
-  positionRows,
+  accountRows,
   sortLabel,
-  sortPositions,
+  sortByKey,
   twrSeries,
 } from '../../src/neon/sections/investment/view-model'
 import { normalizeState } from '../../src/scripts/state'
@@ -68,7 +68,18 @@ function portfolio(overrides: Record<string, unknown> = {}): State {
     ],
     snapshots: { '3': { month: 3, investments: { fondos: 2640, oro: 180 }, accounts: {} } },
     contributions: [],
-    instruments: [],
+    instruments: [
+      {
+        id: 'i-vwce',
+        investmentAssetId: 'fondos',
+        type: 'etf',
+        symbol: 'VWCE',
+        market: 'XETRA',
+        currency: 'EUR',
+        provider: 'yahoo',
+        active: true,
+      },
+    ],
     quotes: {},
     ...overrides,
   })
@@ -89,7 +100,7 @@ it('distinguishes broker movements grouped into one row from an asset outside th
       buy('t3', 'Oro', '2026-02-20', 4, 50),
     ],
   })
-  const visible = simple(state, 1).positions.map((position) => position.id)
+  const visible = simple(state, 1).accounts.map((account) => account.id)
 
   expect(diagnosePositions(state, 1, visible, 'fondos')).toEqual([
     'position-visible',
@@ -289,15 +300,13 @@ describe('maxDrawdown y dropRows', () => {
   })
 })
 
-describe('positionRows y sortPositions', () => {
-  it('cada posición trae títulos y precio, peso, valor, resultado y su evolución en el periodo', () => {
-    const [fondos, oro] = positionRows(portfolio(), simple(), 3)
+describe('accountRows y sortByKey', () => {
+  it('cada cuenta trae cuántas posiciones tiene, peso, valor, resultado y su evolución en el periodo', () => {
+    const [fondos, oro] = accountRows(portfolio(), simple(), 3)
     expect(fondos).toMatchObject({
       id: 'fondos',
       name: 'Fondos',
-      symbol: 'VWCE',
-      units: '20',
-      price: 'a 132,00\u00a0€',
+      holdings: '1 posición',
       weight: '93,6\u00a0%',
       value: '2.640,00\u00a0€',
       gain: '+440,00\u00a0€',
@@ -308,7 +317,7 @@ describe('positionRows y sortPositions', () => {
       openLabel: 'Ver Fondos',
       sparkLabel: 'Fondos: +20,0\u00a0% en el periodo',
     })
-    expect(oro).toMatchObject({ symbol: null, gain: '−20,00\u00a0€', tone: 'loss' })
+    expect(oro).toMatchObject({ holdings: null, gain: '−20,00\u00a0€', tone: 'loss' })
   })
 
   it('la evolución del periodo descuenta lo aportado y parte de lo que valía al empezar', () => {
@@ -317,15 +326,21 @@ describe('positionRows y sortPositions', () => {
       transactions: [buy('t1', 'Fondos', '2026-02-10', 5, 100, 'VWCE')],
       snapshots: { '3': { month: 3, investments: { fondos: 1650 }, accounts: {} } },
     })
-    const [fondos] = positionRows(state, simple(state), 3)
+    const [fondos] = accountRows(state, simple(state), 3)
     // 1.000 € at the start plus 500 € put in: 1.500 € that became 1.650 €.
     expect(fondos.change).toBe('+10,0\u00a0%')
   })
 
   it('ordena por peso, ganancia o cambio, en los dos sentidos', () => {
-    const rows = positionRows(portfolio(), simple(), 3)
-    expect(sortPositions(rows, 'gain', 'asc').map((row) => row.id)).toEqual(['oro', 'fondos'])
-    expect(sortPositions(rows, 'weight', 'desc').map((row) => row.id)).toEqual(['fondos', 'oro'])
+    const rows = accountRows(portfolio(), simple(), 3)
+    expect(sortByKey(rows, 'gain', 'asc', (row) => row).map((row) => row.id)).toEqual([
+      'oro',
+      'fondos',
+    ])
+    expect(sortByKey(rows, 'weight', 'desc', (row) => row).map((row) => row.id)).toEqual([
+      'fondos',
+      'oro',
+    ])
     expect(sortLabel('change', 'asc')).toBe('% cambio · menor a mayor')
   })
 })

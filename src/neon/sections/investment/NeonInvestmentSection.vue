@@ -32,14 +32,19 @@ import NeonButton from '../../ui/NeonButton.vue'
 import NeonEmptyState from '../../ui/NeonEmptyState.vue'
 import { FRAME_QUERY } from '../../ui/sheet-drag'
 import { assetDetail } from './asset-view-model'
+import { instrumentDetail } from './instrument-view-model'
 import { startPage, useAssetRoute } from './asset-route'
+import { coverList } from './cover-groups'
+import { useInvestmentGroupingStore } from './grouping-store'
 import NeonInvestmentAsset from './NeonInvestmentAsset.vue'
 import NeonInvestmentAssetMobile from './NeonInvestmentAssetMobile.vue'
 import NeonInvestmentCards from './NeonInvestmentCards.vue'
+import NeonInvestmentInstrument from './NeonInvestmentInstrument.vue'
 import NeonInvestmentChart from './NeonInvestmentChart.vue'
 import NeonInvestmentMobile from './NeonInvestmentMobile.vue'
-import NeonInvestmentPositions from './NeonInvestmentPositions.vue'
+import NeonInvestmentAccounts from './NeonInvestmentAccounts.vue'
 import NeonInvestmentScore from './NeonInvestmentScore.vue'
+import { useAccountEvolution } from './use-account-evolution'
 import {
   CHART_HEIGHT,
   CHART_WIDTH,
@@ -51,10 +56,9 @@ import {
   periodFigures,
   periodOptions,
   portfolioChart,
-  positionRows,
   quoteNotice,
   signedPct,
-  sortPositions,
+  sortKeyFor,
   toneOf,
   twrSeries,
   type Card,
@@ -70,7 +74,9 @@ import {
 //
 // A position opens its detail, a history entry of its own at
 // `/inversion?activo=<id>`: the arrow and the browser's back button both return
-// to the cover. On the desktop frame that is NeonInvestmentAsset (artboard
+// to the cover. From an account's positions, each instrument opens its own
+// detail at `/inversion?instrumento=<id>` (#561, NeonInvestmentInstrument, the
+// same on both frames): back returns to the account. On the desktop frame that is NeonInvestmentAsset (artboard
 // «Inversión · detalle de activo (VWCE) · 2560 px», #439); on the mobile frame,
 // NeonInvestmentAssetMobile (the same artboard, «móvil · Pixel 10», #440), from
 // the same view model, with its movements as a second entry.
@@ -220,7 +226,7 @@ watch(
   { immediate: true },
 )
 const notice = computed(() => quoteNotice(summarizeQuoteStatus(marketStore.valuation.instruments)))
-const empty = computed(() => vm.value.positions.length === 0)
+const empty = computed(() => vm.value.accounts.length === 0)
 
 // The cover comes in once each time it shows: blocks rise, rows follow. Past
 // that, the rows stop animating, so a row that moves (a new sort, a quote that
@@ -242,15 +248,23 @@ onBeforeUnmount(() => {
   clearTimeout(waitTimer)
 })
 
+const groupingStore = useInvestmentGroupingStore()
+const grouping = computed(() => groupingStore.grouping)
 const sortKey = ref<SortKey>('weight')
 const sortDirection = ref<SortDirection>('desc')
-const rows = computed(() =>
-  sortPositions(
-    positionRows(state.value, vm.value, month.value),
-    sortKey.value,
-    sortDirection.value,
+const list = computed(() =>
+  coverList(
+    grouping.value,
+    { state: state.value, vm: vm.value, month: month.value },
+    { key: sortKey.value, direction: sortDirection.value },
   ),
 )
+
+// A row opens the account, or the instrument for the other two groupings.
+function openRow(id: string): void {
+  if (grouping.value === 'account') route.open(id)
+  else route.openInstrument(id)
+}
 
 const cards = computed<Card[]>(() => [
   {
@@ -266,10 +280,24 @@ const cards = computed<Card[]>(() => [
 ])
 
 const route = useAssetRoute()
+
+const evolution = useAccountEvolution({
+  state,
+  month,
+  accountId: route.selected,
+  positions: computed(() => vm.value.positions),
+})
 const asset = computed(() =>
   route.selected.value
-    ? assetDetail(state.value, vm.value, route.selected.value, { compact: !desktopFrame.value })
+    ? assetDetail(state.value, vm.value, route.selected.value, {
+        compact: !desktopFrame.value,
+        evolution: evolution.value,
+      })
     : null,
+)
+
+const instrument = computed(() =>
+  route.instrument.value ? instrumentDetail(state.value, vm.value, route.instrument.value) : null,
 )
 
 useScreenDiagnostic('investment', () => ({
@@ -284,14 +312,18 @@ useScreenDiagnostic('investment', () => ({
   checks: diagnosePositions(
     state.value,
     month.value,
-    vm.value.positions.map((row) => row.id),
+    vm.value.accounts.map((row) => row.id),
     route.selected.value,
   ),
 }))
 
 // Opening or leaving the detail, or its movements, starts a new page.
 watch(
-  () => [asset.value?.id ?? null, route.movements.value && !desktopFrame.value],
+  () => [
+    asset.value?.id ?? null,
+    instrument.value?.id ?? null,
+    route.movements.value && !desktopFrame.value,
+  ],
   async () => {
     await nextTick()
     if (props.isActive) startPage('investment-title')
@@ -318,12 +350,19 @@ function sortBy(key: SortKey, direction: SortDirection): void {
     class="@container grid min-w-0 content-start gap-[26px]"
     aria-labelledby="investment-title"
   >
-    <NeonBarTitle v-if="isActive && !desktopFrame && !asset" title="Inversión" />
+    <NeonBarTitle v-if="isActive && !desktopFrame && !asset && !instrument" title="Inversión" />
+    <NeonInvestmentInstrument
+      v-if="instrument"
+      :detail="instrument"
+      :touch="!desktopFrame"
+      @back="route.closeInstrument"
+    />
     <NeonInvestmentAssetMobile
-      v-if="!desktopFrame && asset"
+      v-else-if="!desktopFrame && asset"
       :detail="asset"
       :movements="route.movements.value"
       @back="route.close"
+      @open-instrument="route.openInstrument"
       @open-movements="route.openMovements"
       @close-movements="route.closeMovements"
       @buy="openInvestmentEntry({ side: 'buy', ...asset.entry }, $event)"
@@ -339,10 +378,11 @@ function sortBy(key: SortKey, direction: SortDirection): void {
       :chart="compact"
       :method="method"
       :returns="returns"
-      :rows="rows"
+      :list="list"
       :cards="cards"
       :entering="entering"
-      @open="route.open"
+      @open="openRow"
+      @group="groupingStore.setGrouping"
       @method="investmentStore.setReturnMode"
     />
 
@@ -350,6 +390,7 @@ function sortBy(key: SortKey, direction: SortDirection): void {
       v-else-if="asset"
       :detail="asset"
       @back="route.close"
+      @open-instrument="route.openInstrument"
       @buy="openInvestmentEntry({ side: 'buy', ...asset.entry }, $event)"
       @sell="openInvestmentEntry({ side: 'sell', ...asset.entry }, $event)"
     />
@@ -431,13 +472,14 @@ function sortBy(key: SortKey, direction: SortDirection): void {
           ></div>
         </div>
 
-        <NeonInvestmentPositions
-          :rows="rows"
-          :sort-key="sortKey"
+        <NeonInvestmentAccounts
+          :list="list"
+          :sort-key="sortKeyFor(grouping, sortKey)"
           :sort-direction="sortDirection"
           :entering="entering"
-          @open="route.open"
+          @open="openRow"
           @sort="sortBy"
+          @group="groupingStore.setGrouping"
         />
 
         <NeonInvestmentCards

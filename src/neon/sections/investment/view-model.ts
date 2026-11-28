@@ -9,7 +9,6 @@ import type {
   ReturnMode,
 } from '../../../domain/investment/view-model'
 import {
-  formatDecimal,
   formatMoney,
   formatMonthName,
   formatNumber,
@@ -20,6 +19,7 @@ import {
   MINUS,
 } from '../../../lib/format'
 import { computeContributionMetrics, type ContributionEntry } from '../../../lib/finance-core'
+import type { InvestmentGrouping } from '../../../lib/investment-grouping'
 import { ALL_MONTHS, YEAR_START, type Month, type MonthOrStart } from '../../../lib/month'
 import { toSnapshotDate } from '../../../scripts/contribution-workflow'
 import { niceStep } from '../../ui/line-chart'
@@ -37,6 +37,23 @@ export type Tone = 'gain' | 'loss' | 'neutral'
 export function toneOf(value: number): Tone {
   return value > 0.005 ? 'gain' : value < -0.005 ? 'loss' : 'neutral'
 }
+
+/**
+ * The result of a holding as text: the gain in euros, its return over what
+ * went in (blank when nothing went in: there is no return to speak of) and the
+ * tone. One formatter for every list that shows a result.
+ */
+export function resultFigures(figures: { gain: number; invested: number; returnPct: number }) {
+  return {
+    gain: formatSignedMoney(figures.gain),
+    ret: figures.invested > 0 ? signedPct(figures.returnPct) : '',
+    tone: toneOf(figures.gain),
+  }
+}
+
+/** Said under a list of positions when some have no quote. */
+export const UNPRICED_NOTE =
+  'Sin cotización: el valor es la parte que le toca del valor de la cuenta.'
 
 /** The text colour of each tone. */
 export const TONE_TEXT: Record<Tone, string> = {
@@ -539,15 +556,11 @@ export function dropRows(drawdown: Drawdown | null, values: readonly number[]): 
   ]
 }
 
-export interface PositionRow {
-  id: string
-  name: string
-  /** The ticker («VWCE»), when the asset has one. */
-  symbol: string | null
-  /** Units held, or null when the asset has no buy movements. */
-  units: string | null
-  /** «a 132,00 €»: the price those units are valued at. */
-  price: string | null
+/**
+ * What every list of holdings shows of one row (an account, an instrument, a
+ * type): its weight, value and result, as text and as the numbers they sort by.
+ */
+export interface HoldingFigures {
   weight: string
   /** Share of the portfolio, 0–100, for the weight bar. */
   weightPct: number
@@ -555,6 +568,14 @@ export interface PositionRow {
   gain: string
   ret: string
   tone: Tone
+  gainValue: number
+}
+
+export interface AccountRow extends HoldingFigures {
+  id: string
+  name: string
+  /** «2 posiciones»: what the account holds; null when it holds none. */
+  holdings: string | null
   /** `d` of the sparkline: the gain of the period, in a 120×36 box. */
   spark: string
   /** The return of the period: the change once what went in is discounted. */
@@ -562,14 +583,19 @@ export interface PositionRow {
   changeTone: Tone
   sparkLabel: string
   openLabel: string
-  gainValue: number
   changeValue: number
+}
+
+export const TONE_STROKE: Record<Tone, string> = {
+  gain: 'var(--color-gain)',
+  loss: 'var(--color-loss)',
+  neutral: 'var(--color-text)',
 }
 
 export const SPARK_WIDTH = 120
 export const SPARK_HEIGHT = 36
 
-function sparkPath(values: readonly number[]): string {
+export function sparkPath(values: readonly number[]): string {
   if (values.length < 2) return ''
   const min = Math.min(...values)
   const range = Math.max(...values) - min || 1
@@ -583,43 +609,41 @@ function sparkPath(values: readonly number[]): string {
 }
 
 /**
- * The positions of the analysed month, in the domain's order (by value). The
+ * The investment accounts of the analysed month, in the domain's order (by value). The
  * evolution is the period's: from the year's opening value, discounting what
  * went in since, so a purchase doesn't read as a gain.
  */
-export function positionRows(
+export function accountRows(
   state: State,
   vm: InvestmentDashboardViewModel,
   month: Month,
-): PositionRow[] {
+): AccountRow[] {
   const points: MonthOrStart[] = [YEAR_START, ...ALL_MONTHS.filter((m) => m <= month)]
-  return vm.positions.map((position) => {
-    const values = points.map((point) => computeInvestmentValue(state, position.id, point))
-    const invested = points.map((point) => computeInvestedCapitalByAsset(state, position.id, point))
+  return vm.accounts.map((account) => {
+    const values = points.map((point) => computeInvestmentValue(state, account.id, point))
+    const invested = points.map((point) => computeInvestedCapitalByAsset(state, account.id, point))
     const last = points.length - 1
     const flows = invested[last] - invested[0]
     const base = values[0] + Math.max(0, flows)
     const changeValue = base > 0 ? ((values[last] - values[0] - flows) / base) * 100 : 0
-    const units = position.units !== null && position.units > 0 ? position.units : null
+    const count = vm.positions.filter((held) => held.accountId === account.id).length
     const change = signedPct(changeValue)
     return {
-      id: position.id,
-      name: position.name,
-      symbol: position.symbol,
-      units: units === null ? null : formatDecimal(units),
-      price: units === null ? null : `a ${formatMoney(position.value / units)}`,
-      weight: formatPercent(position.weight, { digits: 1 }),
-      weightPct: position.weight,
-      value: formatMoney(position.value),
-      gain: formatSignedMoney(position.gain),
-      ret: signedPct(position.returnPct),
-      tone: toneOf(position.gain),
+      id: account.id,
+      name: account.name,
+      holdings: count ? `${count} ${count === 1 ? 'posición' : 'posiciones'}` : null,
+      weight: formatPercent(account.weight, { digits: 1 }),
+      weightPct: account.weight,
+      value: formatMoney(account.value),
+      gain: formatSignedMoney(account.gain),
+      ret: signedPct(account.returnPct),
+      tone: toneOf(account.gain),
       spark: sparkPath(values.map((value, index) => value - invested[index])),
       change,
       changeTone: toneOf(changeValue),
-      sparkLabel: `${position.name}: ${change} en el periodo`,
-      openLabel: `Ver ${position.name}`,
-      gainValue: position.gain,
+      sparkLabel: `${account.name}: ${change} en el periodo`,
+      openLabel: `Ver ${account.name}`,
+      gainValue: account.gain,
       changeValue,
     }
   })
@@ -644,15 +668,43 @@ export function sortLabel(key: SortKey, direction: SortDirection): string {
   return `${name} · ${direction === 'asc' ? 'menor a mayor' : 'mayor a menor'}`
 }
 
-export function sortPositions(
-  rows: readonly PositionRow[],
+/**
+ * The period's change is the accounts' own: by instrument or by type it is
+ * neither offered as a sort nor used as one. The one place that says so.
+ */
+const hasPeriodChange = (grouping: InvestmentGrouping): boolean => grouping === 'account'
+
+/** The sorts the cover offers for a grouping. */
+export function sortOptionsFor(grouping: InvestmentGrouping): typeof SORT_OPTIONS {
+  return hasPeriodChange(grouping)
+    ? SORT_OPTIONS
+    : SORT_OPTIONS.filter((option) => option.value !== 'change')
+}
+
+/** The sort that applies to a grouping: the one asked for, or weight when it isn't offered. */
+export function sortKeyFor(grouping: InvestmentGrouping, key: SortKey): SortKey {
+  return key === 'change' && !hasPeriodChange(grouping) ? 'weight' : key
+}
+
+type Measured = Pick<HoldingFigures, 'weightPct' | 'gainValue'> & { changeValue?: number }
+
+/** Sorts rows, sections or anything measured by weight, gain or (accounts) period change. */
+export function sortByKey<T>(
+  items: readonly T[],
   key: SortKey,
   direction: SortDirection,
-): PositionRow[] {
-  const pick = (row: PositionRow) =>
-    key === 'weight' ? row.weightPct : key === 'gain' ? row.gainValue : row.changeValue
+  measured: (item: T) => Measured,
+): T[] {
   const sign = direction === 'asc' ? 1 : -1
-  return rows.toSorted((a, b) => sign * (pick(a) - pick(b)))
+  const measure = (item: T) => {
+    const figures = measured(item)
+    return key === 'gain'
+      ? figures.gainValue
+      : key === 'change'
+        ? (figures.changeValue ?? 0)
+        : figures.weightPct
+  }
+  return items.toSorted((a, b) => sign * (measure(a) - measure(b)))
 }
 
 /**

@@ -10,6 +10,7 @@ import {
   type InstrumentQuoteConfig,
   type State,
 } from '../../scripts/types'
+import { DEFAULT_INVESTMENT_GROUPING } from '../investment-grouping'
 import { asMonth, monthIndex } from '../month'
 import { monthFromISO, todayISO } from '../../scripts/utils'
 import type { CachedEntity } from './idb-cache'
@@ -42,13 +43,19 @@ const CATEGORY_STATE_KEYS = {
   investment: 'investmentCategories',
 } as const
 
-/** The destination account of a saving, as the local id of that account; absent otherwise. */
+/**
+ * The destination account of a movement, as the local id of that account: the
+ * cash account of a saving or, when `investment` is allowed, the investment
+ * account of an investment. Absent otherwise.
+ */
 function projectDestination(
   entity: CachedEntity,
   accountIds: Map<string, string>,
+  { investment = false }: { investment?: boolean } = {},
 ): { destinationAccountId?: string } {
   const destination = accountIds.get(String(entity.destinationAccountId))
-  return entity.type === 'saving' && destination ? { destinationAccountId: destination } : {}
+  const carries = entity.type === 'saving' || (investment && entity.type === 'investment')
+  return carries && destination ? { destinationAccountId: destination } : {}
 }
 
 /**
@@ -115,6 +122,7 @@ export function projectSyncV2State(
     tourMobileSeen: bootstrap.settings?.tourMobileSeen === 1,
     theme: bootstrap.settings?.theme ?? null,
     dashboardLayout: bootstrap.settings?.dashboardLayout ?? null,
+    investmentGrouping: bootstrap.settings?.investmentGrouping ?? DEFAULT_INVESTMENT_GROUPING,
     twrLiquidityAccountIds: [],
     accounts: [],
     investmentAssets: [],
@@ -145,6 +153,7 @@ export function projectSyncV2State(
     id: legacyId(account),
     name: String(account.name || ''),
     openingBalance: Number(account.openingBalance || 0),
+    ...(account.isArchived ? { archived: true } : {}),
   })
   projected.accounts = bootstrap.accounts
     .filter((account) => account.kind === 'cash')
@@ -189,7 +198,7 @@ export function projectSyncV2State(
       type: String(transaction.type) as State['transactions'][number]['type'],
       accountId:
         accountIds.get(String(transaction.accountId)) || String(transaction.accountId || ''),
-      ...projectDestination(transaction, accountIds),
+      ...projectDestination(transaction, accountIds, { investment: true }),
       category: categories.get(String(transaction.categoryId)) || 'Sin categoría',
       description: String(transaction.description || ''),
       amount: Number(transaction.amount || 0),

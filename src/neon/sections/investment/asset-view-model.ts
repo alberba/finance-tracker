@@ -1,11 +1,13 @@
 import type { InvestmentEntryPreset } from '../../../composables/useEntrySheet'
+import { returnPercent } from '../../../domain/investment/return-percent'
+import type { PositionEvolution } from '../../../domain/investment/position-evolution'
+import type { AccountPosition, UninstrumentedHolding } from '../../../domain/investment/positions'
 import type {
+  InvestmentAccount,
   InvestmentDashboardViewModel,
-  InvestmentPosition,
 } from '../../../domain/investment/view-model'
-import { matchesInvestmentAsset } from '../../../lib/finance-core'
+import { movementBelongsToInvestmentAsset } from '../../../lib/finance-core'
 import {
-  formatDayMonth,
   formatDecimal,
   formatMoney,
   formatNumber,
@@ -13,8 +15,10 @@ import {
   formatShortDate,
   formatSignedMoney,
 } from '../../../lib/format'
+import { round2 } from '../../../lib/number'
 import type { State, Transaction } from '../../../scripts/types'
-import { signedPct, toneOf, type Tone } from './view-model'
+import { groupByYear, isOperation, newestFirst, type AssetYear } from './movements'
+import { resultFigures, signedPct, sparkPath, toneOf, UNPRICED_NOTE, type Tone } from './view-model'
 
 // The detail of an asset in Inversión (artboard «Inversión · detalle de
 // activo (VWCE) · 2560 px», #439): what it is worth and how it did, its price
@@ -90,33 +94,60 @@ export interface AssetPosition {
   }
 }
 
-export interface AssetMovementRow {
-  id: string
-  /** «15 feb». */
-  day: string
-  side: 'buy' | 'sell' | null
-  /** «Compra», «Venta» or, for a movement without operation, its description. */
-  operation: string
-  fee: string
-  /** A fee was charged: «Sin comisión» is not worth a line of its own. */
-  feeCharged: boolean
-  /** «10 × 120,00 €». */
-  quantity: string
-  total: string
+/** One position of the account: an instrument and what is held of it. */
+export interface PositionLine {
+  instrumentId: string
+  symbol: string
+  /** «2», units held. */
+  units: string
+  /** The average buy price, or «—» without buys. */
+  averagePrice: string
+  value: string
+  invested: string
+  /** «+160,00 €». */
+  gain: string
+  /** «+4,0 %». */
+  ret: string
+  tone: Tone
+  weight: string
+  /** Share of the account's positions, 0–100, for the weight bar. */
+  weightPct: number
+  /** The value is an estimate: the instrument has no quote. */
+  estimated: boolean
+  /** Month by month value of the position; null while it is not known or has no two points. */
+  evolution: PositionEvolutionLine | null
 }
 
-export interface AssetYear {
-  year: string
-  /** «Comprado 2.200,00 € · Vendido +300,00 €». */
-  sum: string
-  rows: AssetMovementRow[]
+/** The monthly evolution of a position, drawn as a line in the sparkline's box. */
+export interface PositionEvolutionLine {
+  /** `d` of the line. */
+  path: string
+  /** «Evolución de BTC: de 1.900,00 € en ene a 10.000,00 € en mar». */
+  label: string
+  /** The line is a share of the account's value: the instrument has no quote history. */
+  approximate: boolean
+}
+
+/** What the account holds with no instrument: movements without units and the opening balance. */
+export interface UninstrumentedLine {
+  value: string
+  invested: string
+  /** «−20,00 €». */
+  gain: string
+  /** «−10,0 %». */
+  ret: string
+  tone: Tone
 }
 
 export interface AssetDetail {
   id: string
-  /** The ticker, or the name when the asset has none. */
-  symbol: string
   name: string
+  /** What the account holds, by value. */
+  positions: PositionLine[]
+  /** The «Sin instrumento» row of the positions; null when it is negligible. */
+  uninstrumented: UninstrumentedLine | null
+  /** Some position has no quote: its value is its share of the account's. */
+  unpricedNote: string | null
   figures: AssetFigure[]
   chart: AssetChart | null
   facts: AssetFact[]
@@ -149,86 +180,20 @@ const COMPACT: ChartFrame = {
 }
 const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
 
-/** Units held, or null when the asset has no units. */
-const heldUnits = (position: InvestmentPosition): number | null =>
-  position.units !== null && position.units > 0 ? position.units : null
-
 const round1 = (value: number) => Math.round(value * 10) / 10
-const round2 = (value: number) => Math.round(value * 100) / 100
 const share = (value: number, total: number) => Math.round((value / total) * 10000) / 100
 
-function isOperation(tx: Transaction): boolean {
-  return !!tx.side && Number(tx.units) > 0
-}
-
 /** The asset's movements, newest first. */
-function assetMovements(state: State, position: InvestmentPosition): Transaction[] {
+function assetMovements(state: State, position: InvestmentAccount): Transaction[] {
   const asset = state.investmentAssets.find((candidate) => candidate.id === position.id)
   if (!asset) return []
   return state.transactions
     .filter(
       (tx): tx is Transaction =>
         tx.type === 'investment' &&
-        matchesInvestmentAsset(tx.category, asset, tx.instrumentId, state.instruments),
+        movementBelongsToInvestmentAsset(tx, asset, state.investmentAssets, state.instruments),
     )
-    .sort(
-      (a, b) =>
-        b.date.localeCompare(a.date) || String(b.time ?? '').localeCompare(String(a.time ?? '')),
-    )
-}
-
-function movementRow(tx: Transaction): AssetMovementRow {
-  const operation = isOperation(tx)
-  const sell = tx.side === 'sell'
-  const amount = Math.abs(Number(tx.amount) || 0)
-  const fee = Number(tx.fee) || 0
-  const units = Number(tx.units)
-  const title = operation ? (sell ? 'Venta' : 'Compra') : tx.description || 'Movimiento'
-  const total = sell ? `+${formatMoney(amount)}` : formatMoney(amount)
-  const day = formatDayMonth(tx.date)
-  return {
-    id: tx.id,
-    day,
-    side: operation ? (sell ? 'sell' : 'buy') : null,
-    operation: title,
-    fee: operation ? (fee > 0 ? `Comisión ${formatMoney(fee)}` : 'Sin comisión') : '',
-    feeCharged: operation && fee > 0,
-    quantity: operation
-      ? `${formatDecimal(units)} × ${formatMoney(Number(tx.unitPrice) || 0)}`
-      : '',
-    total,
-  }
-}
-
-function yearSum(movements: readonly Transaction[]): string {
-  let bought = 0
-  let sold = 0
-  for (const tx of movements) {
-    const amount = Math.abs(Number(tx.amount) || 0)
-    if (tx.side === 'sell') sold += amount
-    else bought += amount
-  }
-  return [
-    bought > 0 ? `Comprado ${formatMoney(round2(bought))}` : '',
-    sold > 0 ? `Vendido +${formatMoney(round2(sold))}` : '',
-  ]
-    .filter(Boolean)
-    .join(' · ')
-}
-
-function groupByYear(movements: readonly Transaction[]): AssetYear[] {
-  const years: Array<{ year: string; movements: Transaction[] }> = []
-  for (const tx of movements) {
-    const year = tx.date.slice(0, 4)
-    const last = years.at(-1)
-    if (last?.year === year) last.movements.push(tx)
-    else years.push({ year, movements: [tx] })
-  }
-  return years.map(({ year, movements: group }) => ({
-    year,
-    sum: yearSum(group),
-    rows: group.map(movementRow),
-  }))
+    .sort(newestFirst)
 }
 
 function parseDay(isoDate: string): number {
@@ -262,7 +227,8 @@ function tickLabels(first: number, last: number): Array<{ time: number; text: st
  * shown yet (#524). Null without two operations on different days.
  */
 export function assetChart(
-  position: InvestmentPosition,
+  account: Pick<InvestmentAccount, 'name'>,
+  average: number | null,
   movements: readonly Transaction[],
   frame: ChartFrame = WIDE,
 ): AssetChart | null {
@@ -275,7 +241,6 @@ export function assetChart(
   const last = operations.at(-1)!
   const end = last.time
   if (end <= operations[0].time) return null
-  const average = position.averagePrice
 
   const sequence = operations
   const prices = sequence.map((point) => point.price)
@@ -338,14 +303,13 @@ export function assetChart(
       text,
     })),
     points,
-    label: `Precio de ${position.name} (${history}): ${formatMoney(round2(operations[0].price))} en la primera operación y ${formatMoney(round2(last.price))} en la última, con ${operations.length} ${operations.length === 1 ? 'operación marcada' : 'operaciones marcadas'}.`,
+    label: `Precio de ${account.name} (${history}): ${formatMoney(round2(operations[0].price))} en la primera operación y ${formatMoney(round2(last.price))} en la última, con ${operations.length} ${operations.length === 1 ? 'operación marcada' : 'operaciones marcadas'}.`,
   }
 }
 
-function assetFacts(position: InvestmentPosition, movements: readonly Transaction[]): AssetFact[] {
+function assetFacts(average: number | null, movements: readonly Transaction[]): AssetFact[] {
   const operations = movements.filter(isOperation)
   const buys = operations.filter((tx) => tx.side !== 'sell')
-  const average = position.averagePrice
   const fees = movements.reduce((sum, tx) => sum + (Number(tx.fee) || 0), 0)
   const facts: AssetFact[] = []
   const fact = (label: string, value: string, note = '', tone: Tone = 'neutral') =>
@@ -358,20 +322,66 @@ function assetFacts(position: InvestmentPosition, movements: readonly Transactio
   return facts
 }
 
-function unitsHeld(position: InvestmentPosition): AssetDetail['units'] {
-  const units = heldUnits(position)
-  return units === null
-    ? null
-    : { count: formatDecimal(units), word: units === 1 ? 'título' : 'títulos' }
+/** The units of an account that holds one instrument; with several there is no single count. */
+function unitsHeld(single: AccountPosition | null): AssetDetail['units'] {
+  return single
+    ? { count: formatDecimal(single.units), word: single.units === 1 ? 'título' : 'títulos' }
+    : null
 }
 
-function assetPosition(position: InvestmentPosition): AssetPosition {
+function evolutionLine(evolution: PositionEvolution | undefined): PositionEvolutionLine | null {
+  if (!evolution) return null
+  const { values } = evolution
+  const start = values.findIndex((value) => value > 0)
+  if (start < 0 || values.length < 2) return null
+  const month = (index: number) => (index === 0 ? 'dic' : MONTHS[index - 1])
+  const last = values.length - 1
+  const approximate = !evolution.priced
+  return {
+    path: sparkPath(values),
+    approximate,
+    label: `Evolución${approximate ? ' aproximada' : ''} de ${evolution.symbol}: de ${formatMoney(values[start])} en ${month(start)} a ${formatMoney(values[last])} en ${month(last)}`,
+  }
+}
+
+function positionLine(position: AccountPosition, evolution: PositionEvolution[]): PositionLine {
+  return {
+    instrumentId: position.instrumentId,
+    symbol: position.symbol,
+    units: formatDecimal(position.units),
+    averagePrice: position.averagePrice === null ? '—' : formatMoney(position.averagePrice),
+    value: formatMoney(position.value),
+    invested: formatMoney(position.invested),
+    ...resultFigures(position),
+    weight: formatPercent(position.weight, { digits: 1 }),
+    weightPct: position.weight,
+    estimated: !position.priced,
+    evolution: evolutionLine(evolution.find((item) => item.instrumentId === position.instrumentId)),
+  }
+}
+
+function uninstrumentedLine(holding: UninstrumentedHolding | undefined): UninstrumentedLine | null {
+  if (!holding) return null
+  const gain = round2(holding.value - holding.invested)
+  return {
+    value: formatMoney(holding.value),
+    invested: formatMoney(holding.invested),
+    ...resultFigures({
+      gain,
+      invested: holding.invested,
+      returnPct: returnPercent(gain, holding.invested),
+    }),
+  }
+}
+
+function assetPosition(position: InvestmentAccount, average: number | null): AssetPosition {
   const weight = formatPercent(position.weight, { digits: 1 })
+  const figures = resultFigures(position)
   const rows: AssetFact[] = []
-  if (position.averagePrice !== null) {
+  if (average !== null) {
     rows.push({
       label: 'Precio medio',
-      value: formatMoney(position.averagePrice),
+      value: formatMoney(average),
       note: '',
       tone: 'neutral',
     })
@@ -380,8 +390,8 @@ function assetPosition(position: InvestmentPosition): AssetPosition {
     {
       label: 'Resultado',
       value: formatSignedMoney(position.gain),
-      note: position.invested > 0 ? signedPct(position.returnPct) : '',
-      tone: toneOf(position.gain),
+      note: figures.ret,
+      tone: figures.tone,
     },
     { label: 'Has puesto', value: formatMoney(position.invested), note: '', tone: 'neutral' },
   )
@@ -404,26 +414,34 @@ export function assetDetail(
   state: State,
   vm: InvestmentDashboardViewModel,
   positionId: string,
-  { compact = false }: { compact?: boolean } = {},
+  { compact = false, evolution = [] }: { compact?: boolean; evolution?: PositionEvolution[] } = {},
 ): AssetDetail | null {
-  const position = vm.positions.find((candidate) => candidate.id === positionId)
+  const position = vm.accounts.find((candidate) => candidate.id === positionId)
   if (!position) return null
+  const positions = vm.positions.filter((held) => held.accountId === position.id)
+  const single = positions.length === 1 ? positions[0] : null
+  const average = single?.averagePrice ?? null
   const movements = assetMovements(state, position)
+  const result = resultFigures(position)
   const operationCount = movements.length
   const last = movements.find(isOperation) ?? movements[0]
 
   return {
     id: position.id,
-    symbol: position.symbol ?? position.name,
     name: position.name,
+    positions: positions.map((held) => positionLine(held, evolution)),
+    uninstrumented: uninstrumentedLine(
+      vm.uninstrumented.find((holding) => holding.accountId === position.id),
+    ),
+    unpricedNote: positions.some((held) => !held.priced) ? UNPRICED_NOTE : null,
     figures: [
       { key: 'value', label: 'Vale hoy', value: formatMoney(position.value), tone: 'neutral' },
       {
         key: 'result',
         label: 'Resultado',
         value: formatSignedMoney(position.gain),
-        note: position.invested > 0 ? signedPct(position.returnPct) : '',
-        tone: toneOf(position.gain),
+        note: result.ret,
+        tone: result.tone,
       },
       {
         key: 'invested',
@@ -438,15 +456,16 @@ export function assetDetail(
         tone: 'neutral',
       },
     ],
-    chart: assetChart(position, movements, compact ? COMPACT : WIDE),
-    facts: assetFacts(position, movements),
-    units: unitsHeld(position),
-    position: assetPosition(position),
+    chart: assetChart(position, average, movements, compact ? COMPACT : WIDE),
+    facts: assetFacts(average, movements),
+    units: unitsHeld(single),
+    position: assetPosition(position, average),
     count: `${operationCount} ${operationCount === 1 ? 'operación' : 'operaciones'}`,
     entry: {
-      symbol: last?.symbol ?? position.symbol ?? '',
+      symbol: last?.symbol ?? single?.symbol ?? '',
       category: last?.category ?? position.name,
       accountId: last?.accountId,
+      destinationAccountId: position.id,
       currency: last?.movementCurrency,
     },
     years: groupByYear(movements),

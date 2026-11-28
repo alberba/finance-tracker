@@ -4,6 +4,7 @@ import { computed, ref } from 'vue'
 import NeonDetailHeader from '../../ui/NeonDetailHeader.vue'
 import { OPERATION_ICONS } from './asset-icons'
 import { type AssetDetail } from './asset-view-model'
+import NeonInvestmentAssetPositions from './NeonInvestmentAssetPositions.vue'
 import NeonInvestmentAssetChart from './NeonInvestmentAssetChart.vue'
 import NeonInvestmentAssetYears from './NeonInvestmentAssetYears.vue'
 import NeonInvestmentQuote from './NeonInvestmentQuote.vue'
@@ -21,6 +22,7 @@ const props = defineProps<{ detail: AssetDetail }>()
 
 const emit = defineEmits<{
   back: []
+  openInstrument: [instrumentId: string]
   buy: [event: MouseEvent]
   sell: [event: MouseEvent]
 }>()
@@ -33,12 +35,16 @@ const reading = computed(() => {
   return points[hot.value ?? points.length - 1]
 })
 
-// With a linked symbol the main chart is its quote; without one, the price of
-// each operation against the average buy price.
+// An account that holds one instrument charts its quote; with several or none,
+// the price of each operation against the average buy price. Each instrument's
+// own quote is its own detail's business.
 const marketStore = useMarketStore()
-const instrument = computed(() =>
-  marketStore.instruments.find((item) => item.investmentAssetId === props.detail.id && item.active),
-)
+const instrument = computed(() => {
+  const [only, ...others] = props.detail.positions
+  return only && !others.length
+    ? marketStore.instruments.find((item) => item.id === only.instrumentId)
+    : undefined
+})
 
 const value = computed(() => props.detail.figures.find((figure) => figure.key === 'value'))
 const result = computed(() => props.detail.figures.find((figure) => figure.key === 'result'))
@@ -64,7 +70,7 @@ function onBack(event: MouseEvent): void {
   <div class="grid min-w-0 content-start gap-[22px]" data-investment-asset>
     <NeonDetailHeader
       class="motion-safe:animate-rise"
-      :label="detail.symbol"
+      :label="detail.name"
       back-href="/inversion"
       back-label="Inversión"
       title-id="investment-title"
@@ -76,8 +82,21 @@ function onBack(event: MouseEvent): void {
     >
       <div class="grid min-w-0 gap-[22px]">
         <section
+          v-if="detail.positions.length || detail.uninstrumented"
           :class="CARD"
           class="motion-safe:animate-rise motion-safe:[animation-delay:50ms]"
+        >
+          <NeonInvestmentAssetPositions
+            :positions="detail.positions"
+            :uninstrumented="detail.uninstrumented"
+            :note="detail.unpricedNote"
+            @open="emit('openInstrument', $event)"
+          />
+        </section>
+
+        <section
+          :class="CARD"
+          class="motion-safe:animate-rise motion-safe:[animation-delay:75ms]"
           aria-labelledby="asset-chart-title"
         >
           <header class="flex items-baseline justify-between gap-3">

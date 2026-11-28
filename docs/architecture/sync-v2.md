@@ -24,10 +24,15 @@ ellos, se pierde o el comando se rechaza; #205 fue un constructor que no lo llev
    - Envía `accountingMonth` (1-12) solo cuando el mes elegido difiere del de la fecha; si no,
      `null` y el mes sigue a la fecha. Es ya el mismo número que `Transaction.month` (ADR 0008):
      la proyección (`projectSyncV2State`) lo copia tal cual y, si es `null`, lo deriva de `date`.
-   - Envía `destinationAccountId` solo en un ahorro, y lo exige resuelto: sin cuenta de destino el
-     comando se omite hasta que resuelva. En los demás tipos va `null`, que borra el destino al
-     cambiar de tipo. La proyección lo devuelve a `Transaction.destinationAccountId` solo cuando
-     sigue siendo un ahorro.
+   - Envía `destinationAccountId` en un ahorro (cuenta de efectivo, obligatoria) y en una inversión
+     (cuenta de inversión donde queda el instrumento, opcional; ADR 0011). Si el destino consta pero
+     no se puede resolver, el comando se omite hasta que resuelva. En los demás tipos va `null`, que
+     borra el destino al cambiar de tipo; pasar de ahorro a inversión o al revés tampoco lo
+     arrastra. El servidor exige que sea de efectivo en un ahorro y de inversión en una inversión.
+     La proyección lo devuelve a `Transaction.destinationAccountId` solo en esos dos tipos. Al
+     atribuir una inversión a su cuenta, manda el destino explícito, luego la cuenta de su
+     instrumento y por último la categoría (`movementBelongsToInvestmentAsset`,
+     `src/lib/finance-core.ts`).
    - Para operaciones importadas de Bitvavo, emite únicamente declarado y descripción. Los stores
      mantienen las restricciones de edición y borrado.
    - Los ajustes van por `syncSettingsUpdate` (`src/lib/client/command-mapping.ts`).
@@ -155,3 +160,9 @@ Cada elemento lleva su casilla (`id`, `col`, `row`, `w`, `h`) y, en los widgets 
 un `chart: 'end'` opcional cuando la gráfica va después de las cifras; sin él va antes.
 La cola pendiente proyecta el mismo valor antes de que lo confirme el servidor. El estado y la
 copia JSON conservan el documento, y el diseño interpreta los widgets y sus tamaños mínimos.
+
+La agrupación de la portada de Inversión (`account`, `instrument` o `type`) viaja como el ajuste
+`investmentGrouping` (`user_settings.investment_grouping`, `NULL` es `account`). Es un texto con
+esos tres valores, no un documento: el comando `settingsUpdate` lo reemplaza, la cola pendiente
+lo proyecta y la copia JSON lo conserva (un valor desconocido se guarda como `NULL`). Lo escribe
+`neon/sections/investment/grouping-store.ts`.

@@ -1,6 +1,6 @@
 import type { DiagnosticCode } from '../../../domain/reports/diagnostic'
 import { positionValue } from '../../../domain/investment/view-model'
-import { matchesInvestmentAsset } from '../../../lib/finance-core'
+import { movementBelongsToInvestmentAsset } from '../../../lib/finance-core'
 import { ALL_MONTHS, type Month } from '../../../lib/month'
 import type { State } from '../../../scripts/types'
 
@@ -25,7 +25,7 @@ export function diagnosePositions(
     for (const tx of moves) {
       if (
         tx.month > month ||
-        !matchesInvestmentAsset(tx.category, asset, tx.instrumentId, state.instruments)
+        !movementBelongsToInvestmentAsset(tx, asset, state.investmentAssets, state.instruments)
       )
         continue
       if (tx.accountId) accounts.add(tx.accountId)

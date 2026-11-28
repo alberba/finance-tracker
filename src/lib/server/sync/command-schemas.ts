@@ -34,6 +34,7 @@
 
 import { Schema } from 'effect'
 import { dashboardLayoutSchema } from '../../dashboard-layout'
+import { investmentGroupingSchema } from '../../investment-grouping'
 
 import { validator, type Validator } from '../../schema'
 
@@ -171,7 +172,8 @@ const entityCreateFields = {
     legacyId: optionalText,
     accountId: nonEmpty,
     categoryId: optionalText,
-    // Only a saving (ahorro) carries one; it travels in the movement's own command (ADR 0007).
+    // A saving (cash account) or an investment (investment account) carries one; it travels
+    // in the movement's own command (ADR 0007).
     destinationAccountId: optionalText,
     type: nonEmpty,
     date: nonEmpty,
@@ -448,6 +450,8 @@ export const settingsUpdateCommandSchema = validator(
       tourDesktopSeen: optionalBoolean,
       tourMobileSeen: optionalBoolean,
       dashboardLayout: Schema.optional(Schema.NullOr(dashboardLayoutSchema)),
+      /** How the cover of Inversión groups its positions. */
+      investmentGrouping: Schema.optional(investmentGroupingSchema),
       currency: Schema.optional(nonEmpty),
       locale: optionalText,
       theme: optionalText,

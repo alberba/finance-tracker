@@ -139,11 +139,14 @@ export async function buildMovementData(
   const accountId = await resolveEntityId('account', movement.accountId)
   if (!accountId) return null
   // A saving is meaningless without a resolvable destination: skip until it resolves.
+  // An investment may carry the investment account it lands in; unresolved, it waits too.
   const destinationAccountId =
-    movement.type === 'saving' && movement.destinationAccountId
+    (movement.type === 'saving' || movement.type === 'investment') && movement.destinationAccountId
       ? await resolveEntityId('account', movement.destinationAccountId)
       : null
   if (movement.type === 'saving' && !destinationAccountId) return null
+  if (movement.type === 'investment' && movement.destinationAccountId && !destinationAccountId)
+    return null
   const categoryId = await resolveOrCreateCategoryId(movement.type, movement.category)
   if (movement.category && !categoryId) return null
   const operation = await buildOperation(movement)

@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, shallowRef } from 'vue'
 
+import { activeEntities } from '../lib/finance-core'
 import { BASE_SEED, EMPTY_STATE_SEED, normalizeState } from '../scripts/state'
 import type { State } from '../scripts/types'
 import { isDemoMode } from '../scripts/demo-mode'
@@ -23,6 +24,8 @@ export const useFinancialStateStore = defineStore('financial-state', () => {
   const budget = computed(() => state.value.budget)
   const goals = computed(() => state.value.goals)
   const investmentAssets = computed(() => state.value.investmentAssets)
+  /** Investment accounts offered for new movements: the archived ones stay out. */
+  const activeInvestmentAssets = computed(() => activeEntities(state.value.investmentAssets))
   const contributions = computed(() => state.value.contributions)
   const instruments = computed(() => state.value.instruments)
   const quotes = computed(() => state.value.quotes)
@@ -74,6 +77,7 @@ export const useFinancialStateStore = defineStore('financial-state', () => {
     budget,
     goals,
     investmentAssets,
+    activeInvestmentAssets,
     contributions,
     instruments,
     quotes,
