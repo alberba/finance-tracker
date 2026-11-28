@@ -35,6 +35,25 @@ export const fetchBenchmarkCloses = (
   }).pipe(Effect.map((body) => body.closes || []))
 }
 
+/** An instrument's previous December close and then each month close of `year`; none in demo mode. */
+export const fetchInstrumentCloses = (
+  instrument: Pick<Instrument, 'symbol' | 'quoteSymbol' | 'type' | 'currency'>,
+  year: number,
+): Effect.Effect<number[], ApiClientError, ClientHttp> => {
+  if (isDemoMode()) return Effect.succeed([])
+
+  const params = new URLSearchParams({
+    symbol: instrument.symbol,
+    type: instrument.type,
+    currency: instrument.currency,
+    year: String(year),
+  })
+  if (instrument.quoteSymbol) params.set('quoteSymbol', instrument.quoteSymbol)
+  return requestApiJson<{ closes?: number[] }>(`/api/market/closes?${params.toString()}`, {
+    fallbackMessage: 'No se pudo cargar el histórico',
+  }).pipe(Effect.map((body) => body.closes || []))
+}
+
 /** A symbol's closes over `range`, for its quote chart; null in demo mode. */
 export const fetchPriceHistory = (
   instrument: Pick<Instrument, 'symbol' | 'quoteSymbol' | 'type' | 'currency'>,

@@ -8,7 +8,11 @@ vi.mock('../../src/lib/server/yahoo-finance', async (importOriginal) => ({
 }))
 
 import type { Benchmark } from '../../src/domain/investment/benchmarks'
-import { loadBenchmarkCloses, monthlyCloses } from '../../src/lib/server/benchmark-history'
+import {
+  loadBenchmarkCloses,
+  loadInstrumentCloses,
+  monthlyCloses,
+} from '../../src/lib/server/benchmark-history'
 import { MarketQuoteError } from '../../src/lib/server/market-data'
 
 const bar = (iso: string, close: number | null, adjclose?: number | null) => ({
@@ -145,5 +149,38 @@ describe('loadBenchmarkCloses', () => {
 
     chartMock.mockResolvedValueOnce({ quotes: [bar(`${year - 1}-12-01T00:00:00Z`, 7)] })
     await expect(Effect.runPromise(loadBenchmarkCloses(benchmark, year))).resolves.toEqual([7])
+  })
+})
+
+describe('loadInstrumentCloses', () => {
+  beforeEach(() => {
+    chartMock.mockReset()
+  })
+
+  it('consulta los cierres mensuales con el ticker de Yahoo del instrumento, no con su símbolo visible', async () => {
+    chartMock.mockResolvedValue({
+      quotes: [bar('1999-12-01T00:00:00Z', 40_000), bar('2000-01-01T00:00:00Z', 42_000)],
+    })
+
+    const closes = await Effect.runPromise(
+      loadInstrumentCloses({ symbol: 'BTC', type: 'crypto', currency: 'EUR' }, 2000),
+    )
+
+    expect(closes).toEqual([40_000, 42_000])
+    expect(chartMock).toHaveBeenCalledWith('BTC-EUR', {
+      period1: '1999-12-01',
+      period2: '2001-01-01',
+      interval: '1mo',
+    })
+  })
+
+  it('falla con MarketQuoteError si Yahoo no responde', async () => {
+    chartMock.mockRejectedValue(new Error('Yahoo caído'))
+
+    await expect(
+      Effect.runPromise(
+        loadInstrumentCloses({ symbol: 'ETH', type: 'crypto', currency: 'EUR' }, 2001),
+      ),
+    ).rejects.toBeInstanceOf(MarketQuoteError)
   })
 })
