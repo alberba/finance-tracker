@@ -362,29 +362,34 @@ let resizeObserver: ResizeObserver | undefined
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(value, max))
 
-// On a phone the sheet grows out of what opened it (the FAB, Comprar…): its
-// box is clipped to that button, in the button's colour, and opens to the full
-// sheet as the colour turns to the panel and the content fades in. Closing runs
-// it back into the button. A sheet dragged down leaves by its edge instead.
+// The mini modal (desktop) and the bottom sheet (phone) grow out of what opened
+// them (the FAB, Apuntar, Comprar…): the box is clipped to that button, in the
+// button's colour, and opens to the full surface as the colour turns to the
+// panel and the content fades in. Closing runs it back into the button. A sheet
+// dragged down leaves by its edge instead. The side panel has no morph.
 const MORPH_EASE = 'cubic-bezier(0.2, 0, 0, 1)'
+const MORPH_IN_MS = { mini: 220, sheet: 380 }
+const MORPH_OUT_MS = { mini: 180, sheet: 260 }
 let morphing: Animation[] = []
 
 function morphKeyframes(
   element: HTMLElement,
 ): { shape: Keyframe[]; colour: Keyframe[]; content: Keyframe[] } | null {
-  if (!narrow.value || !opener?.isConnected) return null
+  if ((sheet.value && !narrow.value) || !opener?.isConnected) return null
   const from = opener.getBoundingClientRect()
   if (!from.width || !from.height) return null
   const box = element.getBoundingClientRect()
   const openerStyle = getComputedStyle(opener)
   const radius = Math.min(parseFloat(openerStyle.borderTopLeftRadius) || 0, from.height / 2)
-  const sheetRadius = parseFloat(getComputedStyle(element).borderTopLeftRadius) || 0
+  const surfaceRadius = parseFloat(getComputedStyle(element).borderTopLeftRadius) || 0
   const panel = getComputedStyle(element).backgroundColor
   const colour = /rgba?\(.*,\s*0\)$|transparent/.test(openerStyle.backgroundColor)
     ? panel
     : openerStyle.backgroundColor
   const start = `inset(${from.top - box.top}px ${box.right - from.right}px ${box.bottom - from.bottom}px ${from.left - box.left}px round ${radius}px)`
-  const end = `inset(0px 0px 0px 0px round ${sheetRadius}px ${sheetRadius}px 0px 0px)`
+  const end = sheet.value
+    ? `inset(0px 0px 0px 0px round ${surfaceRadius}px ${surfaceRadius}px 0px 0px)`
+    : `inset(0px 0px 0px 0px round ${surfaceRadius}px)`
   return {
     shape: [{ clipPath: start }, { clipPath: end }],
     // Linear, apart from the shape's easing: the colour turns while it grows.
@@ -409,11 +414,12 @@ function morphIn(element: HTMLElement): boolean {
   const frames = morphKeyframes(element)
   if (!frames) return false
   element.setAttribute('data-morph', '')
+  const duration = MORPH_IN_MS[sheet.value ? 'sheet' : 'mini']
   morphing = [
-    element.animate(frames.shape, { duration: 460, easing: MORPH_EASE }),
-    element.animate(frames.colour, { duration: 460, easing: 'linear' }),
+    element.animate(frames.shape, { duration, easing: MORPH_EASE }),
+    element.animate(frames.colour, { duration, easing: 'linear' }),
     ...[...element.children].map((child) =>
-      child.animate(frames.content, { duration: 460, easing: 'linear' }),
+      child.animate(frames.content, { duration, easing: 'linear' }),
     ),
   ]
   return true
@@ -427,7 +433,7 @@ function morphOut(element: HTMLElement, done: () => void): boolean {
   stopMorph()
   element.setAttribute('data-morph', '')
   const options = {
-    duration: 300,
+    duration: MORPH_OUT_MS[sheet.value ? 'sheet' : 'mini'],
     easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
     fill: 'forwards',
   } as const
@@ -495,6 +501,7 @@ function present(): void {
   clearTimeout(closeTimer)
   element.removeAttribute('data-closing')
   element.removeAttribute('data-entering')
+  element.removeAttribute('data-leaving')
   resetDrag()
   // Always empty (or the pending movement's data), even when reopened while
   // the exit animation still runs.
@@ -515,12 +522,9 @@ function present(): void {
   if (timing.value) timing.value.open = false
   element.removeAttribute('data-morph')
   stopMorph()
-  if (!sheet.value) {
-    placeMiniModal()
-    element.setAttribute('data-entering', '')
-  } else {
-    morphIn(element)
-  }
+  if (!sheet.value) placeMiniModal()
+  // Without an opener the mini modal fades in centred (`data-entering`).
+  if (!morphIn(element) && !sheet.value) element.setAttribute('data-entering', '')
   void nextTick(() => {
     // The keypad needs no field: the focus rests on the amount, and no system
     // keyboard opens.
@@ -544,6 +548,7 @@ function dismiss(): void {
     element.removeAttribute('data-closing')
     element.removeAttribute('data-entering')
     element.removeAttribute('data-morph')
+    element.removeAttribute('data-leaving')
     stopMorph()
     element.close()
     resetDrag()
@@ -551,6 +556,7 @@ function dismiss(): void {
     opener = null
   }
   if (reducedMotion()) return finish()
+  element.setAttribute('data-leaving', '')
   if (morphOut(element, finish)) return
   element.setAttribute('data-closing', '')
   closeTimer = setTimeout(finish, EXIT_MS)
@@ -1260,12 +1266,12 @@ const labelClass = ENTRY_LABEL_CLASS
   }
 
   .entry-mini[data-entering] {
-    animation: neon-mini-in 280ms var(--ease-out);
+    animation: neon-mini-in 220ms var(--ease-out-expo);
     transform-origin: 0 0;
   }
 
   .entry-mini[data-closing] {
-    animation: neon-mini-out 200ms var(--ease-out) forwards;
+    animation: neon-mini-out 180ms var(--ease-out) forwards;
     transform-origin: 0 0;
   }
 
@@ -1276,6 +1282,21 @@ const labelClass = ENTRY_LABEL_CLASS
   /* Growing out of its opener (morphIn) instead of sliding up. */
   .entry-review[data-morph] {
     animation: none;
+  }
+
+  /* The veil fades in and out (260ms/200ms on desktop, 240ms/200ms on phone). */
+  .neon-entry::backdrop {
+    animation: neon-fade-in 240ms ease-out;
+  }
+
+  .neon-entry[data-leaving]::backdrop {
+    animation: neon-entry-veil-out 200ms ease-out forwards;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) and (width >= 61.3125rem) {
+  .neon-entry::backdrop {
+    animation-duration: 260ms;
   }
 }
 
@@ -1292,6 +1313,13 @@ const labelClass = ENTRY_LABEL_CLASS
   }
 }
 
+@keyframes neon-entry-veil-out {
+  to {
+    opacity: 0;
+  }
+}
+
+/* No opener: centred, fading and popping in/out. */
 @keyframes neon-mini-in {
   from {
     opacity: 0;
