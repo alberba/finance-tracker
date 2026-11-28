@@ -19,6 +19,7 @@ import {
   MINUS,
 } from '../../../lib/format'
 import { computeContributionMetrics, type ContributionEntry } from '../../../lib/finance-core'
+import type { InvestmentGrouping } from '../../../lib/investment-grouping'
 import { ALL_MONTHS, YEAR_START, type Month, type MonthOrStart } from '../../../lib/month'
 import { toSnapshotDate } from '../../../scripts/contribution-workflow'
 import { niceStep } from '../../ui/line-chart'
@@ -555,11 +556,11 @@ export function dropRows(drawdown: Drawdown | null, values: readonly number[]): 
   ]
 }
 
-export interface AccountRow {
-  id: string
-  name: string
-  /** «2 posiciones»: what the account holds; null when it holds none. */
-  holdings: string | null
+/**
+ * What every list of holdings shows of one row (an account, an instrument, a
+ * type): its weight, value and result, as text and as the numbers they sort by.
+ */
+export interface HoldingFigures {
   weight: string
   /** Share of the portfolio, 0–100, for the weight bar. */
   weightPct: number
@@ -567,6 +568,14 @@ export interface AccountRow {
   gain: string
   ret: string
   tone: Tone
+  gainValue: number
+}
+
+export interface AccountRow extends HoldingFigures {
+  id: string
+  name: string
+  /** «2 posiciones»: what the account holds; null when it holds none. */
+  holdings: string | null
   /** `d` of the sparkline: the gain of the period, in a 120×36 box. */
   spark: string
   /** The return of the period: the change once what went in is discounted. */
@@ -574,7 +583,6 @@ export interface AccountRow {
   changeTone: Tone
   sparkLabel: string
   openLabel: string
-  gainValue: number
   changeValue: number
 }
 
@@ -660,15 +668,43 @@ export function sortLabel(key: SortKey, direction: SortDirection): string {
   return `${name} · ${direction === 'asc' ? 'menor a mayor' : 'mayor a menor'}`
 }
 
-export function sortAccounts(
-  rows: readonly AccountRow[],
+/**
+ * The period's change is the accounts' own: by instrument or by type it is
+ * neither offered as a sort nor used as one. The one place that says so.
+ */
+const hasPeriodChange = (grouping: InvestmentGrouping): boolean => grouping === 'account'
+
+/** The sorts the cover offers for a grouping. */
+export function sortOptionsFor(grouping: InvestmentGrouping): typeof SORT_OPTIONS {
+  return hasPeriodChange(grouping)
+    ? SORT_OPTIONS
+    : SORT_OPTIONS.filter((option) => option.value !== 'change')
+}
+
+/** The sort that applies to a grouping: the one asked for, or weight when it isn't offered. */
+export function sortKeyFor(grouping: InvestmentGrouping, key: SortKey): SortKey {
+  return key === 'change' && !hasPeriodChange(grouping) ? 'weight' : key
+}
+
+type Measured = Pick<HoldingFigures, 'weightPct' | 'gainValue'> & { changeValue?: number }
+
+/** Sorts rows, sections or anything measured by weight, gain or (accounts) period change. */
+export function sortByKey<T>(
+  items: readonly T[],
   key: SortKey,
   direction: SortDirection,
-): AccountRow[] {
-  const pick = (row: AccountRow) =>
-    key === 'weight' ? row.weightPct : key === 'gain' ? row.gainValue : row.changeValue
+  measured: (item: T) => Measured,
+): T[] {
   const sign = direction === 'asc' ? 1 : -1
-  return rows.toSorted((a, b) => sign * (pick(a) - pick(b)))
+  const measure = (item: T) => {
+    const figures = measured(item)
+    return key === 'gain'
+      ? figures.gainValue
+      : key === 'change'
+        ? (figures.changeValue ?? 0)
+        : figures.weightPct
+  }
+  return items.toSorted((a, b) => sign * (measure(a) - measure(b)))
 }
 
 /**

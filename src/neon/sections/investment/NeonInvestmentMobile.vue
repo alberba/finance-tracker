@@ -9,8 +9,9 @@ import NeonDetailPanel from '../../ui/NeonDetailPanel.vue'
 import NeonEmptyState from '../../ui/NeonEmptyState.vue'
 import { listSheetGesture, releaseVelocity } from '../../ui/sheet-drag'
 import {
-  groupingOptions,
+  groupingMenu,
   groupingTitle,
+  type CoverList,
   type InstrumentRow,
   type TypeSection,
 } from './cover-groups'
@@ -48,10 +49,7 @@ const props = defineProps<{
   method: ReturnMode
   /** Today's return under each method, for the method menu. */
   returns: Record<ReturnMode, { text: string; tone: Tone }>
-  grouping: InvestmentGrouping
-  rows: readonly AccountRow[]
-  instruments: readonly InstrumentRow[]
-  sections: readonly TypeSection[]
+  list: CoverList
   cards: readonly Card[]
   /** The cover is coming in: the rows follow the sheet (see the section). */
   entering: boolean
@@ -101,10 +99,10 @@ type Row = AccountRow | InstrumentRow
 type Item =
   { kind: 'heading'; id: string; section: TypeSection } | { kind: 'row'; id: string; row: Row }
 const items = computed<Item[]>(() => {
+  const list = props.list
   const asRow = (row: Row): Item => ({ kind: 'row', id: row.id, row })
-  if (props.grouping === 'account') return props.rows.map(asRow)
-  if (props.grouping === 'instrument') return props.instruments.map(asRow)
-  return props.sections.flatMap((section) => [
+  if (list.grouping !== 'type') return list.rows.map(asRow)
+  return list.sections.flatMap((section) => [
     { kind: 'heading' as const, id: `type:${section.id}`, section },
     ...section.rows.map(asRow),
   ])
@@ -115,15 +113,7 @@ const maxWeight = computed(() =>
   Math.max(1, ...items.value.flatMap((item) => (item.kind === 'row' ? [item.row.weightPct] : []))),
 )
 
-const groupingGroups = computed<ChoiceGroup<InvestmentGrouping>[]>(() => [
-  { key: 'grouping', options: groupingOptions(), value: props.grouping },
-])
-const groupingText = computed(
-  () =>
-    `Por ${groupingOptions()
-      .find((option) => option.value === props.grouping)
-      ?.label.toLowerCase()}`,
-)
+const menu = computed(() => groupingMenu(props.list.grouping))
 const typeLabel = (row: Row): string | null => ('typeLabel' in row ? row.typeLabel : null)
 
 // Each card at the foot of the sheet reads as one figure: its first row, with
@@ -348,14 +338,14 @@ const BLEED = '-mx-[clamp(16px,2.6vw,40px)]'
         </button>
         <div class="flex items-center justify-between gap-3">
           <h2 id="investment-accounts-title" class="text-block-title m-0 font-extrabold">
-            {{ groupingTitle(grouping) }}
+            {{ groupingTitle(list.grouping) }}
           </h2>
           <!-- The menu is not part of the drag: a press on it does not move the sheet. -->
           <div @pointerdown.stop @pointerup.stop @pointermove.stop @pointercancel.stop>
             <NeonChoiceMenu
-              :text="groupingText"
+              :text="menu.text"
               label="Agrupar por"
-              :groups="groupingGroups"
+              :groups="menu.groups"
               data-investment-grouping-menu
               @select="(_, value) => emit('group', value)"
             />
@@ -392,8 +382,8 @@ const BLEED = '-mx-[clamp(16px,2.6vw,40px)]'
               type="button"
               class="outline-accent grid min-h-16 w-full grid-cols-[minmax(0,1fr)_auto_3.6rem] items-baseline gap-x-2.5 gap-y-1 py-2.5 text-start focus-visible:outline-2 focus-visible:-outline-offset-2 motion-safe:transition-transform motion-safe:duration-160 motion-safe:ease-out motion-safe:active:scale-[0.99]"
               :aria-label="item.row.openLabel"
-              :data-investment-account="grouping === 'account' ? item.row.id : undefined"
-              :data-investment-instrument="grouping === 'account' ? undefined : item.row.id"
+              :data-investment-account="list.grouping === 'account' ? item.row.id : undefined"
+              :data-investment-instrument="list.grouping === 'account' ? undefined : item.row.id"
               @click="emit('open', item.row.id)"
             >
               <span class="text-row min-w-0 truncate font-bold">

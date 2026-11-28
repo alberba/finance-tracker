@@ -15,7 +15,7 @@ import {
   portfolioChart,
   accountRows,
   sortLabel,
-  sortAccounts,
+  sortByKey,
   twrSeries,
 } from '../../src/neon/sections/investment/view-model'
 import { normalizeState } from '../../src/scripts/state'
@@ -300,7 +300,7 @@ describe('maxDrawdown y dropRows', () => {
   })
 })
 
-describe('accountRows y sortAccounts', () => {
+describe('accountRows y sortByKey', () => {
   it('cada cuenta trae cuántas posiciones tiene, peso, valor, resultado y su evolución en el periodo', () => {
     const [fondos, oro] = accountRows(portfolio(), simple(), 3)
     expect(fondos).toMatchObject({
@@ -333,8 +333,14 @@ describe('accountRows y sortAccounts', () => {
 
   it('ordena por peso, ganancia o cambio, en los dos sentidos', () => {
     const rows = accountRows(portfolio(), simple(), 3)
-    expect(sortAccounts(rows, 'gain', 'asc').map((row) => row.id)).toEqual(['oro', 'fondos'])
-    expect(sortAccounts(rows, 'weight', 'desc').map((row) => row.id)).toEqual(['fondos', 'oro'])
+    expect(sortByKey(rows, 'gain', 'asc', (row) => row).map((row) => row.id)).toEqual([
+      'oro',
+      'fondos',
+    ])
+    expect(sortByKey(rows, 'weight', 'desc', (row) => row).map((row) => row.id)).toEqual([
+      'fondos',
+      'oro',
+    ])
     expect(sortLabel('change', 'asc')).toBe('% cambio · menor a mayor')
   })
 })

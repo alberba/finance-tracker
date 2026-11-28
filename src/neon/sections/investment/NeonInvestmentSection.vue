@@ -15,10 +15,9 @@ import {
 } from '../../../domain/investment/benchmarks'
 import { formatSignedMoney } from '../../../lib/format'
 import { runClientHttp } from '../../../lib/client/runtime'
-import { fetchBenchmarkCloses, fetchInstrumentCloses } from '../../../services/market-api'
+import { fetchBenchmarkCloses } from '../../../services/market-api'
 import { useLiveQuotes } from '../../../composables/useLiveQuotes'
 import { useMediaQuery } from '../../../composables/useMediaQuery'
-import { buildPositionEvolution } from '../../../domain/investment/position-evolution'
 import { summarizeQuoteStatus } from '../../../domain/investment/quote-status'
 import {
   buildInvestmentDashboardViewModel,
@@ -35,7 +34,7 @@ import { FRAME_QUERY } from '../../ui/sheet-drag'
 import { assetDetail } from './asset-view-model'
 import { instrumentDetail } from './instrument-view-model'
 import { startPage, useAssetRoute } from './asset-route'
-import { instrumentRows, sortByKey, sortCover, typeSections } from './cover-groups'
+import { coverList } from './cover-groups'
 import { useInvestmentGroupingStore } from './grouping-store'
 import NeonInvestmentAsset from './NeonInvestmentAsset.vue'
 import NeonInvestmentAssetMobile from './NeonInvestmentAssetMobile.vue'
@@ -45,6 +44,7 @@ import NeonInvestmentChart from './NeonInvestmentChart.vue'
 import NeonInvestmentMobile from './NeonInvestmentMobile.vue'
 import NeonInvestmentAccounts from './NeonInvestmentAccounts.vue'
 import NeonInvestmentScore from './NeonInvestmentScore.vue'
+import { useAccountEvolution } from './use-account-evolution'
 import {
   CHART_HEIGHT,
   CHART_WIDTH,
@@ -56,10 +56,9 @@ import {
   periodFigures,
   periodOptions,
   portfolioChart,
-  accountRows,
   quoteNotice,
   signedPct,
-  sortAccounts,
+  sortKeyFor,
   toneOf,
   twrSeries,
   type Card,
@@ -253,18 +252,12 @@ const groupingStore = useInvestmentGroupingStore()
 const grouping = computed(() => groupingStore.grouping)
 const sortKey = ref<SortKey>('weight')
 const sortDirection = ref<SortDirection>('desc')
-// The period's change is the accounts' own: by instrument or type it sorts by weight.
-const effectiveSortKey = computed<SortKey>(() =>
-  grouping.value !== 'account' && sortKey.value === 'change' ? 'weight' : sortKey.value,
-)
-const rows = computed(() =>
-  sortAccounts(accountRows(state.value, vm.value, month.value), sortKey.value, sortDirection.value),
-)
-const instruments = computed(() =>
-  sortByKey(instrumentRows(vm.value), effectiveSortKey.value, sortDirection.value, (row) => row),
-)
-const sections = computed(() =>
-  sortCover(typeSections(vm.value), effectiveSortKey.value, sortDirection.value),
+const list = computed(() =>
+  coverList(
+    grouping.value,
+    { state: state.value, vm: vm.value, month: month.value },
+    { key: sortKey.value, direction: sortDirection.value },
+  ),
 )
 
 // A row opens the account, or the instrument for the other two groupings.
@@ -288,44 +281,11 @@ const cards = computed<Card[]>(() => [
 
 const route = useAssetRoute()
 
-// The evolution of each position of the open account: its units at each month
-// close by the instrument's monthly close of the year. An instrument whose
-// closes fail to load, or that has none, takes a share of the account's value
-// instead (the domain's rule), so the detail draws without them meanwhile.
-const loadedCloses = shallowRef<{ key: string; closes: Record<string, number[]> } | null>(null)
-watch(
-  [() => route.selected.value, () => state.value.year, () => vm.value.positions.length],
-  async ([accountId, year]) => {
-    if (!accountId) return
-    const key = `${accountId}:${year}`
-    if (loadedCloses.value?.key === key) return
-    const held = vm.value.positions.filter((position) => position.accountId === accountId)
-    // A direct link can open the detail before the state is in: wait for the positions.
-    if (!held.length) return
-    const found: Record<string, number[]> = {}
-    await Promise.all(
-      held.map(async ({ instrumentId }) => {
-        const instrument = state.value.instruments.find((item) => item.id === instrumentId)
-        if (!instrument) return
-        try {
-          const closes = await runClientHttp(fetchInstrumentCloses(instrument, year))
-          if (closes.length) found[instrumentId] = closes
-        } catch {
-          // No history for this instrument: its line is the account's share.
-        }
-      }),
-    )
-    if (route.selected.value === accountId && state.value.year === year) {
-      loadedCloses.value = { key, closes: found }
-    }
-  },
-  { immediate: true },
-)
-const evolution = computed(() => {
-  const accountId = route.selected.value
-  const loaded = loadedCloses.value
-  if (!accountId || loaded?.key !== `${accountId}:${state.value.year}`) return []
-  return buildPositionEvolution(state.value, accountId, month.value, loaded.closes)
+const evolution = useAccountEvolution({
+  state,
+  month,
+  accountId: route.selected,
+  positions: computed(() => vm.value.positions),
 })
 const asset = computed(() =>
   route.selected.value
@@ -418,10 +378,7 @@ function sortBy(key: SortKey, direction: SortDirection): void {
       :chart="compact"
       :method="method"
       :returns="returns"
-      :grouping="grouping"
-      :rows="rows"
-      :instruments="instruments"
-      :sections="sections"
+      :list="list"
       :cards="cards"
       :entering="entering"
       @open="openRow"
@@ -516,11 +473,8 @@ function sortBy(key: SortKey, direction: SortDirection): void {
         </div>
 
         <NeonInvestmentAccounts
-          :grouping="grouping"
-          :rows="rows"
-          :instruments="instruments"
-          :sections="sections"
-          :sort-key="effectiveSortKey"
+          :list="list"
+          :sort-key="sortKeyFor(grouping, sortKey)"
           :sort-direction="sortDirection"
           :entering="entering"
           @open="openRow"

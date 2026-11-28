@@ -7,7 +7,19 @@ import {
 import type { InvestmentDashboardViewModel } from '../../../domain/investment/view-model'
 import { formatMoney, formatPercent } from '../../../lib/format'
 import type { InvestmentGrouping } from '../../../lib/investment-grouping'
-import { resultFigures, type SortDirection, type SortKey, type Tone } from './view-model'
+import type { Month } from '../../../lib/month'
+import type { State } from '../../../scripts/types'
+import type { ChoiceGroup } from '../../ui/NeonChoiceMenu.vue'
+import {
+  accountRows,
+  resultFigures,
+  sortByKey,
+  sortKeyFor,
+  type AccountRow,
+  type HoldingFigures,
+  type SortDirection,
+  type SortKey,
+} from './view-model'
 
 // The cover of Inversión grouped by instrument or by type (#562). By account
 // is `accountRows`. A row here is an instrument summed over its accounts and
@@ -15,7 +27,7 @@ import { resultFigures, type SortDirection, type SortKey, type Tone } from './vi
 // section that heads its instruments. Weights are shares of what all the
 // positions are worth, the same figure the instruments are summed from.
 
-export interface InstrumentRow {
+export interface InstrumentRow extends HoldingFigures {
   /** The instrument's id: the row opens its detail. */
   id: string
   /** Its symbol. */
@@ -24,33 +36,16 @@ export interface InstrumentRow {
   typeLabel: string
   /** «2 cuentas»: where it is held. */
   holdings: string
-  weight: string
-  weightPct: number
-  value: string
-  gain: string
-  ret: string
-  tone: Tone
   /** The value is an estimate: some position has no quote. */
   estimated: boolean
   openLabel: string
-  gainValue: number
-}
-
-export interface TypeSummary {
-  weight: string
-  weightPct: number
-  value: string
-  gain: string
-  ret: string
-  tone: Tone
-  gainValue: number
 }
 
 export interface TypeSection {
   id: string
   /** «Cripto», «ETF»… */
   title: string
-  summary: TypeSummary
+  summary: HoldingFigures
   rows: InstrumentRow[]
 }
 
@@ -68,6 +63,19 @@ export function groupingOptions(): { value: InvestmentGrouping; label: string }[
   }))
 }
 
+/** The grouping menu of the cover: its button's text («Por cuenta») and its options. */
+export function groupingMenu(grouping: InvestmentGrouping): {
+  text: string
+  groups: ChoiceGroup<InvestmentGrouping>[]
+} {
+  const options = groupingOptions()
+  const current = options.find((option) => option.value === grouping)
+  return {
+    text: `Por ${current?.label.toLowerCase()}`,
+    groups: [{ key: 'grouping', options, value: grouping }],
+  }
+}
+
 const TITLE: Record<InvestmentGrouping, string> = {
   account: 'Cuentas',
   instrument: 'Instrumentos',
@@ -80,7 +88,7 @@ export const groupingTitle = (grouping: InvestmentGrouping): string => TITLE[gro
 /** The figures a row and a section of a type share: weight, value and result. */
 function groupFigures(
   group: Pick<InstrumentGroup, 'weight' | 'value' | 'gain' | 'invested' | 'returnPct'>,
-) {
+): HoldingFigures {
   return {
     weight: formatPercent(group.weight, { digits: 1 }),
     weightPct: group.weight,
@@ -117,21 +125,6 @@ export function typeSections(vm: InvestmentDashboardViewModel): TypeSection[] {
   }))
 }
 
-type Measured = { weightPct: number; gainValue: number }
-
-/** Sorts by weight or by gain; the period's change belongs to accounts only. */
-export function sortByKey<T>(
-  items: readonly T[],
-  key: SortKey,
-  direction: SortDirection,
-  measured: (item: T) => Measured,
-): T[] {
-  const sign = direction === 'asc' ? 1 : -1
-  const measure = (item: T) =>
-    key === 'gain' ? measured(item).gainValue : measured(item).weightPct
-  return items.toSorted((a, b) => sign * (measure(a) - measure(b)))
-}
-
 /** The sections and the rows inside each, sorted. */
 export function sortCover(
   sections: readonly TypeSection[],
@@ -142,4 +135,42 @@ export function sortCover(
     ...section,
     rows: sortByKey(section.rows, key, direction, (row) => row),
   }))
+}
+
+/**
+ * The rows of the cover for the grouping the user chose, sorted: the one list
+ * every layout shows. A union, so a layout reads `rows` or `sections` by
+ * `grouping` and nothing else.
+ */
+export type CoverList =
+  | { grouping: 'account'; rows: AccountRow[] }
+  | { grouping: 'instrument'; rows: InstrumentRow[] }
+  | { grouping: 'type'; sections: TypeSection[] }
+
+export function coverList(
+  grouping: InvestmentGrouping,
+  source: { state: State; vm: InvestmentDashboardViewModel; month: Month },
+  sort: { key: SortKey; direction: SortDirection },
+): CoverList {
+  const key = sortKeyFor(grouping, sort.key)
+  const { direction } = sort
+  switch (grouping) {
+    case 'account':
+      return {
+        grouping,
+        rows: sortByKey(
+          accountRows(source.state, source.vm, source.month),
+          key,
+          direction,
+          (row) => row,
+        ),
+      }
+    case 'instrument':
+      return {
+        grouping,
+        rows: sortByKey(instrumentRows(source.vm), key, direction, (row) => row),
+      }
+    case 'type':
+      return { grouping, sections: sortCover(typeSections(source.vm), key, direction) }
+  }
 }
