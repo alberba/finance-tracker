@@ -115,6 +115,7 @@ describe('assetDetail', () => {
         weight: '100,0\u00a0%',
         weightPct: 100,
         estimated: true,
+        evolution: null,
       },
     ])
     expect(detail?.unpricedNote).toMatch(/^Sin cotización/)

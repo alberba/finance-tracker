@@ -157,7 +157,7 @@ export function isQuoteStale(quote: Quote, now = new Date(), maxAgeMinutes = 15)
   return now.getTime() - timestamp > maxAgeMinutes * 60_000
 }
 
-function getExchangeRate(fromCurrency: string, toCurrency: string, fxRates: Record<string, number>): number {
+export function getExchangeRate(fromCurrency: string, toCurrency: string, fxRates: Record<string, number>): number {
   if (fromCurrency === toCurrency) return 1
   const rate = Number(fxRates[`${fromCurrency}/${toCurrency}`] || fxRates[fromCurrency])
   return Number.isFinite(rate) && rate > 0 ? rate : 1

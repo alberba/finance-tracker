@@ -1,6 +1,7 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 
+import { buildPositionEvolution } from '../../src/domain/investment/position-evolution'
 import { buildInvestmentDashboardViewModel } from '../../src/domain/investment/view-model'
 import type { Month } from '../../src/lib/month'
 import { assetDetail } from '../../src/neon/sections/investment/asset-view-model'
@@ -32,7 +33,7 @@ function buy(
   }
 }
 
-function cryptoDetail() {
+function cryptoDetail(withEvolution = false) {
   const instrument = (id: string, symbol: string) => ({
     id,
     investmentAssetId: 'crypto',
@@ -71,7 +72,11 @@ function cryptoDetail() {
     contributions: [],
   })
   const vm = buildInvestmentDashboardViewModel(state, 3, 'simple', { quotes: true })
-  return assetDetail(state, vm, 'crypto')!
+  // BTC has monthly closes; ETH has none and takes its share of the account.
+  const evolution = withEvolution
+    ? buildPositionEvolution(state, 'crypto', 3, { 'i-btc': [1800, 1900, 2500, 5000] })
+    : undefined
+  return assetDetail(state, vm, 'crypto', { evolution })!
 }
 
 describe('NeonInvestmentAssetPositions', () => {
@@ -102,5 +107,29 @@ describe('NeonInvestmentAssetPositions', () => {
         .map((row) => row.attributes('data-asset-position-line')),
     ).toEqual(['BTC', 'ETH'])
     expect(wrapper.get('[data-asset-position-line="BTC"]').text()).toContain('2 · media 2.000,00')
+  })
+
+  it('dibuja la evolución de cada posición y avisa de que la que no tiene histórico es aproximada', () => {
+    const { positions, unpricedNote } = cryptoDetail(true)
+    const wrapper = mount(NeonInvestmentAssetPositions, {
+      props: { positions, note: unpricedNote },
+    })
+
+    const btc = wrapper.get('[data-position-evolution="BTC"]')
+    const eth = wrapper.get('[data-position-evolution="ETH"]')
+    expect(btc.attributes('role')).toBe('img')
+    expect(btc.attributes('aria-label')).toBe(
+      'Evolución de BTC: de 3.800,00\u00a0€ en ene a 10.000,00\u00a0€ en mar',
+    )
+    expect(eth.attributes('aria-label')).toContain('Evolución aproximada de ETH')
+  })
+
+  it('sin evolución calculada no dibuja ninguna', () => {
+    const { positions, unpricedNote } = cryptoDetail()
+    const wrapper = mount(NeonInvestmentAssetPositions, {
+      props: { positions, note: unpricedNote },
+    })
+
+    expect(wrapper.find('[data-position-evolution]').exists()).toBe(false)
   })
 })

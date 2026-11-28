@@ -10,6 +10,7 @@ import {
   type SortDirection,
   type SortKey,
   type Tone,
+  TONE_STROKE,
   TONE_TEXT,
 } from './view-model'
 
@@ -30,11 +31,6 @@ const emit = defineEmits<{
   sort: [key: SortKey, direction: SortDirection]
 }>()
 
-const TONE_STROKE: Record<Tone, string> = {
-  gain: 'var(--color-gain)',
-  loss: 'var(--color-loss)',
-  neutral: 'var(--color-text)',
-}
 // The table comes in with its head, at 200ms, its rows close behind one
 // another (`anim-row`, 25ms apart up to the ninth) and each weight bar drawing
 // itself, shorter than elsewhere, as its row lands: the cover is done in about

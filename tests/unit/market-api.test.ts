@@ -6,7 +6,11 @@ vi.mock('../../src/scripts/demo-mode', () => demo)
 
 import { ApiClientError } from '../../src/lib/client/api-error'
 import { ClientHttp } from '../../src/lib/client/http'
-import { fetchBenchmarkCloses, fetchMarketQuotes } from '../../src/services/market-api'
+import {
+  fetchBenchmarkCloses,
+  fetchInstrumentCloses,
+  fetchMarketQuotes,
+} from '../../src/services/market-api'
 
 const jsonResponse = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -60,6 +64,29 @@ describe('fetchBenchmarkCloses', () => {
       ),
     )
     expect(error).toBeInstanceOf(ApiClientError)
+  })
+})
+
+describe('fetchInstrumentCloses', () => {
+  const eth = { symbol: 'ETH', type: 'crypto', currency: 'EUR' } as const
+
+  it('pide a la API los cierres mensuales del instrumento y el año', async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({ closes: [1, 2] }))
+
+    await expect(run(fetchInstrumentCloses(eth, 2026), request)).resolves.toEqual([1, 2])
+
+    expect(request).toHaveBeenCalledWith(
+      '/api/market/closes?symbol=ETH&type=crypto&currency=EUR&year=2026',
+      expect.objectContaining({ method: 'GET' }),
+    )
+  })
+
+  it('no consulta la red en modo demo', async () => {
+    demo.isDemoMode.mockReturnValue(true)
+    const request = vi.fn<typeof fetch>()
+
+    await expect(run(fetchInstrumentCloses(eth, 2026), request)).resolves.toEqual([])
+    expect(request).not.toHaveBeenCalled()
   })
 })
 

@@ -1,6 +1,8 @@
 import { Effect } from 'effect'
 
 import type { Benchmark } from '../../domain/investment/benchmarks'
+import { yahooQuoteSymbol } from '../../domain/investment/symbol-matching'
+import type { Instrument } from '../../scripts/types'
 import { MarketQuoteError } from './market-data'
 import { yahooFinance } from './yahoo-finance'
 
@@ -16,18 +18,34 @@ export function loadBenchmarkCloses(
   benchmark: Benchmark,
   year: number,
 ): Effect.Effect<number[], MarketQuoteError> {
-  const key = `${benchmark.symbol}:${year}`
+  return loadYahooCloses(benchmark.symbol, benchmark.name, year)
+}
+
+/** The same closes for an instrument's own quote, for the evolution of its position. */
+export function loadInstrumentCloses(
+  instrument: Pick<Instrument, 'symbol' | 'quoteSymbol' | 'type' | 'currency'>,
+  year: number,
+): Effect.Effect<number[], MarketQuoteError> {
+  return loadYahooCloses(yahooQuoteSymbol(instrument), instrument.symbol, year)
+}
+
+function loadYahooCloses(
+  symbol: string,
+  name: string,
+  year: number,
+): Effect.Effect<number[], MarketQuoteError> {
+  const key = `${symbol}:${year}`
   const hit = cache.get(key)
   if (hit && Date.now() - hit.at < TTL_MS) return Effect.succeed(hit.closes)
 
   return Effect.tryPromise({
     try: () =>
-      yahooFinance.chart(benchmark.symbol, {
+      yahooFinance.chart(symbol, {
         period1: `${year - 1}-12-01`,
         period2: `${year + 1}-01-01`,
         interval: '1mo',
       }),
-    catch: () => new MarketQuoteError({ message: `No se pudo consultar ${benchmark.name}.` }),
+    catch: () => new MarketQuoteError({ message: `No se pudo consultar ${name}.` }),
   }).pipe(
     Effect.map((result) => monthlyCloses(result.quotes, year)),
     Effect.tap((closes) => Effect.sync(() => cache.set(key, { at: Date.now(), closes }))),
