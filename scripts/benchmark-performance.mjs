@@ -7,7 +7,7 @@ const latencyMs = Number(process.env.BENCHMARK_LATENCY_MS || 40)
 const throughputMbps = Number(process.env.BENCHMARK_THROUGHPUT_MBPS || 10)
 
 function median(values) {
-  const sorted = [...values].sort((left, right) => left - right)
+  const sorted = values.toSorted((left, right) => left - right)
   const middle = Math.floor(sorted.length / 2)
   return sorted.length % 2 === 0 ? (sorted[middle - 1] + sorted[middle]) / 2 : sorted[middle]
 }
@@ -111,12 +111,13 @@ async function measureRun(browser) {
   )
 
   const clientMetrics = await page.evaluate(() => {
-    const benchmarkWindow = /** @type {Window & { __performanceBenchmark: {
-     *   appReadyMs: number
-     *   largestContentfulPaintMs: number
-     *   longTaskCount: number
-     *   longTaskDurationMs: number
-     * } }} */ (window)
+    const benchmarkWindow =
+      /** @type {Window & { __performanceBenchmark: {
+       *   appReadyMs: number
+       *   largestContentfulPaintMs: number
+       *   longTaskCount: number
+       *   longTaskDurationMs: number
+       * } }} */ (window)
     const navigation = performance.getEntriesByType('navigation')[0]
     const firstContentfulPaint = performance.getEntriesByName('first-contentful-paint').at(-1)
     const scripts = performance

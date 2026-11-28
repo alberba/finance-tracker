@@ -64,8 +64,8 @@ export function subscriptionRows(
   currency = 'EUR',
 ): SubscriptionRowView[] {
   const horizon = addDays(today, NEXT_CHARGE_HORIZON_DAYS)
-  return [...subscriptions]
-    .sort(
+  return subscriptions
+    .toSorted(
       (a, b) =>
         Number(b.active) - Number(a.active) ||
         (a.active ? monthlyEquivalent(b) - monthlyEquivalent(a) : 0) ||
@@ -137,10 +137,33 @@ export interface SubscriptionsSummary {
   upcoming: UpcomingView[]
 }
 
-const MONTH_LABELS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+const MONTH_LABELS = [
+  'ene',
+  'feb',
+  'mar',
+  'abr',
+  'may',
+  'jun',
+  'jul',
+  'ago',
+  'sep',
+  'oct',
+  'nov',
+  'dic',
+]
 const MONTH_NAMES = [
-  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+  'Enero',
+  'Febrero',
+  'Marzo',
+  'Abril',
+  'Mayo',
+  'Junio',
+  'Julio',
+  'Agosto',
+  'Septiembre',
+  'Octubre',
+  'Noviembre',
+  'Diciembre',
 ]
 const UPCOMING_SHOWN = 4
 
@@ -162,7 +185,12 @@ export function subscriptionsSummary(
     const total = charges
       .filter((charge) => charge.date.startsWith(key))
       .reduce((sum, charge) => sum + charge.amount, 0)
-    return { key, monthIndex: date.getUTCMonth(), year: date.getUTCFullYear(), total: round2(total) }
+    return {
+      key,
+      monthIndex: date.getUTCMonth(),
+      year: date.getUTCFullYear(),
+      total: round2(total),
+    }
   })
   const max = Math.max(...totals.map((item) => item.total))
   const min = Math.min(...totals.map((item) => item.total))

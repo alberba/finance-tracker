@@ -14,7 +14,7 @@ bun run setup:worktree
 bun run dev
 ```
 
-`bun run setup:worktree` crea `.dev.vars` y aplica las migraciones D1 locales; cómo entrar en local
+`bun run setup:worktree` crea `.dev.vars` (con el `BETTER_AUTH_URL` del worktree) y aplica las migraciones D1 locales; cómo entrar en local
 con identidad local de pruebas está en el [README](./README.md#ejecutar-en-local-astro). Para Playwright,
 una sola vez: `bun run test:e2e:install`.
 

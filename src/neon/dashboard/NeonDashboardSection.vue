@@ -57,7 +57,7 @@ const editToggle = useTemplateRef<HTMLButtonElement>('editToggle')
 const shown = computed(() => {
   const order = readingOrder(layoutStore.layout.items).map((item) => item.id)
   const rank = (id: WidgetId) => (order.includes(id) ? order.indexOf(id) : order.length)
-  return [...layoutStore.items].sort((a, b) => rank(a.id) - rank(b.id))
+  return layoutStore.items.toSorted((a, b) => rank(a.id) - rank(b.id))
 })
 
 const confirmingReset = shallowRef(false)

@@ -4,8 +4,9 @@
     {
       "name": "dev",
       "runtimeExecutable": "bun",
-      "runtimeArgs": ["run", "dev", "--host", "127.0.0.1", "--port", "4321"],
-      "port": 4321
+      "runtimeArgs": ["run", "dev:worktree", "--host", "127.0.0.1"],
+      "port": 4321,
+      "autoPort": true
     },
     {
       "name": "preview",
