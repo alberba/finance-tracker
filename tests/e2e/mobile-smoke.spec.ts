@@ -55,8 +55,10 @@ test.describe('Mobile smoke', () => {
     })
     expect(manifest.icons).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ sizes: '192x192' }),
-        expect.objectContaining({ sizes: '512x512' }),
+        expect.objectContaining({ sizes: '192x192', purpose: 'any' }),
+        expect.objectContaining({ sizes: '512x512', purpose: 'any' }),
+        expect.objectContaining({ sizes: '192x192', purpose: 'maskable' }),
+        expect.objectContaining({ sizes: '512x512', purpose: 'maskable' }),
       ]),
     )
   })
