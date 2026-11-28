@@ -82,7 +82,6 @@ export default defineConfig({
           '**/.wrangler/**',
           '**/.scratch/**',
           '**/.data/**',
-          '**/coverage/**',
           '**/blob-report/**',
           '**/blob-report-*/**',
           '**/playwright-report/**',

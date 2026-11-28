@@ -52,6 +52,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
+      - name: Agent docs
+        run: bun run check:docs
       - name: Lint
         run: bun run lint
       - name: Astro check
