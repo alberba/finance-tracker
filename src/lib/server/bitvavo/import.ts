@@ -229,7 +229,12 @@ export function previewBitvavo(
       to,
       timeZone: config.timeZone,
       startDate: config.startDate,
-    })
+    }).pipe(
+      // A revoked key asks for attention here too, not only during a sync.
+      Effect.tapError((error) =>
+        error instanceof InvalidCredential ? recordFailure(userId, error) : Effect.void,
+      ),
+    )
     const movements = yield* transactions.listByUser(userId)
     const details = yield* transactions.listTradeDetailsByTransactions(
       userId,

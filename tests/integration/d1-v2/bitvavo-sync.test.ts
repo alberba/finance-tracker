@@ -267,6 +267,14 @@ describe('credentials and attention', () => {
     expect(state?.lastError).not.toContain('test-secret')
   })
 
+  it('also asks for attention when the key is rejected while preparing a preview', async () => {
+    const { user, account } = await createUser()
+    await configure(user.id, account.id)
+    status = 403
+    await expect(run(previewBitvavo(user.id, env))).rejects.toThrow('lectura')
+    expect(await connection(user.id)).toMatchObject({ needsAttention: true })
+  })
+
   it('replaces the credential without losing cursor or movements', async () => {
     const { user, account } = await importedUser()
     status = 401

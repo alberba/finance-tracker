@@ -5,10 +5,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BitvavoConnectionState } from '../../src/lib/bitvavo-types'
 import NeonBitvavoPanel from '../../src/neon/sections/settings/NeonBitvavoPanel.vue'
 
-vi.mock('../../src/stores/sync', () => ({
-  useSyncStore: () => ({ flush: vi.fn(async () => {}), refreshFromServer: vi.fn(async () => {}) }),
-}))
-
 const base: BitvavoConnectionState = {
   accountId: 'account',
   startDate: '2019-01-01',
