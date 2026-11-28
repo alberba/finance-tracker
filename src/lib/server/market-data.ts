@@ -1,12 +1,13 @@
 import { Cause, Data, Deferred, Effect } from 'effect'
+import type { PricePoint } from '../../domain/investment/price-history'
 import type { Instrument, Quote, QuoteDataType, QuoteProvider } from '../../scripts/types'
 import { yahooQuoteSymbol } from '../../domain/investment/symbol-matching'
 import { Http } from './http'
+import { fetchMorningstarCloses, morningstarId } from './morningstar'
 import { yahooFinance, YahooFinanceHttpError } from './yahoo-finance'
 
 export interface MarketDataEnv {
   MARKET_DATA_PROVIDER?: string
-  TWELVE_DATA_API_KEY?: string
   COINGECKO_API_KEY?: string
   COINGECKO_API_PLAN?: string
   MARKET_QUOTE_STALE_MINUTES?: string
@@ -136,6 +137,11 @@ function fetchProviderQuote(
       Effect.catchIf(
         (error: MarketFailure) => Boolean(error),
         (error) => {
+          // A fund Yahoo cannot quote, for whatever reason, still has its daily
+          // price on Morningstar by ISIN or `0P…` id.
+          if (provider === 'yahoo' && morningstarId(instrument)) {
+            return fromProvider('morningstar')
+          }
           const fallbackProvider = resolveFallbackProvider(provider, env)
           if (!fallbackProvider || !shouldUseProviderFallback(provider, error)) {
             return Effect.fail(error)
@@ -153,7 +159,9 @@ function resolveProvider(instrument: Instrument, env: MarketDataEnv): string {
 
 function normalizeProvider(value: string): string {
   const provider = value.trim().toLowerCase()
-  if (!provider) return DEFAULT_PROVIDER
+  // Twelve Data's free plan does not allow showing its prices to people, so an
+  // instrument saved with it is quoted from Yahoo.
+  if (!provider || provider === 'twelve-data') return DEFAULT_PROVIDER
   // Unknown values pass through so the fetch fails loudly instead of
   // silently quoting from another source.
   return provider
@@ -162,7 +170,6 @@ function normalizeProvider(value: string): string {
 function resolveFallbackProvider(provider: string, env: MarketDataEnv): string | null {
   const configuredProvider = normalizeProvider(env.MARKET_DATA_PROVIDER || DEFAULT_PROVIDER)
   if (configuredProvider === provider) return null
-  if (configuredProvider === 'twelve-data' && !env.TWELVE_DATA_API_KEY) return null
   if (configuredProvider === 'coingecko' && !env.COINGECKO_API_KEY) return null
   return configuredProvider
 }
@@ -189,34 +196,37 @@ function fetchProviderQuoteFrom(
               retryAfterMs: error.retryAfterMs,
             })
           : new MarketQuoteError({ message: 'No se pudo consultar Yahoo Finance.' }),
-    })
+    }).pipe(
+      // An unknown ticker (a fund's ISIN, say) answers without a price: a
+      // failure, so a fund can still fall back to Morningstar.
+      Effect.filterOrFail(
+        (raw) => typeof asRecord(raw).regularMarketPrice === 'number',
+        () => new MarketQuoteError({ message: 'Yahoo Finance no devolvió un precio.' }),
+      ),
+    )
   }
   if (provider === 'coingecko') return fetchCoinGecko(instrument, env)
-  if (provider === 'twelve-data') return fetchTwelveData(instrument, env)
+  if (provider === 'morningstar') return fetchMorningstarQuote(instrument)
   return Effect.fail(
     new MarketQuoteError({ message: `Proveedor de cotizaciones desconocido: ${provider}` }),
   )
 }
 
-function fetchTwelveData(
+function fetchMorningstarQuote(
   instrument: Instrument,
-  env: MarketDataEnv,
 ): Effect.Effect<unknown, MarketFailure, Http> {
-  return Effect.gen(function* () {
-    if (!env.TWELVE_DATA_API_KEY) {
-      return yield* new MarketQuoteError({ message: 'TWELVE_DATA_API_KEY no configurada' })
-    }
-    const params = new URLSearchParams({
-      symbol:
-        instrument.type === 'crypto'
-          ? `${instrument.symbol}/${instrument.currency || 'USD'}`
-          : instrument.symbol,
-    })
-    if (instrument.market) params.set('exchange', instrument.market)
-    return yield* fetchJsonWithTimeout(`https://api.twelvedata.com/quote?${params.toString()}`, {
-      Authorization: `apikey ${env.TWELVE_DATA_API_KEY}`,
-    })
-  })
+  const fund = morningstarId(instrument)
+  if (!fund) {
+    return Effect.fail(
+      new MarketQuoteError({ message: 'El símbolo no es un fondo de Morningstar.' }),
+    )
+  }
+  // Two weeks are enough to hold the last two net asset values, holidays included.
+  const since = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+  return fetchMorningstarCloses(fund, since, 'daily').pipe(
+    Effect.map((points) => ({ points })),
+    Effect.mapError((error) => new MarketQuoteError({ message: error.message })),
+  )
 }
 
 function fetchCoinGecko(
@@ -257,6 +267,9 @@ function normalizeProviderQuote(
   const fetchedAt = new Date().toISOString()
   if (provider === 'yahoo') {
     return normalizeYahooQuote(instrument, response, env, fetchedAt)
+  }
+  if (provider === 'morningstar') {
+    return normalizeMorningstarQuote(instrument, response, env, fetchedAt)
   }
   const providerRow =
     provider === 'coingecko'
@@ -348,6 +361,34 @@ function normalizeYahooQuote(
     changePercent:
       readOptionalNumber(raw.regularMarketChangePercent) ??
       calculateChangePercent(price, previousClose),
+  }
+}
+
+/** A fund's last net asset value, in euros, against the one before it. */
+function normalizeMorningstarQuote(
+  instrument: Instrument,
+  raw: Record<string, unknown>,
+  env: MarketDataEnv,
+  fetchedAt: string,
+): Quote {
+  const points = Array.isArray(raw.points) ? (raw.points as PricePoint[]) : []
+  const last = points.at(-1)
+  if (!last) throw new Error('Morningstar no devolvió un precio válido')
+  const previousClose = points.at(-2)?.close ?? null
+  const timestamp = new Date(last.t).toISOString()
+  const stale = Date.now() - last.t > readNumber(env.MARKET_QUOTE_STALE_MINUTES, 15) * 60_000
+  return {
+    instrumentId: instrument.id,
+    price: last.close,
+    currency: 'EUR',
+    timestamp,
+    fetchedAt,
+    dataType: 'eod',
+    source: 'morningstar',
+    status: stale ? 'stale' : 'fresh',
+    isStale: stale,
+    previousClose,
+    changePercent: calculateChangePercent(last.close, previousClose),
   }
 }
 

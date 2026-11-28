@@ -11,7 +11,6 @@ export const INSTRUMENT_TYPE_LABEL: Record<Instrument['type'], string> = {
 
 /** Quote providers an instrument can use, as the selects list them. */
 export const QUOTE_PROVIDERS: ReadonlyArray<{ value: QuoteProvider; label: string }> = [
-  { value: 'twelve-data', label: 'Twelve Data' },
   { value: 'yahoo', label: 'Yahoo Finance' },
   { value: 'coingecko', label: 'CoinGecko' },
 ] as const

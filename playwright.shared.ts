@@ -39,11 +39,7 @@ function localWorkerConfig(port: number, baseURL: string): string {
   )
   const secrets = Object.fromEntries(
     Object.entries(bindings)
-      .filter(
-        ([key, binding]) =>
-          binding.type === 'secret_text' &&
-          ['TWELVE_DATA_API_KEY', 'COINGECKO_API_KEY'].includes(key),
-      )
+      .filter(([key, binding]) => binding.type === 'secret_text' && key === 'COINGECKO_API_KEY')
       .map(([key, binding]) => [key, binding.value]),
   )
   const folder = resolve('.scratch', 'playwright', `${port}-${workerConfigId}`)

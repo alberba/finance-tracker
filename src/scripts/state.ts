@@ -305,9 +305,7 @@ function normalizeInstruments(list: unknown): Instrument[] {
           .trim()
           .toUpperCase()
           .slice(0, 3),
-        provider: String(raw.provider || 'twelve-data')
-          .trim()
-          .toLowerCase(),
+        provider: normalizeQuoteProvider(raw.provider),
         active: raw.active !== false,
         openingUnits: roundWithPrecision(parseFloatSafe(raw.openingUnits, 0), 8),
         ...(raw.holdingUnits !== undefined
@@ -524,6 +522,17 @@ function normalizeStockEvents(input: unknown): StockEventsSettings {
 function normalizeOptionalNumber(value: unknown): number | null {
   const parsed = parseFloatSafe(value, NaN)
   return Number.isFinite(parsed) && parsed >= 0 ? round2(parsed) : null
+}
+
+/**
+ * Yahoo when none is saved. Twelve Data's free plan does not allow showing its
+ * prices to people, so an instrument saved with it moves to Yahoo too.
+ */
+function normalizeQuoteProvider(value: unknown): string {
+  const provider = String(value || '')
+    .trim()
+    .toLowerCase()
+  return !provider || provider === 'twelve-data' ? 'yahoo' : provider
 }
 
 function normalizeQuoteDataType(value: unknown): QuoteDataType {

@@ -358,7 +358,7 @@ export function buildDemoSeed(now: Date = new Date()): State {
         symbol: 'SWDA',
         market: 'XLON',
         currency: 'EUR',
-        provider: 'twelve-data',
+        provider: 'yahoo',
         active: true,
         openingUnits: 152.4,
       },

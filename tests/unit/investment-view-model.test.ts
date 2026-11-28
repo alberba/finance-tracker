@@ -153,7 +153,7 @@ describe('buildInvestmentDashboardViewModel · posiciones', () => {
             symbol: 'SGLN.L',
             market: 'LSE',
             currency: 'EUR',
-            provider: 'twelve-data',
+            provider: 'yahoo',
             active: true,
           },
         ],
