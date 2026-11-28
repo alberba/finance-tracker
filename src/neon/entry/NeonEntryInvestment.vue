@@ -47,6 +47,13 @@ const form = reactive({
     investmentStore.accounts.find((account) => account.id === props.preset?.accountId)?.id ??
     investmentStore.accounts[0]?.id ??
     '',
+  investmentAccountId:
+    financialStateStore.investmentAssets.find(
+      (asset) => asset.id === props.preset?.destinationAccountId,
+    )?.id ??
+    (props.preset?.symbol ? investmentStore.defaultInvestmentAccountId(props.preset.symbol) : '') ??
+    financialStateStore.investmentAssets[0]?.id ??
+    '',
   units: '',
   unitPrice: '',
   fee: '',
@@ -57,11 +64,30 @@ const form = reactive({
   toCash: false,
 })
 
+// The investment account follows the instrument of the typed symbol until the
+// user picks one; a symbol with no instrument leaves what was there.
+let investmentAccountPicked = false
+watch(
+  () => form.symbol,
+  (symbol) => {
+    if (investmentAccountPicked) return
+    const account = investmentStore.defaultInvestmentAccountId(symbol)
+    if (account) form.investmentAccountId = account
+  },
+)
+function pickInvestmentAccount(accountId: string): void {
+  investmentAccountPicked = true
+  form.investmentAccountId = accountId
+}
+
 const isBitvavo = computed(() => investmentStore.isBitvavoBrokerAccount(form.accountId))
 const canSync = computed(() => stockEventsStore.canSyncSymbol(form.symbol))
 
 const brokerOptions = computed(() =>
   investmentStore.accounts.map((account) => ({ value: account.id, label: account.name })),
+)
+const investmentAccountOptions = computed(() =>
+  financialStateStore.investmentAssets.map((asset) => ({ value: asset.id, label: asset.name })),
 )
 const categoryOptions = computed(() =>
   (isBitvavo.value ? ['Crypto'] : investmentStore.investmentCategories).map((name) => ({
@@ -124,6 +150,7 @@ function save(): boolean {
     fee: asInput(form.fee) || '0',
     movementCurrency: form.movementCurrency,
     accountId: form.accountId,
+    destinationAccountId: form.investmentAccountId,
     declared: form.declared,
     toCash: canSync.value && form.toCash,
   })
@@ -227,6 +254,13 @@ const numberClass = `${ENTRY_FIELD_CLASS} font-display text-end tabular-nums`
     :icon="ACCOUNT_ICON"
     label="Broker"
     :options="brokerOptions"
+  />
+  <NeonEntryPicker
+    :model-value="form.investmentAccountId"
+    :icon="ACCOUNT_ICON"
+    label="Cuenta de inversión"
+    :options="investmentAccountOptions"
+    @update:model-value="pickInvestmentAccount"
   />
   <NeonEntryPicker
     v-model="form.category"

@@ -185,9 +185,7 @@ describe('round trip: inversión', () => {
     expect(offline.recurringRules).toHaveLength(1)
     expect(offline.pendingMovements.map((pending) => pending.id).sort()).toEqual(acceptedIds)
     expect(
-      offline.pendingMovements.every(
-        (pending) => pending.ruleId === offline.recurringRules[0].id,
-      ),
+      offline.pendingMovements.every((pending) => pending.ruleId === offline.recurringRules[0].id),
     ).toBe(true)
 
     trip.setOffline(false)
@@ -229,8 +227,7 @@ describe('round trip: inversión', () => {
     expect(
       (await trip.pending()).some(
         (entry) =>
-          (entry as { command: { entityType: string } }).command.entityType ===
-          'pendingMovement',
+          (entry as { command: { entityType: string } }).command.entityType === 'pendingMovement',
       ),
     ).toBe(false)
     trip.syncStore.publishIntentCommands = realPublish
@@ -373,5 +370,136 @@ describe('round trip: inversión', () => {
       fee: 1,
       time: '15:00',
     })
+  })
+})
+
+describe('round trip: cuenta de inversión destino', () => {
+  let trip: RoundTrip
+  let ids: { cash: string; crypto: string; bitvavo: string }
+
+  beforeEach(async () => {
+    trip = await startRoundTrip()
+    const { useSettingsStore } = await import('../../../../src/stores/settings')
+    const { useFinancialStateStore } = await import('../../../../src/stores/financial-state')
+    const financialState = useFinancialStateStore()
+    financialState.commitState((draft) => {
+      draft.investmentCategories = ['Crypto']
+    })
+    const settings = useSettingsStore()
+    settings.addEntity('accounts', 'Corriente', '0')
+    settings.addEntity('investmentAssets', 'Crypto', '0')
+    settings.addEntity('investmentAssets', 'Bitvavo', '0')
+    const [crypto, bitvavo] = financialState.investmentAssets.map((asset) => asset.id)
+    ids = { cash: financialState.accounts[0].id, crypto, bitvavo }
+    await trip.reload()
+  })
+
+  afterEach(() => trip.cleanup())
+
+  async function buy(destinationAccountId?: string) {
+    const { useInvestmentStore } = await import('../../../../src/stores/investment')
+    return useInvestmentStore().addMovement({
+      date: '2026-09-12',
+      time: '10:30',
+      side: 'buy',
+      symbol: 'ETH',
+      category: 'Crypto',
+      unitPrice: '100',
+      units: '2',
+      fee: '0',
+      movementCurrency: 'EUR',
+      accountId: ids.cash,
+      declared: false,
+      ...(destinationAccountId ? { destinationAccountId } : {}),
+    })
+  }
+
+  it('keeps the investment account a purchase lands in after reload', async () => {
+    expect(await buy(ids.bitvavo)).toBe(true)
+
+    const reloaded = await trip.reload()
+
+    expect(reloaded.transactions.find((tx) => tx.type === 'investment')).toMatchObject({
+      accountId: ids.cash,
+      destinationAccountId: ids.bitvavo,
+    })
+  })
+
+  it('keeps the investment account when the movement is edited', async () => {
+    const { useMovementsStore } = await import('../../../../src/stores/movements')
+    await buy(ids.bitvavo)
+    const first = await trip.reload()
+    const movement = first.transactions.find((tx) => tx.type === 'investment')!
+
+    useMovementsStore().saveEdit(movement.id, {
+      date: '2026-09-13',
+      accountId: ids.cash,
+      type: 'investment',
+      category: 'Crypto',
+      description: 'Compra editada',
+      amount: '200',
+    })
+
+    const reloaded = await trip.reload()
+    expect(reloaded.transactions.find((tx) => tx.type === 'investment')).toMatchObject({
+      date: '2026-09-13',
+      destinationAccountId: ids.bitvavo,
+    })
+  })
+
+  it('blocks deleting an investment account that a purchase lands in', async () => {
+    const { useSettingsStore } = await import('../../../../src/stores/settings')
+    await buy(ids.bitvavo)
+    await trip.reload()
+
+    useSettingsStore().removeEntity('investmentAssets', ids.bitvavo)
+
+    const { useFinancialStateStore } = await import('../../../../src/stores/financial-state')
+    expect(useFinancialStateStore().investmentAssets.map((asset) => asset.id)).toContain(
+      ids.bitvavo,
+    )
+    const reloaded = await trip.reload()
+    expect(reloaded.investmentAssets.map((asset) => asset.id)).toContain(ids.bitvavo)
+    expect(reloaded.transactions.find((tx) => tx.type === 'investment')).toMatchObject({
+      destinationAccountId: ids.bitvavo,
+    })
+  })
+
+  it('refuses on the server a destination that is not an investment account', async () => {
+    const { runWithDb } = await import('../../../../src/db/database')
+    const transactionsRepository = await import('../../../../src/db/repositories/transactions')
+
+    await expect(
+      runWithDb(
+        trip.testDb.db as never,
+        transactionsRepository.create(trip.userId, {
+          accountId: ids.cash,
+          destinationAccountId: ids.cash,
+          type: 'investment',
+          date: '2026-09-12',
+          amount: 100,
+          currency: 'EUR',
+        }),
+      ),
+    ).rejects.toThrow(/cuenta de inversión/)
+  })
+
+  it('does not store a destination on a type that has none', async () => {
+    const { runWithDb } = await import('../../../../src/db/database')
+    const transactionsRepository = await import('../../../../src/db/repositories/transactions')
+
+    const row = await runWithDb(
+      trip.testDb.db as never,
+      transactionsRepository.create(trip.userId, {
+        accountId: ids.cash,
+        destinationAccountId: ids.bitvavo,
+        type: 'expense',
+        date: '2026-09-12',
+        amount: 100,
+        currency: 'EUR',
+      }),
+    )
+
+    expect(row.destinationAccountId).toBeNull()
   })
 })

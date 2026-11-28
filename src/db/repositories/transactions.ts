@@ -16,6 +16,7 @@ import {
   type Db,
   RejectedCommandError,
   assertOwnedReferences,
+  assertInvestmentDestination,
   assertSavingAccounts,
   chunkIds,
   clientIdentity,
@@ -55,7 +56,7 @@ export interface CreateTransactionInput {
   legacyId?: string | null
   accountId: string
   categoryId?: string | null
-  /** Only a saving carries one; any other type stores null. */
+  /** Only a saving (cash account) or an investment (investment account) carries one; any other type stores null. */
   destinationAccountId?: string | null
   type: string
   date: string
@@ -112,12 +113,15 @@ async function createSql(
     accountId: input.accountId,
     categoryId: input.categoryId,
   })
-  const destinationAccountId = input.type === 'saving' ? (input.destinationAccountId ?? null) : null
+  const carriesDestination = input.type === 'saving' || input.type === 'investment'
+  const destinationAccountId = carriesDestination ? (input.destinationAccountId ?? null) : null
   if (input.type === 'saving') {
     if (!destinationAccountId) {
       throw new RejectedCommandError('El ahorro necesita una cuenta destino.')
     }
     await assertSavingAccounts(db, userId, { accountId: input.accountId, destinationAccountId })
+  } else if (destinationAccountId) {
+    await assertInvestmentDestination(db, userId, destinationAccountId)
   }
   const now = nowIso()
   const [row] = await db
@@ -172,12 +176,16 @@ async function updateSql(
   const nextAmount = input.amount ?? existing.amount
   const nextType = input.type ?? existing.type
   const nextAccountId = input.accountId ?? existing.accountId
-  // Leaving saving drops the destination; staying keeps it unless the patch says otherwise.
+  // Another type drops the destination; staying keeps it unless the patch says otherwise.
+  // Switching between saving and investment never carries the old one over: one is a
+  // cash account and the other an investment account.
   const nextDestination =
-    nextType !== 'saving'
+    nextType !== 'saving' && nextType !== 'investment'
       ? null
       : input.destinationAccountId === undefined
-        ? existing.destinationAccountId
+        ? nextType === existing.type
+          ? existing.destinationAccountId
+          : null
         : input.destinationAccountId
   if (nextType === 'saving') {
     if (!nextDestination) {
@@ -187,6 +195,8 @@ async function updateSql(
       accountId: nextAccountId,
       destinationAccountId: nextDestination,
     })
+  } else if (nextType === 'investment' && nextDestination) {
+    await assertInvestmentDestination(db, userId, nextDestination)
   }
   const [row] = await db
     .update(transactions)

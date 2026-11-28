@@ -311,7 +311,9 @@ describe('cuenta de inversión destino del movimiento', () => {
 
     const positions = buildAccountPositions(state, 3)
 
-    expect(positions.map((position) => [position.accountId, position.symbol, position.units])).toEqual([
+    expect(
+      positions.map((position) => [position.accountId, position.symbol, position.units]),
+    ).toEqual([
       ['crypto', 'ETH', 1],
       ['bitvavo', 'ETH', 3],
     ])
@@ -329,9 +331,7 @@ describe('cuenta de inversión destino del movimiento', () => {
   })
 
   it('sin cuenta destino ni instrumento, la categoría atribuye el movimiento (legacy)', () => {
-    const state = withBitvavo([
-      operation('t1', '2026-01-10', 'buy', 1, 100, { category: 'Oro' }),
-    ])
+    const state = withBitvavo([operation('t1', '2026-01-10', 'buy', 1, 100, { category: 'Oro' })])
 
     expect(computeInvestmentValue(state, 'oro', 3)).toBe(100)
   })

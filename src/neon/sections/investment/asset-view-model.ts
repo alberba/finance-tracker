@@ -490,6 +490,7 @@ export function assetDetail(
       symbol: last?.symbol ?? single?.symbol ?? '',
       category: last?.category ?? position.name,
       accountId: last?.accountId,
+      destinationAccountId: position.id,
       currency: last?.movementCurrency,
     },
     years: groupByYear(movements),
