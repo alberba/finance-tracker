@@ -1,8 +1,8 @@
 import { round2 } from '../../lib/number'
-import type { Entity } from '../../lib/finance-core'
+import { movementBelongsToInvestmentAsset, type Entity } from '../../lib/finance-core'
 import type { MonthOrStart } from '../../lib/month'
 import type { Instrument, InstrumentType, State, Transaction } from '../../scripts/types'
-import { matchesInvestmentAsset, computeInvestmentValue } from './calculations'
+import { computeInvestmentValue } from './calculations'
 import { symbolsMatchInstrument } from './symbol-matching'
 import { quoteUnitPrice } from './valuation'
 
@@ -56,10 +56,15 @@ interface Holding {
 
 const round8 = (value: number): number => Math.round(value * 1e8) / 1e8
 
-/** The investment account a movement belongs to. The one place the attribution rule lives. */
+/**
+ * The investment account a movement belongs to: its explicit destination
+ * account, then its instrument's account, then its category (legacy). The rule
+ * lives in `movementBelongsToInvestmentAsset`, shared with the account's value.
+ */
 export function accountOfMovement(state: State, tx: Transaction): string | null {
-  const account = state.investmentAssets.find((asset) =>
-    matchesInvestmentAsset(tx.category, asset as Entity, tx.instrumentId, state.instruments),
+  const assets = state.investmentAssets as Entity[]
+  const account = assets.find((asset) =>
+    movementBelongsToInvestmentAsset(tx, asset, assets, state.instruments),
   )
   return account?.id ?? null
 }

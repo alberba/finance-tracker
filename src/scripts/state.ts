@@ -606,7 +606,7 @@ function normalizeTransactions(list: unknown): Transaction[] {
         .slice(0, 3)
       if (movementCurrency) safe.movementCurrency = movementCurrency
 
-      if (type === 'saving') {
+      if (type === 'saving' || type === 'investment') {
         const destinationAccountId = String(rawItem.destinationAccountId || '').trim()
         if (destinationAccountId) safe.destinationAccountId = destinationAccountId
       }

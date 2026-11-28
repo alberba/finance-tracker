@@ -4,6 +4,7 @@ import {
   computeInvestmentValue as coreInvestmentValue,
   getWealthByMonth as coreWealthByMonth,
   matchesInvestmentAsset,
+  movementBelongsToInvestmentAsset,
   type Entity,
   type Snapshot,
   type Transaction,
@@ -103,7 +104,8 @@ export function computeInvestedCapitalByAsset(state: State, assetId: string, mon
   const contributions = state.transactions.reduce((sum, item) => {
     if (item.type !== 'investment') return sum
     if (Number(item.month) > month) return sum
-    if (!matchesInvestmentAsset(item.category, asset as Entity, item.instrumentId, state.instruments)) return sum
+    if (!movementBelongsToInvestmentAsset(item, asset as Entity, assets(state), state.instruments))
+      return sum
     return sum + Number(item.amount || 0)
   }, 0)
   return round2(openingCapital + contributions)

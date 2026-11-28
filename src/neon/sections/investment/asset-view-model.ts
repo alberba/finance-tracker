@@ -4,7 +4,7 @@ import type {
   InvestmentAccount,
   InvestmentDashboardViewModel,
 } from '../../../domain/investment/view-model'
-import { matchesInvestmentAsset } from '../../../lib/finance-core'
+import { movementBelongsToInvestmentAsset } from '../../../lib/finance-core'
 import {
   formatDayMonth,
   formatDecimal,
@@ -190,7 +190,7 @@ function assetMovements(state: State, position: InvestmentAccount): Transaction[
     .filter(
       (tx): tx is Transaction =>
         tx.type === 'investment' &&
-        matchesInvestmentAsset(tx.category, asset, tx.instrumentId, state.instruments),
+        movementBelongsToInvestmentAsset(tx, asset, state.investmentAssets, state.instruments),
     )
     .sort(
       (a, b) =>
