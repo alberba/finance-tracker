@@ -1,6 +1,6 @@
 # Parches de dependencias
 
-## http-cache-semantics 4.2.0
+## http-cache-semantics (4.2.0, vigente en 4.3.0)
 
 La auditoría de producción detecta
 [GHSA-ch52-4w7c-c8xp](https://github.com/advisories/GHSA-ch52-4w7c-c8xp).
