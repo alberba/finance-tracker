@@ -218,7 +218,7 @@ watch(
   { immediate: true },
 )
 const notice = computed(() => quoteNotice(summarizeQuoteStatus(marketStore.valuation.instruments)))
-const empty = computed(() => vm.value.positions.length === 0)
+const empty = computed(() => vm.value.accounts.length === 0)
 
 // The cover comes in once each time it shows: blocks rise, rows follow. Past
 // that, the rows stop animating, so a row that moves (a new sort, a quote that
