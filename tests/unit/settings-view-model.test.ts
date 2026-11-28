@@ -13,7 +13,7 @@ function instrument(partial: Partial<Instrument> & Pick<Instrument, 'id' | 'symb
     type: 'etf',
     market: '',
     currency: 'EUR',
-    provider: 'twelve-data',
+    provider: 'yahoo',
     active: true,
     ...partial,
   }

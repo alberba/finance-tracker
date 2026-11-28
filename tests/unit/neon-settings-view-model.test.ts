@@ -274,6 +274,7 @@ describe('filas móviles', () => {
       openingBalance: 0,
       kind: 'ETF',
       symbol: 'VWCE',
+      ticker: 'VWCE.DE',
       provider: 'Yahoo Finance',
       linked: 3,
       pending: 0,

@@ -17,7 +17,7 @@ export type InstrumentType = 'stock' | 'etf' | 'fund' | 'crypto'
 export type QuoteStatus = 'fresh' | 'stale' | 'unavailable'
 
 /** Quote providers an instrument can point at. */
-export type QuoteProvider = 'yahoo' | 'twelve-data' | 'coingecko'
+export type QuoteProvider = 'yahoo' | 'coingecko'
 
 /**
  * What the price represents: `delayed` when the provider says so

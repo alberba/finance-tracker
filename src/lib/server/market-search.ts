@@ -1,13 +1,9 @@
 /**
- * Symbol search against Yahoo Finance with a Twelve Data fallback (ADR-0006).
- *
- * Returns `Effect<MarketSearchResult[], MarketSearchError, Http>`: the
- * fallback, the timeout and the request de-duplication are composed, and
- * HTTP enters through the `Http` service.
+ * Symbol search against Yahoo Finance (ADR-0006), with its results cached for a
+ * minute and identical searches in flight shared.
  */
 
 import { Data, Deferred, Effect, Exit } from 'effect'
-import { Http } from './http'
 import { yahooFinance, YahooFinanceHttpError } from './yahoo-finance'
 
 export interface MarketSearchResult {
@@ -18,11 +14,6 @@ export interface MarketSearchResult {
   type: string
 }
 
-export interface MarketSearchEnv {
-  TWELVE_DATA_API_KEY?: string
-}
-
-const SEARCH_TIMEOUT = '5 seconds'
 const SEARCH_CACHE_MS = 60_000
 const searchCache = new Map<string, { expiresAt: number; results: MarketSearchResult[] }>()
 const inFlightSearches = new Map<
@@ -38,8 +29,7 @@ export class MarketSearchError extends Data.TaggedError('MarketSearchError')<{
 
 export function searchYahooSymbols(
   query: string,
-  env: MarketSearchEnv = {},
-): Effect.Effect<MarketSearchResult[], MarketSearchError, Http> {
+): Effect.Effect<MarketSearchResult[], MarketSearchError> {
   return Effect.gen(function* () {
     const normalizedQuery = query.trim()
     if (!normalizedQuery) return []
@@ -59,7 +49,7 @@ export function searchYahooSymbols(
     inFlightSearches.set(cacheKey, deferred)
 
     return yield* Effect.gen(function* () {
-      const exit = yield* Effect.exit(loadSearchResults(cacheKey, normalizedQuery, env))
+      const exit = yield* Effect.exit(loadSearchResults(cacheKey, normalizedQuery))
       yield* Deferred.succeed(deferred, exit)
       if (Exit.isSuccess(exit)) return exit.value
       return yield* Effect.failCause(exit.cause)
@@ -76,23 +66,12 @@ export function searchYahooSymbols(
 function loadSearchResults(
   cacheKey: string,
   query: string,
-  env: MarketSearchEnv,
-): Effect.Effect<MarketSearchResult[], MarketSearchError, Http> {
-  const search = Effect.tryPromise({
+): Effect.Effect<MarketSearchResult[], MarketSearchError> {
+  return Effect.tryPromise({
     try: () => yahooFinance.search(query, { quotesCount: 10, newsCount: 0 }),
     catch: toSearchError,
-  }).pipe(Effect.map(parseYahooResults))
-
-  return search.pipe(
-    Effect.catchIf(
-      (error: MarketSearchError) => Boolean(error),
-      (error) => {
-        if (!env.TWELVE_DATA_API_KEY || !shouldUseSearchFallback(error)) {
-          return Effect.fail(error)
-        }
-        return searchTwelveDataSymbols(query, env)
-      },
-    ),
+  }).pipe(
+    Effect.map(parseYahooResults),
     Effect.tap((results) => Effect.sync(() => cacheSearchResults(cacheKey, results))),
   )
 }
@@ -115,23 +94,6 @@ function parseYahooResults(raw: unknown): MarketSearchResult[] {
     .filter((result): result is MarketSearchResult => result !== null)
 }
 
-function searchTwelveDataSymbols(
-  query: string,
-  env: MarketSearchEnv,
-): Effect.Effect<MarketSearchResult[], MarketSearchError, Http> {
-  return Effect.gen(function* () {
-    const params = new URLSearchParams({ symbol: query, outputsize: '10' })
-    const body = yield* fetchJson(`https://api.twelvedata.com/symbol_search?${params.toString()}`, {
-      Authorization: `apikey ${env.TWELVE_DATA_API_KEY}`,
-    })
-    const data = asRecord(body)
-    const results = Array.isArray(data.data) ? data.data : []
-    return results
-      .map(toSearchResult)
-      .filter((result): result is MarketSearchResult => result !== null)
-  })
-}
-
 function cacheSearchResults(cacheKey: string, results: MarketSearchResult[]): void {
   searchCache.set(cacheKey, { expiresAt: Date.now() + SEARCH_CACHE_MS, results })
 }
@@ -145,45 +107,11 @@ function toSearchResult(value: unknown): MarketSearchResult | null {
   if (!symbol) return null
   return {
     symbol,
-    name: String(quote.longname || quote.shortname || quote.instrument_name || symbol),
+    name: String(quote.longname || quote.shortname || symbol),
     exchange: String(quote.exchDisp || quote.exchange || ''),
     currency: String(quote.currency || '').toUpperCase(),
-    type: String(quote.quoteType || quote.typeDisp || quote.instrument_type || ''),
+    type: String(quote.quoteType || quote.typeDisp || ''),
   }
-}
-
-function shouldUseSearchFallback(error: MarketSearchError): boolean {
-  return error.status === 0 || error.status === 429 || error.status >= 500
-}
-
-function fetchJson(
-  url: string,
-  headers: Record<string, string>,
-): Effect.Effect<unknown, MarketSearchError, Http> {
-  return Effect.gen(function* () {
-    const http = yield* Http
-    const response = yield* Effect.tryPromise({
-      try: (signal) => http.request(url, { signal, headers }),
-      catch: () =>
-        new MarketSearchError({ message: 'No se pudo contactar con el buscador.', status: 0 }),
-    }).pipe(
-      Effect.timeout(SEARCH_TIMEOUT),
-      Effect.catchTag('TimeoutError', () =>
-        Effect.fail(new MarketSearchError({ message: 'El buscador agotó el tiempo.', status: 0 })),
-      ),
-    )
-    if (!response.ok) {
-      return yield* new MarketSearchError({
-        message: `Buscador respondió ${response.status}`,
-        status: response.status,
-      })
-    }
-    return yield* Effect.promise(() =>
-      response.json().catch(() => {
-        throw new MarketSearchError({ message: 'Respuesta inválida del buscador.', status: 0 })
-      }),
-    )
-  })
 }
 
 function asRecord(value: unknown): Record<string, unknown> {

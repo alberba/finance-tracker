@@ -1,5 +1,7 @@
 import { Effect } from 'effect'
 
+import type { PriceHistory, PriceRange } from '../domain/investment/price-history'
+import type { SymbolCandidate } from '../domain/investment/ticker-suggestion'
 import type { Instrument, Quote } from '../scripts/types'
 import { isDemoMode } from '../scripts/demo-mode'
 import { requestApiJson } from '../lib/client/api-client'
@@ -31,4 +33,36 @@ export const fetchBenchmarkCloses = (
   return requestApiJson<{ closes?: number[] }>(`/api/market/benchmark?${params.toString()}`, {
     fallbackMessage: 'No se pudo cargar el índice',
   }).pipe(Effect.map((body) => body.closes || []))
+}
+
+/** A symbol's closes over `range`, for its quote chart; null in demo mode. */
+export const fetchPriceHistory = (
+  instrument: Pick<Instrument, 'symbol' | 'quoteSymbol' | 'type' | 'currency'>,
+  range: PriceRange,
+): Effect.Effect<PriceHistory | null, ApiClientError, ClientHttp> => {
+  if (isDemoMode()) return Effect.succeed(null)
+
+  const params = new URLSearchParams({
+    symbol: instrument.symbol,
+    type: instrument.type,
+    currency: instrument.currency,
+    range,
+  })
+  if (instrument.quoteSymbol) params.set('quoteSymbol', instrument.quoteSymbol)
+  return requestApiJson<{ history?: PriceHistory }>(`/api/market/history?${params.toString()}`, {
+    fallbackMessage: 'No se pudo cargar la cotización',
+  }).pipe(Effect.map((body) => body.history ?? null))
+}
+
+/** Yahoo's search for `query`: each result's ticker and kind; none in demo mode. */
+export const fetchSymbolCandidates = (
+  query: string,
+): Effect.Effect<SymbolCandidate[], ApiClientError, ClientHttp> => {
+  if (isDemoMode() || !query.trim()) return Effect.succeed([])
+
+  const params = new URLSearchParams({ q: query.trim() })
+  return requestApiJson<{ results?: SymbolCandidate[] }>(
+    `/api/market/search?${params.toString()}`,
+    { fallbackMessage: 'No se pudieron buscar símbolos' },
+  ).pipe(Effect.map((body) => body.results ?? []))
 }

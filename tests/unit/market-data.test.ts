@@ -32,7 +32,7 @@ const instrument: Instrument = {
   symbol: 'VWCE',
   market: 'XETRA',
   currency: 'EUR',
-  provider: 'twelve-data',
+  provider: 'yahoo',
   active: true,
 }
 
@@ -41,29 +41,44 @@ describe('adaptador de mercado server-side', () => {
     quoteMock.mockReset()
   })
 
-  it('normaliza la respuesta del proveedor y calcula la variación diaria', async () => {
+  it('un fondo que Yahoo no cotiza toma su último valor liquidativo de Morningstar', async () => {
+    quoteMock.mockResolvedValue(undefined)
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
       new Response(
         JSON.stringify({
-          price: '125.5',
-          previous_close: '124',
-          datetime: new Date().toISOString(),
+          TimeSeries: {
+            Security: [
+              {
+                HistoryDetail: [
+                  { EndDate: '2026-11-26', Value: '62.3372' },
+                  { EndDate: '2026-11-27', Value: '63.4458' },
+                ],
+              },
+            ],
+          },
         }),
         { status: 200 },
       ),
     )
-    const quote = await loadQuote({ instrument }, { TWELVE_DATA_API_KEY: 'secret' }, fetchMock)
+    const fund: Instrument = {
+      ...instrument,
+      id: 'vanguard-global',
+      type: 'fund',
+      symbol: 'IE00B03HD191',
+    }
+    const quote = await loadQuote({ instrument: fund }, {}, fetchMock)
     expect(quote).toMatchObject({
-      instrumentId: 'asset-vwce',
-      price: 125.5,
+      instrumentId: 'vanguard-global',
+      price: 63.4458,
       currency: 'EUR',
-      source: 'twelve-data',
-      changePercent: 1.21,
-      status: 'fresh',
+      previousClose: 62.3372,
+      changePercent: 1.78,
+      timestamp: '2026-11-27T00:00:00.000Z',
+      source: 'morningstar',
     })
     expect(fetchMock).toHaveBeenCalledWith(
-      expect.not.stringContaining('apikey=secret'),
-      expect.objectContaining({ headers: { Authorization: 'apikey secret' } }),
+      expect.stringMatching(/lt\.morningstar\.com.*id=IE00B03HD191.*idtype=ISIN/),
+      expect.anything(),
     )
   })
 
@@ -406,43 +421,29 @@ describe('adaptador de mercado server-side', () => {
     expect(quote).toMatchObject({ status: 'unavailable', source: 'unavailable' })
   })
 
-  it('usa Twelve Data cuando Yahoo Finance responde 429', async () => {
-    quoteMock.mockRejectedValue(new YahooFinanceHttpError(429, 60_000))
-    const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({
-          price: '9.276',
-          previous_close: '9.312',
-          datetime: new Date().toISOString(),
-        }),
-        { status: 200 },
-      ),
-    )
+  it('cotiza desde Yahoo un instrumento guardado con Twelve Data', async () => {
+    quoteMock.mockResolvedValue({
+      currency: 'EUR',
+      regularMarketPrice: 9.276,
+      regularMarketTime: new Date(),
+    })
+    const fetchMock = vi.fn<typeof fetch>()
 
     const quote = await loadQuote(
       {
         instrument: {
           ...instrument,
-          id: 'aged-mi-rate-limit-fallback',
+          id: 'aged-mi-legacy-twelve-data',
           symbol: 'AGED.MI',
-          market: '',
-          provider: 'yahoo',
+          provider: 'twelve-data',
         },
       },
-      { MARKET_DATA_PROVIDER: 'twelve-data', TWELVE_DATA_API_KEY: 'fallback-secret' },
+      {},
       fetchMock,
     )
 
-    expect(quote).toMatchObject({
-      instrumentId: 'aged-mi-rate-limit-fallback',
-      price: 9.276,
-      source: 'twelve-data',
-      status: 'fresh',
-    })
-    expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining('api.twelvedata.com/quote?symbol=AGED.MI'),
-      expect.objectContaining({ headers: { Authorization: 'apikey fallback-secret' } }),
-    )
+    expect(quote).toMatchObject({ price: 9.276, source: 'yahoo' })
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('deduplica las cotizaciones iguales que llegan mientras hay una petición en vuelo', async () => {

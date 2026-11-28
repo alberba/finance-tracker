@@ -4,8 +4,8 @@ MARKET_DATA_PROVIDER=yahoo
 MARKET_QUOTE_STALE_MINUTES=15
 MARKET_QUOTE_CACHE_SECONDS=300
 
-# Yahoo Finance no necesita clave. Twelve Data es una alternativa opcional.
-TWELVE_DATA_API_KEY=
+# Yahoo Finance no necesita clave. Los fondos (ISIN o 0P…) usan Morningstar si
+# Yahoo no los cotiza, también sin clave.
 
 # Opcional: respaldo específico para cripto.
 COINGECKO_API_KEY=

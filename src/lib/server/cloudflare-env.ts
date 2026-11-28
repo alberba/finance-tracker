@@ -24,7 +24,6 @@ export interface RuntimeEnv {
   GITHUB_BOT_LOGIN?: string
   SENTRY_DSN?: string
   MARKET_DATA_PROVIDER?: string
-  TWELVE_DATA_API_KEY?: string
   COINGECKO_API_KEY?: string
   COINGECKO_API_PLAN?: string
   MARKET_QUOTE_STALE_MINUTES?: string

@@ -6,8 +6,9 @@ import { OPERATION_ICONS } from './asset-icons'
 import { type AssetDetail } from './asset-view-model'
 import NeonInvestmentAssetChart from './NeonInvestmentAssetChart.vue'
 import NeonInvestmentAssetYears from './NeonInvestmentAssetYears.vue'
-import NeonInvestmentQuoteSoon from './NeonInvestmentQuoteSoon.vue'
+import NeonInvestmentQuote from './NeonInvestmentQuote.vue'
 import { TONE_TEXT } from './view-model'
+import { useMarketStore } from '../../../stores/market'
 
 // The detail of an asset in Inversión (#439), desktop. The header is
 // the detail header («‹ VWCE», DESIGN.md): the arrow and the symbol, nothing
@@ -31,6 +32,13 @@ const reading = computed(() => {
   const points = props.detail.chart?.points ?? []
   return points[hot.value ?? points.length - 1]
 })
+
+// With a linked symbol the main chart is its quote; without one, the price of
+// each operation against the average buy price.
+const marketStore = useMarketStore()
+const instrument = computed(() =>
+  marketStore.instruments.find((item) => item.investmentAssetId === props.detail.id && item.active),
+)
 
 const value = computed(() => props.detail.figures.find((figure) => figure.key === 'value'))
 const result = computed(() => props.detail.figures.find((figure) => figure.key === 'result'))
@@ -74,10 +82,16 @@ function onBack(event: MouseEvent): void {
         >
           <header class="flex items-baseline justify-between gap-3">
             <h2 id="asset-chart-title" class="text-block-title m-0 font-extrabold">
-              Precio y tus operaciones
+              <template v-if="instrument">
+                Cotización
+                <span class="text-muted text-note ms-1.5 font-bold">
+                  {{ instrument.quoteSymbol || instrument.symbol }}
+                </span>
+              </template>
+              <template v-else>Precio y tus operaciones</template>
             </h2>
             <span
-              v-if="detail.chart"
+              v-if="!instrument && detail.chart"
               class="text-muted inline-flex items-center gap-3.5 text-xs font-bold"
               aria-hidden="true"
             >
@@ -92,7 +106,8 @@ function onBack(event: MouseEvent): void {
             </span>
           </header>
 
-          <template v-if="detail.chart && reading">
+          <NeonInvestmentQuote v-if="instrument" :instrument="instrument" />
+          <template v-else-if="detail.chart && reading">
             <p
               class="m-0 flex min-h-[1.6em] flex-wrap items-baseline gap-x-3 gap-y-0.5 font-bold tabular-nums"
               aria-live="polite"
@@ -174,8 +189,6 @@ function onBack(event: MouseEvent): void {
         <h2 id="asset-position-title" class="text-block-title m-0 font-extrabold" data-asset-name>
           {{ detail.name }}
         </h2>
-
-        <NeonInvestmentQuoteSoon />
 
         <div v-if="value" class="grid gap-1" data-asset-figure="value">
           <span class="text-muted text-meta font-bold">{{ value.label }}</span>

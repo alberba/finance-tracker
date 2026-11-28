@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, shallowRef } from 'vue'
 
 import { buildPortfolioValuation, type PortfolioValuation } from '../domain/investment/valuation'
-import { quoteSourceKey } from '../domain/investment/symbol-matching'
+import { inferInstrumentType, quoteSourceKey } from '../domain/investment/symbol-matching'
 import { fetchMarketQuotes } from '../services/market-api'
 import { runClientHttp } from '../lib/client/runtime'
 import type { Instrument, InstrumentType } from '../scripts/types'
@@ -101,6 +101,29 @@ export const useMarketStore = defineStore('market', () => {
     })
     const added = instruments.value.find((instrument) => instrument.id === id)
     if (added) persistConfiguration(added, true)
+    return true
+  }
+
+  /**
+   * Points the instrument at another provider ticker (`VWCE.DE`, an ISIN…);
+   * its visible symbol, which movements match, stays. False when nothing changed.
+   */
+  function setQuoteTicker(id: string, ticker: string): boolean {
+    const quoteSymbol = ticker.trim().toUpperCase()
+    const current = instruments.value.find((instrument) => instrument.id === id)
+    if (!quoteSymbol || !current || (current.quoteSymbol || current.symbol) === quoteSymbol) {
+      return false
+    }
+    financialStateStore.commitState((draft) => {
+      const instrument = draft.instruments.find((item) => item.id === id)
+      if (!instrument) return
+      instrument.quoteSymbol = quoteSymbol
+      instrument.type = inferInstrumentType(quoteSymbol)
+      instrument.provider = 'yahoo'
+      delete draft.quotes[id]
+    })
+    const updated = instruments.value.find((instrument) => instrument.id === id)
+    if (updated) persistConfiguration(updated)
     return true
   }
 
@@ -219,6 +242,7 @@ export const useMarketStore = defineStore('market', () => {
     lastRefreshAt,
     addInstrument,
     removeInstrument,
+    setQuoteTicker,
     linkExistingMovements,
     refreshQuotes,
     tickClock,
