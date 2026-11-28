@@ -36,7 +36,7 @@ import NeonInvestmentAssetMobile from './NeonInvestmentAssetMobile.vue'
 import NeonInvestmentCards from './NeonInvestmentCards.vue'
 import NeonInvestmentChart from './NeonInvestmentChart.vue'
 import NeonInvestmentMobile from './NeonInvestmentMobile.vue'
-import NeonInvestmentPositions from './NeonInvestmentPositions.vue'
+import NeonInvestmentAccounts from './NeonInvestmentAccounts.vue'
 import NeonInvestmentScore from './NeonInvestmentScore.vue'
 import {
   CHART_HEIGHT,
@@ -49,10 +49,10 @@ import {
   periodFigures,
   periodOptions,
   portfolioChart,
-  positionRows,
+  accountRows,
   quoteNotice,
   signedPct,
-  sortPositions,
+  sortAccounts,
   toneOf,
   twrSeries,
   type Card,
@@ -243,11 +243,7 @@ onBeforeUnmount(() => {
 const sortKey = ref<SortKey>('weight')
 const sortDirection = ref<SortDirection>('desc')
 const rows = computed(() =>
-  sortPositions(
-    positionRows(state.value, vm.value, month.value),
-    sortKey.value,
-    sortDirection.value,
-  ),
+  sortAccounts(accountRows(state.value, vm.value, month.value), sortKey.value, sortDirection.value),
 )
 
 const cards = computed<Card[]>(() => [
@@ -412,7 +408,7 @@ function sortBy(key: SortKey, direction: SortDirection): void {
           ></div>
         </div>
 
-        <NeonInvestmentPositions
+        <NeonInvestmentAccounts
           :rows="rows"
           :sort-key="sortKey"
           :sort-direction="sortDirection"

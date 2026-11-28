@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { buildDemoSeed } from '../../src/data/demo-seed'
 import { computeInvestmentPortfolioValueForReturnMode } from '../../src/domain/investment/calculations'
+import { buildAccountPositions } from '../../src/domain/investment/positions'
 import { twrSeries } from '../../src/neon/sections/investment/view-model'
 import { normalizeState } from '../../src/scripts/state'
 
@@ -73,5 +74,13 @@ describe('demo seed', () => {
     for (let index = 1; index < series.length; index += 1) {
       expect(Math.abs(series[index] - series[index - 1])).toBeLessThan(10)
     }
+  })
+
+  it('has an account with several instruments, so the demo shows the account → positions model', () => {
+    const crypto = buildAccountPositions(seed, 7, { quotes: true }).filter(
+      (position) => position.accountId === 'criptomonedas',
+    )
+    expect(crypto.map((position) => position.symbol).sort()).toEqual(['BTC', 'ETH'])
+    expect(crypto.every((position) => position.priced && position.units > 0)).toBe(true)
   })
 })

@@ -66,7 +66,18 @@ function portfolio(overrides: Record<string, unknown> = {}): State {
     ],
     snapshots: { '3': { month: 3, investments: { fondos: 1980, oro: 180 }, accounts: {} } },
     contributions: [],
-    instruments: [],
+    instruments: [
+      {
+        id: 'i-vwce',
+        investmentAssetId: 'fondos',
+        type: 'etf',
+        symbol: 'VWCE',
+        market: 'XETRA',
+        currency: 'EUR',
+        provider: 'yahoo',
+        active: true,
+      },
+    ],
     quotes: {},
     ...overrides,
   })
@@ -76,9 +87,8 @@ const detailOf = (id: string, state = portfolio()) =>
   assetDetail(state, buildInvestmentDashboardViewModel(state, 3, 'simple'), id)
 
 describe('assetDetail', () => {
-  it('titula con el símbolo y da las cuatro cifras del resumen', () => {
+  it('titula con el nombre de la cuenta y da las cuatro cifras del resumen', () => {
     const detail = detailOf('fondos')
-    expect(detail?.symbol).toBe('VWCE')
     expect(detail?.name).toBe('Fondos')
     expect(detail?.figures.map(({ key, label, value }) => ({ key, label, value }))).toEqual([
       { key: 'value', label: 'Vale hoy', value: '1.980,00 €' },
@@ -88,8 +98,64 @@ describe('assetDetail', () => {
     ])
   })
 
-  it('un activo sin símbolo se titula con su nombre', () => {
-    expect(detailOf('oro')?.symbol).toBe('Oro')
+  it('lista las posiciones de la cuenta con sus cifras y avisa de las que no tienen cotización', () => {
+    const detail = detailOf('fondos')
+
+    expect(detail?.positions).toEqual([
+      {
+        instrumentId: 'i-vwce',
+        symbol: 'VWCE',
+        units: '15',
+        averagePrice: '110,00\u00a0€',
+        value: '1.980,00\u00a0€',
+        invested: '2.850,50\u00a0€',
+        gain: '−870,50\u00a0€',
+        ret: '−30,5\u00a0%',
+        tone: 'loss',
+        weight: '100,0\u00a0%',
+        weightPct: 100,
+        estimated: true,
+      },
+    ])
+    expect(detail?.unpricedNote).toMatch(/^Sin cotización/)
+  })
+
+  it('una cuenta sin instrumentos no tiene posiciones ni aviso', () => {
+    const detail = detailOf('oro')
+
+    expect(detail?.positions).toEqual([])
+    expect(detail?.unpricedNote).toBeNull()
+  })
+
+  it('una cuenta con varios instrumentos no tiene un recuento único de títulos', () => {
+    const state = portfolio({
+      instruments: [
+        ...portfolio().instruments,
+        {
+          id: 'i-iwda',
+          investmentAssetId: 'fondos',
+          type: 'etf',
+          symbol: 'IWDA',
+          market: 'XETRA',
+          currency: 'EUR',
+          provider: 'yahoo',
+          active: true,
+        },
+      ],
+      transactions: [
+        ...portfolio().transactions,
+        {
+          ...operation('t5', 'Fondos', '2026-03-02', 'buy', 2, 50),
+          symbol: 'IWDA',
+          instrumentId: 'i-iwda',
+        },
+      ],
+    })
+
+    const detail = detailOf('fondos', state)
+
+    expect(detail?.positions.map((line) => line.symbol).sort()).toEqual(['IWDA', 'VWCE'])
+    expect(detail?.units).toBeNull()
   })
 
   it('un activo que ya no está en la cartera no tiene detalle', () => {

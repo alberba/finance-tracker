@@ -1,9 +1,7 @@
 import { ALL_MONTHS, atMonth, YEAR_START, type Month, type MonthOrStart } from '../../lib/month'
 import {
   computeContributionMetrics as computeContributionMetricsCore,
-  matchesInvestmentAsset,
   type ContributionEntry,
-  type Entity,
 } from '../../lib/finance-core'
 import { toSnapshotDate } from '../../scripts/contribution-workflow'
 import {
@@ -20,6 +18,7 @@ import {
   computeInvestmentValue,
 } from './calculations'
 import { getContributionEntriesFromSnapshots } from './contributions'
+import { buildAccountPositions, type AccountPosition, type PositionOptions } from './positions'
 
 export type ReturnMode = 'simple' | 'twr'
 
@@ -31,7 +30,12 @@ export interface ChartSeries {
   dashed?: boolean
 }
 
-export interface InvestmentPosition {
+/**
+ * An investment account as the cover lists it. An account is where money is, not
+ * an asset: it carries no symbol, units or price. What it holds is its positions
+ * (`InvestmentDashboardViewModel.positions`).
+ */
+export interface InvestmentAccount {
   id: string
   name: string
   value: number
@@ -40,14 +44,6 @@ export interface InvestmentPosition {
   returnPct: number
   /** Share of the portfolio value, 0–100. */
   weight: number
-  /** Instrument symbol, from the linked instrument or the latest movement. */
-  symbol: string | null
-  /** Units held at the end of the month, from buy and sell movements. */
-  units: number | null
-  /** Average buy price per unit. */
-  averagePrice: number | null
-  /** ISO date of the latest movement up to the month. */
-  lastMovementDate: string | null
   /** Gain over invested capital per chart point, same labels as the portfolio chart. */
   series: ChartSeries
 }
@@ -61,7 +57,10 @@ export interface InvestmentDashboardViewModel {
   displayReturn: number
   returnIsGood: boolean
   returnLabel: string
-  positions: InvestmentPosition[]
+  /** Investment accounts with value, by value. */
+  accounts: InvestmentAccount[]
+  /** What each account holds, one entry per account × instrument (see `buildAccountPositions`). */
+  positions: AccountPosition[]
   /** € view: portfolio value against contributed capital. */
   valueSeries: ChartSeries[]
   /** % view: cumulative return of the portfolio. */
@@ -73,53 +72,11 @@ function toGainPercent(value: number, investedCapital: number): number {
   return investedCapital <= 0 ? 0 : ((value - investedCapital) / investedCapital) * 100
 }
 
-type PositionDetail = Pick<
-  InvestmentPosition,
-  'symbol' | 'units' | 'averagePrice' | 'lastMovementDate'
->
-
-/** Symbol, units, average buy price and last movement of an asset up to a month. */
-function buildPositionDetail(state: State, asset: Entity, month: Month): PositionDetail {
-  const movements = state.transactions
-    .filter(
-      (tx) =>
-        tx.type === 'investment' &&
-        Number(tx.month) <= month &&
-        matchesInvestmentAsset(tx.category, asset, tx.instrumentId, state.instruments),
-    )
-    .sort((a, b) => String(a.date).localeCompare(String(b.date)))
-
-  let units = 0
-  let boughtUnits = 0
-  let boughtCost = 0
-  for (const tx of movements) {
-    const txUnits = Number(tx.units)
-    if (!tx.side || !Number.isFinite(txUnits) || txUnits <= 0) continue
-    if (tx.side === 'sell') {
-      units -= txUnits
-    } else {
-      units += txUnits
-      boughtUnits += txUnits
-      boughtCost += txUnits * Number(tx.unitPrice || 0)
-    }
-  }
-
-  const instrument = state.instruments.find(
-    (item) => item.investmentAssetId === asset.id && item.active,
-  )
-  const latestSymbol = movements.findLast((tx) => tx.symbol)?.symbol
-  return {
-    symbol: instrument?.symbol || latestSymbol || null,
-    units: boughtUnits > 0 ? Math.round(units * 1e8) / 1e8 : null,
-    averagePrice: boughtUnits > 0 ? boughtCost / boughtUnits : null,
-    lastMovementDate: movements.at(-1)?.date ?? null,
-  }
-}
-
 export function buildInvestmentDashboardViewModel(
   state: State,
   month: Month,
   returnMode: ReturnMode,
+  positionOptions: PositionOptions = {},
 ): InvestmentDashboardViewModel {
   const investedCapital = computeInvestedCapital(state, month)
   const isTWR = returnMode === 'twr'
@@ -162,7 +119,7 @@ export function buildInvestmentDashboardViewModel(
     .sort((a, b) => b.value - a.value)
   const positionTotal = valued.reduce((sum, { value }) => sum + value, 0)
 
-  const positions: InvestmentPosition[] = valued.map(({ asset, value }) => {
+  const accounts: InvestmentAccount[] = valued.map(({ asset, value }) => {
     const invested = computeInvestedCapitalByAsset(state, asset.id, month)
     return {
       id: asset.id,
@@ -172,7 +129,6 @@ export function buildInvestmentDashboardViewModel(
       gain: value - invested,
       returnPct: toGainPercent(value, invested),
       weight: positionTotal > 0 ? (value / positionTotal) * 100 : 0,
-      ...buildPositionDetail(state, asset as Entity, month),
       series: {
         name: asset.name,
         values: chartPoints.map((m) =>
@@ -193,7 +149,8 @@ export function buildInvestmentDashboardViewModel(
     displayReturn,
     returnIsGood: displayReturn >= 0,
     returnLabel: isTWR ? 'Rentabilidad TWR' : 'Rentabilidad estimada',
-    positions,
+    accounts,
+    positions: buildAccountPositions(state, month, positionOptions),
     valueSeries: [
       { name: 'Valor de cartera', values: portfolioTotalValues },
       {

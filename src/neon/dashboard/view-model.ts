@@ -680,9 +680,9 @@ function investmentsBlock(
     period.month,
     'simple',
   )
-  const ranked = portfolio.positions.filter((position) => position.weight > 0)
+  const ranked = portfolio.accounts.filter((position) => position.weight > 0)
   const shown = ranked.slice(0, POSITION_LIMIT).map((position) => ({
-    name: position.symbol || position.name,
+    name: position.name,
     weight: round2(position.weight),
   }))
   const rest = ranked.slice(POSITION_LIMIT).reduce((sum, position) => sum + position.weight, 0)

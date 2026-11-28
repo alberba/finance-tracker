@@ -35,15 +35,17 @@ export function calculateInstrumentUnits(
     ? Number(instrument.holdingUnits)
     : Number(instrument.openingUnits || 0)
   return round8(
-    startingUnits + transactions.reduce((total, transaction) => {
-      if (
-        !isTransactionForInstrument(transaction, instrument, transactions) ||
-        !isTransactionAfterHoldingsCutoff(transaction, instrument, hasCurrentSnapshot)
-      ) return total
-      const units = Number(transaction.units || 0)
-      if (!Number.isFinite(units) || units <= 0) return total
-      return total + (transaction.side === 'sell' ? -units : units)
-    }, 0),
+    startingUnits +
+      transactions.reduce((total, transaction) => {
+        if (
+          !isTransactionForInstrument(transaction, instrument, transactions) ||
+          !isTransactionAfterHoldingsCutoff(transaction, instrument, hasCurrentSnapshot)
+        )
+          return total
+        const units = Number(transaction.units || 0)
+        if (!Number.isFinite(units) || units <= 0) return total
+        return total + (transaction.side === 'sell' ? -units : units)
+      }, 0),
   )
 }
 
@@ -70,7 +72,8 @@ function isTransactionAfterHoldingsCutoff(
     transaction.createdAt &&
     instrument.holdingsUpdatedAt &&
     Date.parse(transaction.createdAt) <= Date.parse(instrument.holdingsUpdatedAt)
-  ) return false
+  )
+    return false
   if (transaction.createdAt && instrument.holdingsUpdatedAt) return true
   return Boolean(instrument.holdingsAsOf && transaction.date > instrument.holdingsAsOf)
 }
@@ -97,7 +100,16 @@ export function buildPortfolioValuation(
   const maxAgeMinutes = options.maxAgeMinutes ?? 15
   const valuations = state.instruments
     .filter((instrument) => instrument.active)
-    .map((instrument) => buildInstrumentValuation(state, instrument, baseCurrency, now, maxAgeMinutes, options.fxRates || {}))
+    .map((instrument) =>
+      buildInstrumentValuation(
+        state,
+        instrument,
+        baseCurrency,
+        now,
+        maxAgeMinutes,
+        options.fxRates || {},
+      ),
+    )
 
   const byAsset: Record<string, number> = {}
   valuations.forEach((valuation) => {
@@ -121,15 +133,15 @@ function buildInstrumentValuation(
 ): InstrumentValuation {
   const quote = state.quotes[instrument.id] || null
   const units = calculateInstrumentUnits(instrument, state.transactions)
-  const quoteCurrency = quote?.currency || instrument.currency || baseCurrency
-  const exchangeRate = getExchangeRate(quoteCurrency, baseCurrency, fxRates)
-  const value = quote && quote.status !== 'unavailable' ? round2(units * quote.price * exchangeRate) : 0
+  const unitPrice = quoteUnitPrice(quote, instrument, baseCurrency, fxRates)
+  const value = unitPrice === null ? 0 : round2(units * unitPrice)
   const staleByAge = quote ? isQuoteStale(quote, now, maxAgeMinutes) : true
-  const status = !quote || quote.status === 'unavailable'
-    ? 'unavailable'
-    : staleByAge || quote.isStale
-      ? 'stale'
-      : 'fresh'
+  const status =
+    !quote || quote.status === 'unavailable'
+      ? 'unavailable'
+      : staleByAge || quote.isStale
+        ? 'stale'
+        : 'fresh'
 
   return {
     instrument,
@@ -142,20 +154,38 @@ function buildInstrumentValuation(
   }
 }
 
+/** What one unit of an instrument is worth in the base currency; null without a usable quote. */
+export function quoteUnitPrice(
+  quote: Quote | null | undefined,
+  instrument: Pick<Instrument, 'currency'>,
+  baseCurrency: string,
+  fxRates: Record<string, number> = {},
+): number | null {
+  if (!quote || quote.status === 'unavailable') return null
+  const quoteCurrency = quote.currency || instrument.currency || baseCurrency
+  return quote.price * getExchangeRate(quoteCurrency, baseCurrency, fxRates)
+}
+
 export function isQuoteStale(quote: Quote, now = new Date(), maxAgeMinutes = 15): boolean {
   const timestamp = Date.parse(quote.timestamp)
   if (!Number.isFinite(timestamp)) return true
   return now.getTime() - timestamp > maxAgeMinutes * 60_000
 }
 
-function getExchangeRate(fromCurrency: string, toCurrency: string, fxRates: Record<string, number>): number {
+function getExchangeRate(
+  fromCurrency: string,
+  toCurrency: string,
+  fxRates: Record<string, number>,
+): number {
   if (fromCurrency === toCurrency) return 1
   const rate = Number(fxRates[`${fromCurrency}/${toCurrency}`] || fxRates[fromCurrency])
   return Number.isFinite(rate) && rate > 0 ? rate : 1
 }
 
 function calculateWeightedChange(valuations: InstrumentValuation[]): number | null {
-  const priced = valuations.filter((valuation) => valuation.value > 0 && valuation.dailyChangePercent !== null)
+  const priced = valuations.filter(
+    (valuation) => valuation.value > 0 && valuation.dailyChangePercent !== null,
+  )
   const denominator = priced.reduce((total, valuation) => total + valuation.value, 0)
   if (!denominator) return null
   return round2(

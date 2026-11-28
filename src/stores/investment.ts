@@ -71,6 +71,8 @@ export const useInvestmentStore = defineStore('investment', () => {
       financialStateStore.state,
       ui.investmentMonth,
       ui.investmentReturnMode as ReturnMode,
+      // The cover reads up to today: positions are worth their instruments' quotes.
+      { quotes: true },
     ),
   )
 

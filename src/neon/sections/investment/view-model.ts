@@ -9,7 +9,6 @@ import type {
   ReturnMode,
 } from '../../../domain/investment/view-model'
 import {
-  formatDecimal,
   formatMoney,
   formatMonthName,
   formatNumber,
@@ -539,15 +538,11 @@ export function dropRows(drawdown: Drawdown | null, values: readonly number[]): 
   ]
 }
 
-export interface PositionRow {
+export interface AccountRow {
   id: string
   name: string
-  /** The ticker («VWCE»), when the asset has one. */
-  symbol: string | null
-  /** Units held, or null when the asset has no buy movements. */
-  units: string | null
-  /** «a 132,00 €»: the price those units are valued at. */
-  price: string | null
+  /** «2 posiciones»: what the account holds; null when it holds none. */
+  holdings: string | null
   weight: string
   /** Share of the portfolio, 0–100, for the weight bar. */
   weightPct: number
@@ -583,43 +578,41 @@ function sparkPath(values: readonly number[]): string {
 }
 
 /**
- * The positions of the analysed month, in the domain's order (by value). The
+ * The investment accounts of the analysed month, in the domain's order (by value). The
  * evolution is the period's: from the year's opening value, discounting what
  * went in since, so a purchase doesn't read as a gain.
  */
-export function positionRows(
+export function accountRows(
   state: State,
   vm: InvestmentDashboardViewModel,
   month: Month,
-): PositionRow[] {
+): AccountRow[] {
   const points: MonthOrStart[] = [YEAR_START, ...ALL_MONTHS.filter((m) => m <= month)]
-  return vm.positions.map((position) => {
-    const values = points.map((point) => computeInvestmentValue(state, position.id, point))
-    const invested = points.map((point) => computeInvestedCapitalByAsset(state, position.id, point))
+  return vm.accounts.map((account) => {
+    const values = points.map((point) => computeInvestmentValue(state, account.id, point))
+    const invested = points.map((point) => computeInvestedCapitalByAsset(state, account.id, point))
     const last = points.length - 1
     const flows = invested[last] - invested[0]
     const base = values[0] + Math.max(0, flows)
     const changeValue = base > 0 ? ((values[last] - values[0] - flows) / base) * 100 : 0
-    const units = position.units !== null && position.units > 0 ? position.units : null
+    const count = vm.positions.filter((held) => held.accountId === account.id).length
     const change = signedPct(changeValue)
     return {
-      id: position.id,
-      name: position.name,
-      symbol: position.symbol,
-      units: units === null ? null : formatDecimal(units),
-      price: units === null ? null : `a ${formatMoney(position.value / units)}`,
-      weight: formatPercent(position.weight, { digits: 1 }),
-      weightPct: position.weight,
-      value: formatMoney(position.value),
-      gain: formatSignedMoney(position.gain),
-      ret: signedPct(position.returnPct),
-      tone: toneOf(position.gain),
+      id: account.id,
+      name: account.name,
+      holdings: count ? `${count} ${count === 1 ? 'posición' : 'posiciones'}` : null,
+      weight: formatPercent(account.weight, { digits: 1 }),
+      weightPct: account.weight,
+      value: formatMoney(account.value),
+      gain: formatSignedMoney(account.gain),
+      ret: signedPct(account.returnPct),
+      tone: toneOf(account.gain),
       spark: sparkPath(values.map((value, index) => value - invested[index])),
       change,
       changeTone: toneOf(changeValue),
-      sparkLabel: `${position.name}: ${change} en el periodo`,
-      openLabel: `Ver ${position.name}`,
-      gainValue: position.gain,
+      sparkLabel: `${account.name}: ${change} en el periodo`,
+      openLabel: `Ver ${account.name}`,
+      gainValue: account.gain,
       changeValue,
     }
   })
@@ -644,12 +637,12 @@ export function sortLabel(key: SortKey, direction: SortDirection): string {
   return `${name} · ${direction === 'asc' ? 'menor a mayor' : 'mayor a menor'}`
 }
 
-export function sortPositions(
-  rows: readonly PositionRow[],
+export function sortAccounts(
+  rows: readonly AccountRow[],
   key: SortKey,
   direction: SortDirection,
-): PositionRow[] {
-  const pick = (row: PositionRow) =>
+): AccountRow[] {
+  const pick = (row: AccountRow) =>
     key === 'weight' ? row.weightPct : key === 'gain' ? row.gainValue : row.changeValue
   const sign = direction === 'asc' ? 1 : -1
   return rows.toSorted((a, b) => sign * (pick(a) - pick(b)))
