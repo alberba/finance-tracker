@@ -1,4 +1,4 @@
-# Importación inicial de Bitvavo
+# Bitvavo: importación inicial y sincronización
 
 El recorrido vive en Configuración → Conexiones → Bitvavo, con sync v2 activo.
 El grid de Conexiones reúne Stock Events y Bitvavo; cada tarjeta abre los ajustes de su proveedor
@@ -23,7 +23,10 @@ unitario se conservan como cadenas decimales, el flujo EUR es bruto y la comisi�
 Una compra consume bruto + comisión; una venta devuelve bruto − comisión. El signo del libro
 mayor es positivo para la compra y negativo para la venta. Comisión cero EUR sigue siendo el
 supuesto autorizado allí; otras divisas, tipos y contratos incoherentes aparecen como
-incompatibles. No se infieren precios ni tolerancias contables.
+incompatibles, con el tipo nombrado si no es compra o venta (depósito, retirada…). No se infieren
+precios. La única tolerancia es el ruido de coma flotante con que Bitvavo serializa algunos brutos
+(`9.969987463999999` por 9,969987464): diferencia relativa ≤ 10⁻¹² frente a cantidad × precio. Se
+conservan las cifras que envía Bitvavo.
 
 `transactions.remote_operation` conserva identidad, instante, zona, fecha/hora local, lado,
 símbolo, cantidad, precio, comisión e importe exactos. `external_id` es único por usuario. El
@@ -39,8 +42,41 @@ Cada operación se escribe junto a su detalle, revisión y cambio de sync en un 
 configuración concurrentes, y se renueva entre operaciones. Una caída deja el cursor sin avanzar;
 los movimientos completados se reconocen por identidad externa al reintentar. El cursor avanza
 solo al terminar el `Effect.gen` de confirmación. Las revisiones y el bootstrap permiten que otros
-clientes vean los cambios. La primera importación consulta el rango completo configurado;
-la sincronización incremental de #191 queda fuera de este recorrido.
+clientes vean los cambios. La primera importación consulta el rango completo configurado.
+
+## Sincronización (#191)
+
+Tras la primera importación el panel deja de ofrecer la vista previa y muestra la sincronización:
+estado, último intento, última sincronización correcta y los contadores creadas, actualizadas, sin
+cambios y omitidas (`bitvavo_connections.last_*`). «Sincronizar ahora» vuelve a leer desde el
+cursor menos un solapamiento de 7 días (`SYNC_OVERLAP_MS`) y clasifica cada operación por su
+`external_id`: nueva, corregida o igual. Una corrección reescribe los campos financieros y la
+proyección local; conserva declaración, descripción, categoría, cuenta y vínculo con el
+instrumento. El cursor es el mayor instante remoto del rango y solo avanza en la escritura final
+(`finishRange`), junto con las omitidas y el resultado; un fallo entre operaciones registra el
+intento como fallido y el reintento reconoce lo ya aplicado.
+
+Las operaciones incompatibles (precio o comisión fuera de EUR) se guardan en `bitvavo_skipped`
+solo con identidad, instante y motivo. «Reintentar omitidas» amplía el rango hasta la más antigua
+y vuelve a consultar Bitvavo; nunca reproduce un payload guardado. Un rango completo sustituye las
+omitidas que cubre.
+
+La reserva de `bitvavo_connections` impide dos sincronizaciones, importaciones o cambios de
+configuración a la vez; vive en la base de datos porque varias instancias pueden atender al mismo
+usuario. Los límites de frecuencia, `Retry-After`/reset y el backoff siguen en el `Schedule` del
+cliente. Una clave rechazada (401/403) deja la conexión en «Requiere atención»; guardar una clave
+nueva la limpia sin tocar cursor ni movimientos. Con la conexión hecha, la clave es opcional al
+guardar ajustes.
+
+Adelantar la fecha inicial anula el cursor para traer el historial anterior; retrasarla no borra
+nada. La cuenta vinculada queda fija tras la primera importación. Cambiar la zona horaria
+rematerializa fecha y hora de cada movimiento importado desde `executedAt` (UTC), de forma
+idempotente si se interrumpe. Desconectar borra configuración, clave, vistas previas y omitidas;
+los movimientos se conservan y una reconexión los reconoce por su identidad.
+
+`integration_audit_events` registra configuración, lectura de la clave, sincronización y
+desconexión con su resultado y, como mucho, contadores o el mensaje saneado; nunca secretos ni
+datos remotos.
 
 ## Piloto de Effect
 
@@ -81,9 +117,11 @@ Las fronteras cubiertas son el HTTP del proveedor, confirmación/repositorios co
 proyección y sync, estados del panel y recorrido Playwright con rutas y D1 reales. Para E2E,
 las identidades del proveedor de autenticación de pruebas, exclusivamente en loopback con
 `TEST_AUTH_ENABLED`, aportan el historial falso mediante `X-Test-Bitvavo-History`; nunca llaman
-a Bitvavo real. La cabecera no altera el proveedor de una identidad de producción.
+a Bitvavo real; `X-Test-Bitvavo-Status` simula una clave revocada o una caída. Las cabeceras no
+alteran el proveedor de una identidad de producción.
 
 ```sh
-bunx vitest run tests/unit/bitvavo.test.ts tests/integration/d1-v2/bitvavo.test.ts
+bunx vitest run tests/unit/bitvavo.test.ts tests/integration/d1-v2/bitvavo.test.ts \
+  tests/integration/d1-v2/bitvavo-sync.test.ts tests/component/NeonBitvavoPanel.test.ts
 bunx playwright test --config playwright.bitvavo.config.ts
 ```

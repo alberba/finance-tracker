@@ -31,7 +31,41 @@ export interface BitvavoPreview {
       alreadyImported: boolean
     }
   >
-  incompatible: Array<{ externalId: string; reason: string }>
+  incompatible: SkippedOperation[]
+}
+
+/** An operation left out of the import: identity, instant and reason only. */
+export interface SkippedOperation {
+  externalId: string
+  executedAt: string | null
+  reason: string
+}
+
+/** Outcome of the last attempt; `attention` means the credential must be replaced. */
+export type BitvavoSyncStatus = 'success' | 'warning' | 'failed' | 'attention'
+
+export interface BitvavoSyncCounts {
+  created: number
+  updated: number
+  unchanged: number
+  skipped: number
+}
+
+/** What the panel shows about a configured connection (never credentials). */
+export interface BitvavoConnectionState {
+  accountId: string
+  startDate: string
+  timeZone: string
+  cursor: number | null
+  /** The first import completed: later runs synchronize incrementally. */
+  imported: boolean
+  needsAttention: boolean
+  lastAttemptAt: number | null
+  lastAttemptStatus: BitvavoSyncStatus | null
+  lastError: string | null
+  lastSuccessAt: number | null
+  lastCounts: BitvavoSyncCounts | null
+  skipped: SkippedOperation[]
 }
 export interface DuplicateResolution {
   externalId: string

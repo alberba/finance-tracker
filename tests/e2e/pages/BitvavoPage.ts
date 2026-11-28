@@ -36,7 +36,30 @@ export class BitvavoPage {
   }
   async confirm() {
     await this.panel.getByRole('button', { name: 'Confirmar importación completa' }).click()
-    await expect(this.panel.getByRole('status')).toContainText('movimientos importados')
+    await expect(this.notice).toContainText('movimientos importados')
+  }
+  /** The outcome of the last action (import, sync, save, disconnect). */
+  get notice() {
+    return this.panel.locator('[data-bitvavo-notice]')
+  }
+  get status() {
+    return this.panel.locator('[data-bitvavo-status]')
+  }
+  async syncNow() {
+    await this.panel.getByRole('button', { name: 'Sincronizar ahora' }).click()
+  }
+  /** Replaces the key keeping every other setting. */
+  async replaceKey() {
+    await this.panel.getByLabel('API key', { exact: true }).fill('new-key')
+    await this.panel.getByLabel('Secreto API').fill('new-secret')
+    await this.panel.getByRole('button', { name: 'Guardar conexión', exact: true }).click()
+    await expect(this.notice).toContainText('Conexión validada')
+  }
+  async disconnect() {
+    await this.panel.getByRole('button', { name: 'Desconectar Bitvavo' }).click()
+    const dialog = this.page.getByRole('alertdialog', { name: '¿Desconectar Bitvavo?' })
+    await dialog.getByRole('button', { name: 'Desconectar', exact: true }).click()
+    await expect(this.notice).toContainText('Bitvavo desconectado')
   }
   async close() {
     await this.panel.getByRole('button', { name: 'Cerrar', exact: true }).last().click()

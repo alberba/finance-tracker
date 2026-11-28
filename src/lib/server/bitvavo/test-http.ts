@@ -17,6 +17,9 @@ export function bitvavoHttpForRequest(
   )
     return fetch
   return async () => {
+    // Lets E2E reproduce a revoked key or a provider outage.
+    const status = Number(request.headers.get('X-Test-Bitvavo-Status'))
+    if (status >= 400 && status < 600) return new Response('', { status })
     const fixture = request.headers.get('X-Test-Bitvavo-History')
     if (!fixture || fixture.length > 16000)
       throw new RejectedCommandError(

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as accounts from '../../../../src/db/repositories/accounts'
-import { importOperation } from '../../../../src/db/repositories/bitvavo'
+import { applyOperation } from '../../../../src/db/repositories/bitvavo'
 import * as market from '../../../../src/db/repositories/market'
 import { listChangesSince } from '../../../../src/db/repositories/sync'
 import type { Db } from '../../../../src/db/client'
@@ -576,7 +576,7 @@ describe('round trip: imported movement protections (#263)', () => {
           openingBalance: 0,
         }),
       )
-      await runWithDb(db, importOperation(userId, accountId, remoteOperation, null))
+      await runWithDb(db, applyOperation(userId, accountId, remoteOperation, null))
     })
   })
   afterEach(() => trip.cleanup())
