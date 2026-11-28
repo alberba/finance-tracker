@@ -33,6 +33,8 @@ export interface NewInvestmentMovementInput {
   fee: string
   movementCurrency: string
   accountId: string
+  /** The investment account the instrument lands in; defaults to the one of its instrument. */
+  destinationAccountId?: string
   declared: boolean
   toCash?: boolean
 }
@@ -47,11 +49,24 @@ export const useInvestmentStore = defineStore('investment', () => {
   const accounts = computed(() => financialStateStore.accounts)
   const investmentCategories = computed(() => financialStateStore.state.investmentCategories)
 
-  function findUniqueInstrumentId(symbol: string): string | undefined {
+  /** The instrument a symbol names; with several, the one in the destination account. */
+  function findInstrumentId(symbol: string, destinationAccountId?: string): string | undefined {
     const matches = financialStateStore.state.instruments.filter((instrument) =>
       symbolsMatchInstrument(symbol, instrument),
     )
-    return matches.length === 1 ? matches[0].id : undefined
+    if (matches.length === 1) return matches[0].id
+    const inDestination = matches.filter(
+      (instrument) => instrument.investmentAssetId === destinationAccountId,
+    )
+    return inDestination.length === 1 ? inDestination[0].id : undefined
+  }
+
+  /** The investment account a symbol belongs to by default: the one of its instrument. */
+  function defaultInvestmentAccountId(symbol: string): string | undefined {
+    const instrumentId = findInstrumentId(normalizeInvestmentSymbol(symbol))
+    return financialStateStore.state.instruments.find(
+      (instrument) => instrument.id === instrumentId,
+    )?.investmentAssetId
   }
 
   function isBitvavoBrokerAccount(accountId: string): boolean {
@@ -82,6 +97,13 @@ export const useInvestmentStore = defineStore('investment', () => {
 
   function setMonth(month: Month): void {
     ui.investmentMonth = month
+  }
+
+  /** The chosen investment account when it exists, otherwise the one of the symbol's instrument. */
+  function resolveDestination(chosen: string | undefined, symbol: string): string | undefined {
+    const known = (id: string | undefined) =>
+      financialStateStore.investmentAssets.some((asset) => asset.id === id) ? id : undefined
+    return known(chosen?.trim()) ?? known(defaultInvestmentAccountId(symbol))
   }
 
   function addMovement(input: NewInvestmentMovementInput): boolean {
@@ -121,7 +143,11 @@ export const useInvestmentStore = defineStore('investment', () => {
       input.category.trim(),
       computed.normalizedSymbol,
     )
-    const instrumentId = findUniqueInstrumentId(computed.normalizedSymbol)
+    const destinationAccountId = resolveDestination(
+      input.destinationAccountId,
+      computed.normalizedSymbol,
+    )
+    const instrumentId = findInstrumentId(computed.normalizedSymbol, destinationAccountId)
 
     const transaction: Transaction = {
       id: uid('tx'),
@@ -129,6 +155,7 @@ export const useInvestmentStore = defineStore('investment', () => {
       month: monthFromISO(date) ?? ui.investmentMonth,
       type: 'investment',
       accountId,
+      ...(destinationAccountId ? { destinationAccountId } : {}),
       category,
       description: computed.description,
       amount: computed.signedAmount,
@@ -159,6 +186,7 @@ export const useInvestmentStore = defineStore('investment', () => {
     dashboardViewModel,
     isBitvavoBrokerAccount,
     resolveInvestmentCategory,
+    defaultInvestmentAccountId,
     setReturnMode,
     setMonth,
     addMovement,

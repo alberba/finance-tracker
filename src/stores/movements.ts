@@ -284,9 +284,14 @@ export const useMovementsStore = defineStore('movements', () => {
       tx.date = date
       tx.month = fields.month ?? monthFromISO(date) ?? tx.month
       tx.accountId = accountId
+      const wasInvestment = tx.type === 'investment'
       tx.type = type
       if (type === 'saving') tx.destinationAccountId = destinationAccountId
-      else delete tx.destinationAccountId
+      // An investment keeps the investment account it lands in: the edit form
+      // does not offer it, so only an explicit one changes it.
+      else if (type === 'investment' && destinationAccountId)
+        tx.destinationAccountId = destinationAccountId
+      else if (!(type === 'investment' && wasInvestment)) delete tx.destinationAccountId
       tx.category = category
       tx.description = description
       tx.amount = round2(amount)
@@ -365,8 +370,9 @@ export const useMovementsStore = defineStore('movements', () => {
         }
         updated += 1
         if (newType && isTransactionType(newType)) {
+          // Staying an investment keeps its investment account; any other change drops it.
+          if (newType !== item.type) delete item.destinationAccountId
           item.type = newType
-          delete item.destinationAccountId
         }
         if (newAccountId) {
           item.accountId = newAccountId

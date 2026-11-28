@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { computeInvestmentValue } from '../../src/domain/investment/calculations'
 import { buildAccountPositions } from '../../src/domain/investment/positions'
 import type { Month } from '../../src/lib/month'
 import { normalizeState } from '../../src/scripts/state'
@@ -267,5 +268,82 @@ describe('buildAccountPositions', () => {
       ['crypto', 'BTC'],
       ['oro', 'SGLN'],
     ])
+  })
+})
+
+describe('cuenta de inversión destino del movimiento', () => {
+  const withBitvavo = (transactions: Record<string, unknown>[]) =>
+    crypto({
+      investmentAssets: [
+        { id: 'crypto', name: 'Crypto', openingBalance: 0 },
+        { id: 'bitvavo', name: 'Bitvavo', openingBalance: 0 },
+        { id: 'oro', name: 'Oro', openingBalance: 0 },
+      ],
+      transactions,
+    })
+
+  it('la cuenta destino explícita manda sobre la del instrumento', () => {
+    const state = withBitvavo([
+      operation('t1', '2026-01-10', 'buy', 2, 100, {
+        instrumentId: 'i-eth',
+        symbol: 'ETH',
+        destinationAccountId: 'bitvavo',
+      }),
+    ])
+
+    const positions = buildAccountPositions(state, 3)
+
+    expect(positions.map((position) => [position.accountId, position.symbol])).toEqual([
+      ['bitvavo', 'ETH'],
+    ])
+    expect(computeInvestmentValue(state, 'bitvavo', 3)).toBe(200)
+    expect(computeInvestmentValue(state, 'crypto', 3)).toBe(0)
+  })
+
+  it('un instrumento comprado en dos cuentas es una posición en cada una', () => {
+    const state = withBitvavo([
+      operation('t1', '2026-01-10', 'buy', 1, 100, { instrumentId: 'i-eth' }),
+      operation('t2', '2026-01-11', 'buy', 3, 100, {
+        instrumentId: 'i-eth',
+        destinationAccountId: 'bitvavo',
+      }),
+    ])
+
+    const positions = buildAccountPositions(state, 3)
+
+    expect(
+      positions.map((position) => [position.accountId, position.symbol, position.units]),
+    ).toEqual([
+      ['crypto', 'ETH', 1],
+      ['bitvavo', 'ETH', 3],
+    ])
+  })
+
+  it('sin cuenta destino, manda la cuenta del instrumento sobre la categoría', () => {
+    const state = withBitvavo([
+      operation('t1', '2026-01-10', 'buy', 1, 100, { instrumentId: 'i-eth', category: 'Oro' }),
+    ])
+
+    expect(buildAccountPositions(state, 3).map((position) => position.accountId)).toEqual([
+      'crypto',
+    ])
+    expect(computeInvestmentValue(state, 'oro', 3)).toBe(0)
+  })
+
+  it('sin cuenta destino ni instrumento, la categoría atribuye el movimiento (legacy)', () => {
+    const state = withBitvavo([operation('t1', '2026-01-10', 'buy', 1, 100, { category: 'Oro' })])
+
+    expect(computeInvestmentValue(state, 'oro', 3)).toBe(100)
+  })
+
+  it('una cuenta destino que ya no existe no deja el movimiento huérfano', () => {
+    const state = withBitvavo([
+      operation('t1', '2026-01-10', 'buy', 1, 100, {
+        instrumentId: 'i-eth',
+        destinationAccountId: 'borrada',
+      }),
+    ])
+
+    expect(computeInvestmentValue(state, 'crypto', 3)).toBe(100)
   })
 })

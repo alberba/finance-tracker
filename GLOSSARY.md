@@ -46,7 +46,7 @@ _Avoid_: trade suelto, detalle
 
 **Plantilla de movimiento**:
 El conjunto de datos que describe qué movimiento hay que crear: tipo, importe, categoría,
-descripción, cuenta y, si es de inversión, la operación o, si es de ahorro, la cuenta destino. Una regla recurrente es una plantilla
+descripción, cuenta y, si es de inversión, la operación y la cuenta de inversión destino o, si es de ahorro, la cuenta destino. Una regla recurrente es una plantilla
 más un calendario; un movimiento pendiente es una plantilla más una fecha; un movimiento es una
 plantilla ya ocurrida.
 _Avoid_: borrador, payload
