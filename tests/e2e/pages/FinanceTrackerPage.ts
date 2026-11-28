@@ -44,7 +44,7 @@ function typedDate(isoDate: string): string {
 export class FinanceTrackerPage {
   constructor(
     private readonly page: Page,
-    private readonly options: { preserveWelcome?: boolean } = {},
+    private readonly options: { preserveSetup?: boolean } = {},
   ) {}
 
   get dashboardSection(): Locator {
@@ -106,7 +106,7 @@ export class FinanceTrackerPage {
   async goto() {
     await this.page.goto('/')
     await expect(this.page.locator('html[data-finance-ready="true"]')).toBeVisible()
-    await this.dismissWelcomeIfNeeded()
+    await this.dismissSetupIfNeeded()
     await expect(
       this.dashboardSection.getByRole('heading', { name: SECTION_CONFIG.dashboard.headingText }),
     ).toBeVisible()
@@ -115,7 +115,7 @@ export class FinanceTrackerPage {
   async reload() {
     await this.page.reload()
     await expect(this.page.locator('html[data-finance-ready="true"]')).toBeVisible()
-    await this.dismissWelcomeIfNeeded()
+    await this.dismissSetupIfNeeded()
     await expect(this.page.locator('[data-finance-workspace]')).toBeVisible()
   }
 
@@ -449,22 +449,16 @@ export class FinanceTrackerPage {
     await expect(panel).toBeHidden()
   }
 
-  async dismissWelcomeIfNeeded() {
-    if (this.options.preserveWelcome) return
-    const welcome = this.page.getByRole('dialog', { name: 'Bienvenido a tus finanzas' })
-    // Readiness precedes the welcome island's watcher. Wait for its decision
+  async dismissSetupIfNeeded() {
+    if (this.options.preserveSetup) return
+    // Readiness precedes the setup island's watcher. Wait for its decision
     // rather than racing an isVisible() check against the first presentation.
-    await expect
-      .poll(async () => {
-        if (await welcome.isVisible()) return true
-        if (await this.page.getByRole('button', { name: 'Retomar bienvenida' }).isVisible())
-          return true
-        return (await this.page.locator('[data-welcome-state="complete"]').count()) > 0
-      })
-      .toBe(true)
-    if (await welcome.isVisible()) {
-      await welcome.getByRole('button', { name: /^(Ahora no|Entendido)$/ }).click()
-      await expect(welcome).toBeHidden()
+    const state = this.page.locator('[data-setup-state]')
+    await expect(state).not.toHaveAttribute('data-setup-state', 'loading')
+    if ((await state.getAttribute('data-setup-state')) === 'open') {
+      const setup = this.page.locator('dialog[data-setup]')
+      await setup.getByRole('button', { name: 'Ahora no' }).first().click()
+      await expect(setup).toBeHidden()
     }
   }
 

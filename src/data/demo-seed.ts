@@ -293,9 +293,9 @@ export function buildDemoSeed(now: Date = new Date()): State {
     dashboardLayout: null,
     onboardingPresented: false,
     onboardingDismissed: false,
-    onboardingAccountCompleted: false,
-    onboardingMovementCompleted: false,
     onboardingCompleted: false,
+    onboardingStep: 0,
+    theme: null,
     year,
     currency: 'EUR',
     // The bank accounts are not a broker's cash: marking them as TWR liquidity

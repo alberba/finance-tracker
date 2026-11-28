@@ -4,7 +4,8 @@ import { FinanceTrackerPage } from './pages/FinanceTrackerPage'
 
 type Entity = { id: string; version: number; name: string }
 type Bootstrap = {
-  settings: Record<string, number>
+  settings: Record<string, number | string | null>
+  twrLiquidityAccounts: Array<{ accountId: string }>
   accounts: Entity[]
   transactions: Entity[]
   categories: Array<Entity & { kind: string }>
@@ -20,8 +21,9 @@ const test = base.extend<{ email: string }>({
   },
 })
 
-const welcome = (page: Page) => page.getByRole('dialog', { name: 'Bienvenido a tus finanzas' })
-const resume = (page: Page) => page.getByRole('button', { name: 'Retomar bienvenida' })
+const setup = (page: Page) => page.locator('dialog[data-setup]')
+const resume = (page: Page) => page.getByRole('button', { name: 'Retomar puesta en marcha' })
+const title = (page: Page) => setup(page).getByRole('heading', { level: 1 })
 
 async function initialize(request: APIRequestContext) {
   const response = await request.post('/api/state/initialize', { data: {} })
@@ -64,15 +66,22 @@ async function sync(request: APIRequestContext, commands: object[]) {
   )
 }
 
-async function expectSettings(request: APIRequestContext, settings: Record<string, number>) {
+async function expectSettings(
+  request: APIRequestContext,
+  settings: Record<string, number | string>,
+) {
   await expect.poll(async () => (await bootstrap(request)).settings).toMatchObject(settings)
 }
 
-async function openWelcome(page: Page) {
-  const tracker = new FinanceTrackerPage(page, { preserveWelcome: true })
+async function openSetup(page: Page) {
+  const tracker = new FinanceTrackerPage(page, { preserveSetup: true })
   await tracker.goto()
-  await expect(welcome(page)).toBeVisible()
+  await expect(setup(page)).toBeVisible()
   return tracker
+}
+
+async function next(page: Page, label: 'Siguiente' | 'Saltar' | 'Entendido' = 'Siguiente') {
+  await setup(page).getByRole('button', { name: label, exact: true }).click()
 }
 
 async function seedExistingData(request: APIRequestContext) {
@@ -109,15 +118,14 @@ async function seedExistingData(request: APIRequestContext) {
   ])
 }
 
-test.describe('Bienvenida (sync v2)', () => {
-  test('primer acceso: categorías iniciales y bienvenida omisible', async ({ page, context }) => {
+test.describe('Puesta en marcha (sync v2)', () => {
+  test('primer acceso: categorías iniciales y el asistente abierto', async ({ page, context }) => {
     const before = await bootstrap(context.request)
     expect(before.settings).toMatchObject({
       onboardingPresented: 0,
       onboardingDismissed: 0,
-      onboardingAccountCompleted: 0,
-      onboardingMovementCompleted: 0,
       onboardingCompleted: 0,
+      onboardingStep: 0,
     })
     expect(before.accounts).toEqual([])
     expect(before.transactions).toEqual([])
@@ -136,32 +144,96 @@ test.describe('Bienvenida (sync v2)', () => {
     expect((await initialize(context.request)).alreadyInitialized).toBe(true)
     expect((await bootstrap(context.request)).categories).toEqual(before.categories)
     await page.emulateMedia({ reducedMotion: 'reduce' })
-    await openWelcome(page)
-    await expect(welcome(page).getByRole('button', { name: 'Crear cuenta' })).toBeEnabled()
-    await expect(welcome(page).getByRole('button', { name: 'Registrar movimiento' })).toBeDisabled()
-    await expect(
-      welcome(page).getByText('Crea una cuenta para poder registrar movimientos.'),
-    ).toBeVisible()
+    await openSetup(page)
+    await expect(title(page)).toHaveText('Te damos la bienvenida')
     await expectSettings(context.request, { onboardingPresented: 1, onboardingCompleted: 0 })
   })
 
-  test('Ahora no persiste tras recargar y en un dispositivo nuevo; permite retomarla', async ({
+  test('un usuario nuevo llega a «Listo» con su moneda, su tema y una cuenta de liquidez', async ({
     page,
     context,
     browser,
     email,
   }) => {
     await initialize(context.request)
-    const tracker = await openWelcome(page)
-    await welcome(page).getByRole('button', { name: 'Ahora no' }).click()
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    const tracker = await openSetup(page)
+    await setup(page).getByRole('button', { name: 'Empezar de cero' }).click()
+    await expect(title(page)).toHaveText('Moneda y tema')
+    await setup(page).getByRole('button', { name: 'USD' }).click()
+    await setup(page)
+      .getByRole('button', { name: /^Oscuro fuerte/ })
+      .click()
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'oscuro-fuerte')
+    await next(page)
+
+    await expect(title(page)).toHaveText('Tus cuentas')
+    const advance = setup(page).getByRole('button', { name: 'Siguiente', exact: true })
+    await expect(advance).toBeDisabled()
+    await setup(page).getByLabel('Nombre').fill('Cuenta nómina')
+    await setup(page).getByLabel('Saldo actual').fill('1500')
+    await setup(page).getByRole('button', { name: 'Añadir cuenta' }).click()
+    await expect(setup(page).getByRole('list', { name: 'Cuentas creadas' })).toContainText(
+      'Cuenta nómina',
+    )
+    await next(page)
+    await expect(title(page)).toHaveText('Ingresos y gastos fijos')
+    await next(page, 'Saltar')
+    await expect(title(page)).toHaveText('¿Inviertes?')
+    await next(page, 'Saltar')
+    await expect(title(page)).toHaveText('Categorías')
+    await next(page)
+    await expect(title(page)).toHaveText('Listo')
+    await next(page, 'Entendido')
+    await expect(setup(page)).toBeHidden()
+
     await expectSettings(context.request, {
-      onboardingPresented: 1,
+      currency: 'USD',
+      theme: 'oscuro-fuerte',
+      onboardingCompleted: 1,
+    })
+    const data = await bootstrap(context.request)
+    expect(data.accounts.map(({ name }) => name)).toEqual(['Cuenta nómina'])
+    expect(data.twrLiquidityAccounts.map(({ accountId }) => accountId)).toEqual([
+      data.accounts[0].id,
+    ])
+    await expect(page.locator('#sidebar-sync-status')).toHaveText(/^Sincronizado ·/)
+    await tracker.reload()
+    await expect(setup(page)).toBeHidden()
+    await expect(resume(page)).toHaveCount(0)
+
+    // The theme is the user's: another device paints it too.
+    const device = await browser.newContext({ extraHTTPHeaders: { 'X-Test-User-Email': email } })
+    try {
+      const devicePage = await device.newPage()
+      await new FinanceTrackerPage(devicePage).goto()
+      await expect(devicePage.locator('html')).toHaveAttribute('data-theme', 'oscuro-fuerte')
+    } finally {
+      await device.close()
+    }
+  })
+
+  test('Ahora no se recuerda y otro dispositivo retoma en el mismo paso', async ({
+    page,
+    context,
+    browser,
+    email,
+  }) => {
+    await initialize(context.request)
+    const tracker = await openSetup(page)
+    await setup(page).getByRole('button', { name: 'Empezar de cero' }).click()
+    await next(page)
+    await expect(title(page)).toHaveText('Tus cuentas')
+    await setup(page).getByRole('button', { name: 'Ahora no' }).first().click()
+    await expect(setup(page)).toBeHidden()
+    await expectSettings(context.request, {
       onboardingDismissed: 1,
       onboardingCompleted: 0,
+      onboardingStep: 2,
     })
     await expect(page.locator('#sidebar-sync-status')).toHaveText(/^Sincronizado ·/)
     await tracker.reload()
-    await expect(welcome(page)).toBeHidden()
+    await expect(setup(page)).toBeHidden()
     await expect(resume(page)).toBeVisible()
     const device = await browser.newContext({
       ...devices['Pixel 5'],
@@ -169,133 +241,19 @@ test.describe('Bienvenida (sync v2)', () => {
     })
     try {
       const devicePage = await device.newPage()
-      await new FinanceTrackerPage(devicePage, { preserveWelcome: true }).goto()
-      await expect(welcome(devicePage)).toBeHidden()
+      await new FinanceTrackerPage(devicePage, { preserveSetup: true }).goto()
+      await expect(setup(devicePage)).toBeHidden()
       await resume(devicePage).click()
-      await expect(welcome(devicePage)).toBeVisible()
+      await expect(title(devicePage)).toHaveText('Tus cuentas')
       await expect(
-        welcome(devicePage).getByRole('button', { name: 'Registrar movimiento' }),
+        setup(devicePage).getByRole('button', { name: 'Siguiente', exact: true }),
       ).toBeDisabled()
     } finally {
       await device.close()
     }
   })
 
-  test('Crear cuenta abre la ficha y el progreso permite registrar el primer movimiento', async ({
-    page,
-    context,
-    browser,
-    email,
-  }) => {
-    await initialize(context.request)
-    const tracker = await openWelcome(page)
-    await welcome(page).getByRole('button', { name: 'Crear cuenta' }).click()
-    const settings = page.locator('#settings')
-    const name = settings.getByLabel('Nombre de la nueva cuenta')
-    await expect(name).toBeFocused()
-    await name.fill('Mi primera cuenta')
-    await settings.getByLabel('Saldo inicial de la nueva cuenta').fill('100')
-    await settings.getByRole('button', { name: 'Añadir' }).first().click()
-    await expect(
-      settings.getByRole('button', { name: 'Eliminar Mi primera cuenta', exact: true }),
-    ).toBeVisible()
-    await expectSettings(context.request, {
-      onboardingPresented: 1,
-      onboardingDismissed: 1,
-      onboardingAccountCompleted: 1,
-      onboardingMovementCompleted: 0,
-    })
-    await expect(page.locator('#sidebar-sync-status')).toHaveText(/^Sincronizado ·/)
-    await tracker.reload()
-    await resume(page).click()
-    await expect(welcome(page).getByText('✓ Cuenta creada')).toBeVisible()
-    await expect(welcome(page).getByRole('button', { name: 'Registrar movimiento' })).toBeEnabled()
-    const device = await browser.newContext({ extraHTTPHeaders: { 'X-Test-User-Email': email } })
-    try {
-      const devicePage = await device.newPage()
-      await new FinanceTrackerPage(devicePage, { preserveWelcome: true }).goto()
-      await resume(devicePage).click()
-      await expect(welcome(devicePage).getByText('✓ Cuenta creada')).toBeVisible()
-    } finally {
-      await device.close()
-    }
-    await welcome(page).getByRole('button', { name: 'Registrar movimiento' }).click()
-    const movement = tracker.entrySheet
-    await expect(movement).toBeVisible()
-    await movement.getByRole('textbox', { name: 'Importe' }).fill('12')
-    await movement.getByRole('button', { name: 'Categoría', exact: true }).click()
-    await movement
-      .getByRole('dialog', { name: 'Categoría', exact: true })
-      .getByRole('button', { name: 'Alimentación', exact: true })
-      .last()
-      .click()
-    await movement.getByLabel('Descripción').fill('Mi primer movimiento')
-    await movement.getByRole('button', { name: 'Guardar' }).click()
-    await expect(movement).toBeHidden()
-    await expectSettings(context.request, {
-      onboardingAccountCompleted: 1,
-      onboardingMovementCompleted: 1,
-      onboardingCompleted: 1,
-    })
-    await expect(page.locator('#sidebar-sync-status')).toHaveText(/^Sincronizado ·/)
-    await tracker.reload()
-    await expect(welcome(page)).toBeHidden()
-    await expect(resume(page)).toHaveCount(0)
-    expect((await bootstrap(context.request)).transactions).toHaveLength(1)
-  })
-
-  test('hitos previos muestran Entendido sin modificar categorías; borrar datos no reabre la guía', async ({
-    page,
-    context,
-  }) => {
-    await seedExistingData(context.request)
-    const before = await bootstrap(context.request)
-    await initialize(context.request)
-    expect((await bootstrap(context.request)).categories).toEqual(before.categories)
-    const tracker = await openWelcome(page)
-    await expect(welcome(page).getByText('✓ Cuenta creada')).toBeVisible()
-    await expect(welcome(page).getByText('✓ Movimiento registrado')).toBeVisible()
-    await expect(welcome(page).getByRole('button', { name: 'Crear cuenta' })).toHaveCount(0)
-    await expect(welcome(page).getByRole('button', { name: 'Registrar movimiento' })).toHaveCount(0)
-    await expectSettings(context.request, {
-      onboardingAccountCompleted: 1,
-      onboardingMovementCompleted: 1,
-      onboardingCompleted: 0,
-    })
-    await welcome(page).getByRole('button', { name: 'Entendido' }).click()
-    await expectSettings(context.request, { onboardingCompleted: 1 })
-    const data = await bootstrap(context.request)
-    // Remove the referencing movement before its account, respecting D1 FKs.
-    for (const [entityType, entities] of [
-      ['transaction', data.transactions],
-      ['account', data.accounts],
-    ] as const) {
-      await sync(
-        context.request,
-        entities.map((entity) => ({
-          commandId: randomUUID(),
-          action: 'remove',
-          entityType,
-          entityId: entity.id,
-          baseVersion: entity.version,
-        })),
-      )
-    }
-    await expect(page.locator('#sidebar-sync-status')).toHaveText(/^Sincronizado ·/)
-    await tracker.reload()
-    await expect(welcome(page)).toBeHidden()
-    await expect(resume(page)).toHaveCount(0)
-    const after = await bootstrap(context.request)
-    expect(after.accounts).toEqual([])
-    expect(after.transactions).toEqual([])
-    expect(after.settings).toMatchObject({
-      onboardingCompleted: 1,
-      onboardingAccountCompleted: 1,
-      onboardingMovementCompleted: 1,
-    })
-  })
-
-  test('importar una copia completa los hitos de una bienvenida omitida', async ({
+  test('restaurar una copia lleva a «Listo» con los datos importados', async ({
     page,
     context,
     browser,
@@ -309,33 +267,21 @@ test.describe('Bienvenida (sync v2)', () => {
       expect(exported.ok()).toBe(true)
       const backup = await exported.body()
       await initialize(context.request)
-      const tracker = await openWelcome(page)
-      await welcome(page).getByRole('button', { name: 'Ahora no' }).click()
-      await expectSettings(context.request, { onboardingDismissed: 1 })
-      await expect(page.locator('#sidebar-sync-status')).toHaveText(/^Sincronizado ·/)
-      await tracker.openData()
-      const data = page.locator('#data')
-      await data.getByRole('button', { name: /Importar/ }).click()
-      await data
-        .locator('#import-json')
-        .setInputFiles({ name: 'copia.json', mimeType: 'application/json', buffer: backup })
+      await openSetup(page)
       const imported = page.waitForResponse((response) =>
         response.url().includes('/api/data/import?mode=replace'),
       )
       const reloaded = page.waitForEvent('framenavigated', (frame) => frame === page.mainFrame())
-      await data.getByRole('button', { name: 'Sustituir mis datos' }).click()
-      const importResponse = await imported
-      expect(importResponse.ok()).toBe(true)
+      await setup(page)
+        .getByLabel('Copia de seguridad')
+        .setInputFiles({ name: 'copia.json', mimeType: 'application/json', buffer: backup })
+      expect((await imported).ok()).toBe(true)
       await reloaded
       await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible()
-      await expectSettings(context.request, {
-        onboardingAccountCompleted: 1,
-        onboardingMovementCompleted: 1,
-        onboardingCompleted: 1,
-      })
-      await expect(page.locator('[data-welcome-state="complete"]')).toHaveCount(1)
-      await expect(welcome(page)).toBeHidden()
-      await expect(resume(page)).toHaveCount(0)
+      await expect(title(page)).toHaveText('Listo')
+      await expect(setup(page).getByText('1 cuenta')).toBeVisible()
+      await next(page, 'Entendido')
+      await expectSettings(context.request, { onboardingCompleted: 1 })
       const restored = await bootstrap(context.request)
       expect(restored.accounts).toHaveLength(1)
       expect(restored.transactions).toHaveLength(1)

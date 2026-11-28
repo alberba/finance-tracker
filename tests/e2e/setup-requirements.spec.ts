@@ -10,7 +10,7 @@ test('sin cuentas no se apuntan movimientos, y crear una lo desbloquea', async (
   await tracker.goto()
   // Start from a clean slate through the supported state APIs: reset wipes the
   // seeded scenario (accounts, movements, categories) and re-seeds defaults,
-  // then the welcome tour is marked complete so only setup requirements show.
+  // then the setup wizard is marked complete so only setup requirements show.
   const headers = { 'X-Test-User-Email': testUserEmail }
   const reset = await page.request.post('/api/state/reset', { headers, data: {} })
   expect(reset.ok(), await reset.text()).toBe(true)

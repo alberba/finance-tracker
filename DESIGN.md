@@ -41,7 +41,7 @@ Valores del tema por defecto (oscuro suave). Los otros tres temas redefinen los 
 
 ## Temas
 
-El usuario elige el tema en Configuración › Preferencias y se aplica al momento; se guarda en el dispositivo (`localStorage`, clave `neon-theme`) y el script previo al primer pintado lo aplica sin parpadeo. `oscuro-suave` es el por defecto y `claro-melocoton` el que se aplica si el sistema pide modo claro y no hay elección. Todos comparten tipografía, formas y movimiento: solo cambian los tokens de color, la opacidad del área y la sombra. Los temas claros usan `--color-accent-text` para todo acento que sea texto, porque el naranja de relleno no alcanza 4.5:1 sobre fondo claro.
+El usuario elige el tema en Configuración › Preferencias o en la puesta en marcha y se aplica al momento. Se guarda en el usuario (`user_settings.theme`), así que sus otros dispositivos lo siguen al cargar sus datos; el dispositivo guarda además una copia (`localStorage`, clave `neon-theme`) que el script previo al primer pintado aplica sin parpadeo. `oscuro-suave` es el por defecto y `claro-melocoton` el que se aplica si el sistema pide modo claro y no hay elección. Todos comparten tipografía, formas y movimiento: solo cambian los tokens de color, la opacidad del área y la sombra. Los temas claros usan `--color-accent-text` para todo acento que sea texto, porque el naranja de relleno no alcanza 4.5:1 sobre fondo claro.
 
 | Token                     | Oscuro suave                  | Oscuro fuerte                  | Claro hueso                       | Claro melocotón                    |
 | ------------------------- | ----------------------------- | ------------------------------ | --------------------------------- | ---------------------------------- |
@@ -285,6 +285,12 @@ Toda hoja de alta o edición en móvil crece desde el botón que la abre (el FAB
 **Role:** detalle o edición de un elemento de la sección (objetivo, plan del año; en móvil, también la categoría del presupuesto y la cuenta de Patrimonio)
 
 Escritorio: panel lateral a toda altura pegado a la derecha, `width: min(460px, 100%)`, fondo `--color-panel`, `border-inline-start: 1px solid --color-line`, `box-shadow: var(--shadow-float)`. Es más ancho que el alta porque lleva historial y gráficos. Todos los paneles de detalle miden lo mismo, sea cual sea la sección. Móvil: hoja inferior como la del alta, con `max-height: 88%`. En escritorio entra con `anim-panel` (desde el borde derecho, y su contenido detrás); en móvil, con `anim-sheet`.
+
+### Puesta en marcha
+
+**Role:** configurar la app la primera vez: moneda y tema, cuentas, fijos, inversiones y categorías
+
+Diálogo modal a pantalla completa (`--color-bg`, sin velo), una pantalla por paso. Escritorio: a la izquierda una columna de 400px en `--color-side` con la marca, la etiqueta «Puesta en marcha» y la lista de pasos (filas de 52px, radio 14px; el actual en `--color-panel2` con su número en un círculo de 30px con borde `--color-accent`, los hechos con un check en `--color-gain`, los opcionales con «Opcional» en `--color-faint`) y, abajo, «Ahora no» con la nota de que lo creado se guarda. El contenido va en una columna de 820px centrada, a 120px del borde superior: etiqueta «Paso n de 6», H1 y lede; debajo, un pie con filete superior: «Atrás» a la izquierda y el primario a la derecha («Siguiente»; «Saltar» en un paso opcional vacío; «Entendido» en «Listo»). Móvil: barra superior con atrás, «Paso n de 6» y «Ahora no», una barra de progreso de seis tramos de 4px (hechos en `--color-soft`, el actual en `--color-accent`) y el primario a todo el ancho abajo. Lo que se crea en un paso se lista en una tarjeta de filas de 68px; los formularios largos (una regla recurrente, una conexión) abren su panel de detalle encima. Cada paso entra con `anim-rise` y el foco va a su H1. Cerrado antes de terminar, deja encima de la sección una línea con «Retomar puesta en marcha».
 
 ### Chip de filtro
 

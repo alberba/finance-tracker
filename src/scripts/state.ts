@@ -51,9 +51,9 @@ export const EMPTY_STATE_SEED = {
   year: new Date().getFullYear(),
   onboardingPresented: false,
   onboardingDismissed: false,
-  onboardingAccountCompleted: false,
-  onboardingMovementCompleted: false,
   onboardingCompleted: false,
+  onboardingStep: 0,
+  theme: null,
   dashboardLayout: null,
   currency: 'EUR',
   twrLiquidityAccountIds: [],
@@ -158,9 +158,9 @@ export function normalizeState(candidate: unknown): State {
       .slice(0, 3),
     onboardingPresented: input?.onboardingPresented === true,
     onboardingDismissed: input?.onboardingDismissed === true,
-    onboardingAccountCompleted: input?.onboardingAccountCompleted === true,
-    onboardingMovementCompleted: input?.onboardingMovementCompleted === true,
     onboardingCompleted: input?.onboardingCompleted === true,
+    onboardingStep: normalizeOnboardingStep(input?.onboardingStep),
+    theme: typeof input?.theme === 'string' && input.theme ? input.theme : null,
     dashboardLayout: parseDashboardLayout(input?.dashboardLayout),
     twrLiquidityAccountIds,
     accounts,
@@ -209,6 +209,11 @@ export function normalizeState(candidate: unknown): State {
   sortContributionsInState(safe)
 
   return safe
+}
+
+/** A step index of the setup wizard; anything else starts it from the beginning. */
+function normalizeOnboardingStep(value: unknown): number {
+  return Number.isInteger(value) && (value as number) >= 0 ? (value as number) : 0
 }
 
 function normalizeTwrLiquidityAccountIds(input: unknown, accounts: State['accounts']): string[] {

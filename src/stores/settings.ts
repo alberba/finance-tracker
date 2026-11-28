@@ -74,14 +74,29 @@ export const useSettingsStore = defineStore('settings', () => {
   function saveGeneral(year: string, currency: string): void {
     financialStateStore.commitState((draft) => {
       draft.year = parseIntSafe(year, draft.year)
+    })
+    // `year` has no counterpart in `user_settings`/`settingsUpdateCommandSchema`
+    // (currency/locale/theme only) — it stays a client-only concept, not synced.
+    saveCurrency(currency)
+    showToast('Configuración general guardada.')
+  }
+
+  function saveCurrency(currency: string): void {
+    financialStateStore.commitState((draft) => {
       draft.currency = String(currency || draft.currency || 'EUR')
         .toUpperCase()
         .slice(0, 3)
     })
-    // `year` has no counterpart in `user_settings`/`settingsUpdateCommandSchema`
-    // (currency/locale/theme only) — it stays a client-only concept, not synced.
     void syncSettingsUpdate({ currency: financialStateStore.currency })
-    showToast('Configuración general guardada.')
+  }
+
+  /** Whether an account counts as liquidity: money the user could use tomorrow. */
+  function setLiquidity(accountId: string, liquid: boolean): void {
+    financialStateStore.commitState((draft) => {
+      const others = (draft.twrLiquidityAccountIds || []).filter((id) => id !== accountId)
+      draft.twrLiquidityAccountIds = liquid ? [...others, accountId] : others
+    })
+    void syncTwrLiquidityAccounts(financialStateStore.state.twrLiquidityAccountIds)
   }
 
   function syncEntities(key: EntityKey, before: readonly Entity[]): void {
@@ -357,6 +372,8 @@ export const useSettingsStore = defineStore('settings', () => {
     saveGeneral,
     addEntity,
     updateEntityField,
+    saveCurrency,
+    setLiquidity,
     saveEntity,
     removeEntity,
     addCategory,

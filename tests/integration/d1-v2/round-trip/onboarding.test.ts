@@ -8,8 +8,6 @@ import { runWithDb } from '../../../../src/db/database'
 const progress = {
   onboardingPresented: true,
   onboardingDismissed: true,
-  onboardingAccountCompleted: true,
-  onboardingMovementCompleted: true,
   onboardingCompleted: true,
 }
 
@@ -20,10 +18,19 @@ describe('onboarding settings round trip', () => {
   })
   afterEach(() => trip.cleanup())
 
-  it('defaults old or absent settings to an unpresented welcome', async () => {
-    expect(await trip.reload()).toMatchObject(
-      Object.fromEntries(Object.keys(progress).map((key) => [key, false])),
-    )
+  it('defaults old or absent settings to an unpresented wizard at its first step', async () => {
+    expect(await trip.reload()).toMatchObject({
+      ...Object.fromEntries(Object.keys(progress).map((key) => [key, false])),
+      onboardingStep: 0,
+      theme: null,
+    })
+  })
+
+  it('persists the step to resume at and the theme the user chose', async () => {
+    await syncSettingsUpdate({ onboardingStep: 3, theme: 'claro-hueso' })
+    expect(await trip.reload()).toMatchObject({ onboardingStep: 3, theme: 'claro-hueso' })
+    await syncSettingsUpdate({ currency: 'USD' })
+    expect(await trip.reload()).toMatchObject({ onboardingStep: 3, theme: 'claro-hueso' })
   })
 
   it('persists all milestones across reloads and preserves them on unrelated updates', async () => {
@@ -50,14 +57,17 @@ describe('onboarding settings round trip', () => {
     await syncSettingsUpdate(progress)
     await trip.reload()
     const { applySyncBatch } = await import('../../../../src/lib/server/sync/apply-command')
-    const result = await runWithDb(trip.testDb.db, applySyncBatch(trip.userId, [
-      {
-        commandId: 'onboarding-replay',
-        action: 'settingsUpdate',
-        baseVersion: 0,
-        patch: progress,
-      },
-    ]))
+    const result = await runWithDb(
+      trip.testDb.db,
+      applySyncBatch(trip.userId, [
+        {
+          commandId: 'onboarding-replay',
+          action: 'settingsUpdate',
+          baseVersion: 0,
+          patch: progress,
+        },
+      ]),
+    )
     expect(result.results[0].status).toBe('noop')
   })
 })

@@ -3,13 +3,14 @@ import { computed, defineAsyncComponent, onMounted } from 'vue'
 import type { Component } from 'vue'
 
 import { useFinanceReady } from '../../composables/useFinanceReady'
+import { useUserTheme } from '../../composables/useNeonTheme'
 import type { SectionId } from '../../scripts/types'
 import { useFinancialStateStore } from '../../stores/financial-state'
 import { useStockEventsStore } from '../../stores/stockevents'
 import { useUiStore } from '../../stores/ui'
 import NeonDashboardSection from '../dashboard/NeonDashboardSection.vue'
 import NeonReportLauncher from '../layout/NeonReportLauncher.vue'
-import NeonWelcome from '../onboarding/NeonWelcome.vue'
+import NeonSetup from '../onboarding/NeonSetup.vue'
 
 const sectionLoaders = {
   transactions: () => import('../sections/transactions/NeonTransactionsSection.vue'),
@@ -72,6 +73,7 @@ onMounted(() => {
 })
 
 const uiStore = useUiStore()
+useUserTheme()
 const stockEventsStore = useStockEventsStore()
 uiStore.setActiveSection(props.activeSection)
 uiStore.setPage(props.page)
@@ -94,7 +96,7 @@ const canShow = computed(() => financeReady.value || financialStateStore.status 
 
 <template>
   <div class="contents" data-finance-workspace>
-    <NeonWelcome />
+    <NeonSetup />
     <template v-if="!canShow" />
     <ReportsPage v-else-if="isReportsPage" />
     <component :is="activeSectionComponent" v-else :key="currentSection" :is-active="true" />

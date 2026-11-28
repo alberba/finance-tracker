@@ -16,9 +16,8 @@ export interface CreateUserSettingsInput {
   dashboardLayout?: DashboardLayoutPreference | null
   onboardingPresented?: boolean
   onboardingDismissed?: boolean
-  onboardingAccountCompleted?: boolean
-  onboardingMovementCompleted?: boolean
   onboardingCompleted?: boolean
+  onboardingStep?: number
   stockeventsEnabled?: boolean
   stockeventsTradesToCash?: boolean
 }
@@ -30,9 +29,8 @@ export interface UpdateUserSettingsInput {
   dashboardLayout?: DashboardLayoutPreference | null
   onboardingPresented?: boolean
   onboardingDismissed?: boolean
-  onboardingAccountCompleted?: boolean
-  onboardingMovementCompleted?: boolean
   onboardingCompleted?: boolean
+  onboardingStep?: number
   stockeventsEnabled?: boolean
   stockeventsTradesToCash?: boolean
 }
@@ -58,9 +56,8 @@ async function createSql(
       dashboardLayout: input.dashboardLayout ?? null,
       onboardingPresented: input.onboardingPresented ? 1 : 0,
       onboardingDismissed: input.onboardingDismissed ? 1 : 0,
-      onboardingAccountCompleted: input.onboardingAccountCompleted ? 1 : 0,
-      onboardingMovementCompleted: input.onboardingMovementCompleted ? 1 : 0,
       onboardingCompleted: input.onboardingCompleted ? 1 : 0,
+      onboardingStep: input.onboardingStep ?? 0,
       stockeventsEnabled: input.stockeventsEnabled ? 1 : 0,
       stockeventsTradesToCash: input.stockeventsTradesToCash ? 1 : 0,
       createdAt: now,
@@ -112,24 +109,13 @@ async function updateSql(
           : input.onboardingDismissed
             ? 1
             : 0,
-      onboardingAccountCompleted:
-        input.onboardingAccountCompleted === undefined
-          ? existing.onboardingAccountCompleted
-          : input.onboardingAccountCompleted
-            ? 1
-            : 0,
-      onboardingMovementCompleted:
-        input.onboardingMovementCompleted === undefined
-          ? existing.onboardingMovementCompleted
-          : input.onboardingMovementCompleted
-            ? 1
-            : 0,
       onboardingCompleted:
         input.onboardingCompleted === undefined
           ? existing.onboardingCompleted
           : input.onboardingCompleted
             ? 1
             : 0,
+      onboardingStep: input.onboardingStep ?? existing.onboardingStep,
       updatedAt: nowIso(),
       version: existing.version + 1,
     })

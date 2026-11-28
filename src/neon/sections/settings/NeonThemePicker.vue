@@ -5,7 +5,7 @@ import { THEME_CHOICES } from './view-model'
 // The four themes of DESIGN.md as a group of toggle buttons. Each swatch is
 // painted by the theme it names (`data-theme` on the swatch redefines the
 // tokens inside it), so it can't drift from the real values. The choice
-// applies at once and is remembered on this device.
+// applies at once and is saved to the user, for all their devices.
 const { theme } = useNeonTheme()
 </script>
 

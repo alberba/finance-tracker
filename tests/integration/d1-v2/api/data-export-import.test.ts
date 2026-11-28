@@ -380,9 +380,8 @@ async function seedFullDataset(db: TestDatabase['db'], userId: string): Promise<
     userSettingsRepository.create(userId, {
       onboardingPresented: true,
       onboardingDismissed: true,
-      onboardingAccountCompleted: true,
-      onboardingMovementCompleted: true,
       onboardingCompleted: true,
+      onboardingStep: 6,
       currency: 'EUR',
       locale: 'es-ES',
       theme: 'dark',
@@ -479,9 +478,8 @@ describe('GET /api/data/export + POST /api/data/import', () => {
         userSettingsRepository.create(principal.userId, {
           onboardingPresented: true,
           onboardingDismissed: false,
-          onboardingAccountCompleted: true,
-          onboardingMovementCompleted: true,
           onboardingCompleted: true,
+          onboardingStep: 6,
         }),
       )
       const { POST } = await import('../../../../src/pages/api/data/import')
@@ -492,9 +490,8 @@ describe('GET /api/data/export + POST /api/data/import', () => {
             currency: 'USD',
             onboardingPresented: 0,
             onboardingDismissed: 1,
-            onboardingAccountCompleted: 0,
-            onboardingMovementCompleted: 0,
             onboardingCompleted: 0,
+            onboardingStep: 1,
           },
         }),
         locals: { principal },
@@ -507,9 +504,8 @@ describe('GET /api/data/export + POST /api/data/import', () => {
         currency: 'USD',
         onboardingPresented: 1,
         onboardingDismissed: 0,
-        onboardingAccountCompleted: 1,
-        onboardingMovementCompleted: 1,
         onboardingCompleted: 1,
+        onboardingStep: 6,
       })
     },
   )

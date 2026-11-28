@@ -110,15 +110,12 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
         onboardingDismissed: previousSettings
           ? previousSettings.onboardingDismissed === 1
           : optionalFlag((body.settings as Row | undefined)?.onboardingDismissed),
-        onboardingAccountCompleted: previousSettings
-          ? previousSettings.onboardingAccountCompleted === 1
-          : optionalFlag((body.settings as Row | undefined)?.onboardingAccountCompleted),
-        onboardingMovementCompleted: previousSettings
-          ? previousSettings.onboardingMovementCompleted === 1
-          : optionalFlag((body.settings as Row | undefined)?.onboardingMovementCompleted),
         onboardingCompleted: previousSettings
           ? previousSettings.onboardingCompleted === 1
           : optionalFlag((body.settings as Row | undefined)?.onboardingCompleted),
+        onboardingStep: previousSettings
+          ? previousSettings.onboardingStep
+          : optionalStep((body.settings as Row | undefined)?.onboardingStep),
       }
       if (replace) {
         await runServer(tx, wipeUserData(userId))
@@ -618,6 +615,10 @@ function optionalNumber(value: unknown): number | null {
 }
 
 /** Settings flags travel as `0`/`1` from D1 or as booleans; anything else leaves the stored value. */
+function optionalStep(value: unknown): number | undefined {
+  return Number.isInteger(value) && (value as number) >= 0 ? (value as number) : undefined
+}
+
 function optionalFlag(value: unknown): boolean | undefined {
   if (value === 1 || value === true) return true
   if (value === 0 || value === false) return false
