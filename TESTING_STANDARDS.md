@@ -37,9 +37,11 @@ narrativa.
 7. **Ajusta la implementación, no el test.** Una aserción solo se debilita si cambia el
    comportamiento esperado, y la PR lo explica. No añadas `skip`, `fixme`, timeouts ni reintentos
    para tapar una carrera.
-8. **Lo temporal se valida en la PR, no en la suite.** Un backfill, una reparación o un script de un
-   solo uso se comprueba con una ejecución anotada, no con un test permanente. Una migración
-   versionada sí es permanente: añade su caso de integración y no la borres al cerrar la PR.
+8. **Lo temporal se valida en la PR, no en la suite.** Un backfill o un script de un solo uso se
+   comprueba con una ejecución anotada, no con un test permanente. Son permanentes, con su caso de
+   integración contra SQLite: una migración versionada y una reparación con plan en seco +
+   ejecución que comprueba invariantes (`db:repair` y sus hermanas en `scripts/lib/`), porque se
+   vuelven a lanzar sobre datos nuevos.
 
 ## Unit, component e integration
 
@@ -128,7 +130,8 @@ narrativa.
 - La skill `tdd` lo lee antes de empezar el ciclo rojo-verde; la skill `code-review` lo añade a las
   fuentes del eje Standards.
 - Un agente que vaya a añadir más de 3 tests propone antes la lista (test y defecto que evita), salvo
-  que el ticket ya la enumere. Una PR con tests de IA indica lo que queda sin cubrir y pasa la
+  que el ticket ya la enumere. Sin humano al que proponérsela (`/implement-spec`, agentes en segundo
+  plano), la lista va en su informe final y en el cuerpo de la PR, junto a la tabla de la regla 1. Una PR con tests de IA indica lo que queda sin cubrir y pasa la
   revisión independiente de la regla 22.
 
 ## Checklist de PR de tests
