@@ -1,4 +1,5 @@
 import type { DashboardLayoutPreference } from '../lib/dashboard-layout'
+import type { InvestmentGrouping } from '../lib/investment-grouping'
 import type { Month } from '../lib/month'
 
 export const TRANSACTION_TYPES = ['income', 'expense', 'saving', 'investment'] as const
@@ -243,6 +244,8 @@ export interface StateMeta {
 
 export interface State {
   dashboardLayout: DashboardLayoutPreference | null
+  /** How the cover of Inversión groups its positions (#562). */
+  investmentGrouping: InvestmentGrouping
   onboardingPresented: boolean
   onboardingDismissed: boolean
   onboardingCompleted: boolean

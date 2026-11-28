@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test'
 import { test, expect } from './fixtures'
+import { expectSyncCommand } from './pages/sync'
 import { editScenarioState, holdVwceInFondos } from './seed-sync-v2'
 
 /**
@@ -227,5 +228,54 @@ test.describe('Inversión', () => {
     await page.goBack()
     await expect(page).toHaveURL(/\/inversion\?activo=[^&]+$/)
     await expect(section(page).getByRole('heading', { name: 'Posiciones' })).toBeVisible()
+  })
+
+  test('agrupa la portada por instrumento y por tipo, recuerda la elección y abre el instrumento', async ({
+    page,
+    tracker,
+  }) => {
+    await serveLateQuotes(page)
+    await tracker.goto()
+    await holdVwceInFondos(page)
+    await tracker.openInvestment()
+
+    const accounts = section(page).locator('[data-investment-accounts]')
+    await expect(accounts).toHaveAttribute('data-investment-grouping', 'account')
+    await expect(accounts.getByRole('heading', { name: 'Cuentas' })).toBeVisible()
+
+    await accounts.getByRole('button', { name: 'Por cuenta' }).click()
+    const saved = expectSyncCommand(
+      page,
+      (command) =>
+        command.action === 'settingsUpdate' && command.patch.investmentGrouping === 'instrument',
+    )
+    await page
+      .getByRole('menu', { name: 'Agrupar por' })
+      .getByRole('menuitemradio', { name: 'Instrumento' })
+      .click()
+    await saved
+    await expect(accounts.getByRole('heading', { name: 'Instrumentos' })).toBeVisible()
+    const vwce = accounts.locator('[data-investment-instrument]')
+    await expect(vwce).toHaveCount(1)
+    await expect(vwce).toContainText('VWCE')
+    await expect(vwce).toContainText('1 cuenta')
+
+    // The choice is kept after a reload.
+    await tracker.reload()
+    await expect(accounts).toHaveAttribute('data-investment-grouping', 'instrument')
+
+    await accounts.getByRole('button', { name: 'Por instrumento' }).click()
+    await page
+      .getByRole('menu', { name: 'Agrupar por' })
+      .getByRole('menuitemradio', { name: 'Tipo' })
+      .click()
+    const etf = accounts.locator('[data-investment-type="etf"]')
+    await expect(etf.getByRole('heading', { name: 'ETF' })).toBeVisible()
+    await expect(etf.locator('[data-investment-instrument]')).toContainText('VWCE')
+
+    await etf.getByRole('button', { name: 'Ver VWCE' }).click()
+    await expect(page).toHaveURL(/\/inversion\?instrumento=[^&]+$/)
+    await expect(section(page).getByRole('heading', { level: 1 })).toHaveText('VWCE')
+    await expect(section(page).locator('[data-instrument-total]')).toContainText('1.950,00')
   })
 })

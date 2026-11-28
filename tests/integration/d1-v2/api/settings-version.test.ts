@@ -176,3 +176,41 @@ describe('dashboard layout through sync', () => {
     }
   })
 })
+
+describe('investment grouping through sync', () => {
+  it('survives the outbox schema, offline projection, storage and remote changes', async () => {
+    const database = createTestDb()
+    try {
+      const user = await seedUser(database.db)
+      const command = settingsUpdateCommandSchema.parse({
+        commandId: 'grouping-save',
+        action: 'settingsUpdate',
+        patch: { investmentGrouping: 'type' },
+      })
+      expect(projectSyncV2State(applyPendingCommands(emptyReadModel(), [command])).investmentGrouping).toBe(
+        'type',
+      )
+      const result = await runWithDb(database.db, applySyncBatch(user.id, [command]))
+      expect(result.results[0].status).toBe('applied')
+      expect(
+        (await runWithDb(database.db, userSettingsRepository.get(user.id)))?.investmentGrouping,
+      ).toBe('type')
+      const changes = await runWithDb(database.db, syncRepository.listChangesSince(user.id, 0))
+      const remote = applyRemoteChanges(emptyReadModel(), changes, result.revision)
+      expect(projectSyncV2State(remote).investmentGrouping).toBe('type')
+    } finally {
+      database.close()
+    }
+  })
+
+  it('is by account until someone chooses otherwise, and rejects a grouping that does not exist', () => {
+    expect(projectSyncV2State(emptyReadModel()).investmentGrouping).toBe('account')
+    expect(() =>
+      settingsUpdateCommandSchema.parse({
+        commandId: 'grouping-bad',
+        action: 'settingsUpdate',
+        patch: { investmentGrouping: 'broker' },
+      }),
+    ).toThrow()
+  })
+})

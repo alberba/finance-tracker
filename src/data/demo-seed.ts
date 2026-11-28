@@ -314,6 +314,7 @@ export function buildDemoSeed(now: Date = new Date()): State {
       savedAt: null,
     },
     dashboardLayout: null,
+    investmentGrouping: 'account',
     onboardingPresented: false,
     onboardingDismissed: false,
     onboardingCompleted: false,

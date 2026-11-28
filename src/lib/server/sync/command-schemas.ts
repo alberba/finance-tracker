@@ -34,6 +34,7 @@
 
 import { Schema } from 'effect'
 import { dashboardLayoutSchema } from '../../dashboard-layout'
+import { investmentGroupingSchema } from '../../investment-grouping'
 
 import { validator, type Validator } from '../../schema'
 
@@ -449,6 +450,8 @@ export const settingsUpdateCommandSchema = validator(
       tourDesktopSeen: optionalBoolean,
       tourMobileSeen: optionalBoolean,
       dashboardLayout: Schema.optional(Schema.NullOr(dashboardLayoutSchema)),
+      /** How the cover of Inversión groups its positions. */
+      investmentGrouping: Schema.optional(investmentGroupingSchema),
       currency: Schema.optional(nonEmpty),
       locale: optionalText,
       theme: optionalText,

@@ -121,6 +121,7 @@ export function projectSyncV2State(
     tourMobileSeen: bootstrap.settings?.tourMobileSeen === 1,
     theme: bootstrap.settings?.theme ?? null,
     dashboardLayout: bootstrap.settings?.dashboardLayout ?? null,
+    investmentGrouping: bootstrap.settings?.investmentGrouping ?? 'account',
     twrLiquidityAccountIds: [],
     accounts: [],
     investmentAssets: [],

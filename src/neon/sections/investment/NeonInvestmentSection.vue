@@ -33,6 +33,8 @@ import { FRAME_QUERY } from '../../ui/sheet-drag'
 import { assetDetail } from './asset-view-model'
 import { instrumentDetail } from './instrument-view-model'
 import { startPage, useAssetRoute } from './asset-route'
+import { instrumentRows, sortByKey, sortCover, typeSections } from './cover-groups'
+import { useInvestmentGroupingStore } from './grouping-store'
 import NeonInvestmentAsset from './NeonInvestmentAsset.vue'
 import NeonInvestmentAssetMobile from './NeonInvestmentAssetMobile.vue'
 import NeonInvestmentCards from './NeonInvestmentCards.vue'
@@ -245,11 +247,29 @@ onBeforeUnmount(() => {
   clearTimeout(waitTimer)
 })
 
+const groupingStore = useInvestmentGroupingStore()
+const grouping = computed(() => groupingStore.grouping)
 const sortKey = ref<SortKey>('weight')
 const sortDirection = ref<SortDirection>('desc')
+// The period's change is the accounts' own: by instrument or type it sorts by weight.
+const effectiveSortKey = computed<SortKey>(() =>
+  grouping.value !== 'account' && sortKey.value === 'change' ? 'weight' : sortKey.value,
+)
 const rows = computed(() =>
   sortAccounts(accountRows(state.value, vm.value, month.value), sortKey.value, sortDirection.value),
 )
+const instruments = computed(() =>
+  sortByKey(instrumentRows(vm.value), effectiveSortKey.value, sortDirection.value, (row) => row),
+)
+const sections = computed(() =>
+  sortCover(typeSections(vm.value), effectiveSortKey.value, sortDirection.value),
+)
+
+// A row opens the account, or the instrument for the other two groupings.
+function openRow(id: string): void {
+  if (grouping.value === 'account') route.open(id)
+  else route.openInstrument(id)
+}
 
 const cards = computed<Card[]>(() => [
   {
@@ -379,10 +399,14 @@ function sortBy(key: SortKey, direction: SortDirection): void {
       :chart="compact"
       :method="method"
       :returns="returns"
+      :grouping="grouping"
       :rows="rows"
+      :instruments="instruments"
+      :sections="sections"
       :cards="cards"
       :entering="entering"
-      @open="route.open"
+      @open="openRow"
+      @group="groupingStore.setGrouping"
       @method="investmentStore.setReturnMode"
     />
 
@@ -473,12 +497,16 @@ function sortBy(key: SortKey, direction: SortDirection): void {
         </div>
 
         <NeonInvestmentAccounts
+          :grouping="grouping"
           :rows="rows"
-          :sort-key="sortKey"
+          :instruments="instruments"
+          :sections="sections"
+          :sort-key="effectiveSortKey"
           :sort-direction="sortDirection"
           :entering="entering"
-          @open="route.open"
+          @open="openRow"
           @sort="sortBy"
+          @group="groupingStore.setGrouping"
         />
 
         <NeonInvestmentCards

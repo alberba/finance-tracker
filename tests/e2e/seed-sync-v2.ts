@@ -89,6 +89,7 @@ function buildSeedExport(seed: State) {
     settings: {
       currency,
       dashboardLayout: seed.dashboardLayout,
+      investmentGrouping: seed.investmentGrouping,
       stockeventsEnabled: seed.stockEvents.enabled,
       stockeventsTradesToCash: seed.stockEvents.tradesToCash,
     },

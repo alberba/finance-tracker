@@ -75,6 +75,7 @@
  */
 
 import type { DashboardLayoutPreference } from '../dashboard-layout'
+import type { InvestmentGrouping } from '../investment-grouping'
 import type { Month } from '../month'
 import { useSyncStore } from '../../stores/sync'
 import type { SyncEntityType } from '../server/sync/command-schemas'
@@ -311,6 +312,7 @@ export async function syncRemoveByKey(
  */
 export async function syncSettingsUpdate(patch: {
   dashboardLayout?: DashboardLayoutPreference | null
+  investmentGrouping?: InvestmentGrouping
   currency?: string
   locale?: string | null
   theme?: string | null
