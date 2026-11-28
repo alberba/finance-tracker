@@ -184,3 +184,36 @@ describe('NeonEntrySheet: compra desde Inversión', () => {
     })
   })
 })
+
+describe('NeonEntrySheet: cuentas de inversión archivadas', () => {
+  beforeEach(() => {
+    useFinancialStateStore().patchState((draft) => {
+      draft.investmentAssets = [
+        { id: 'etf', name: 'ETF', openingBalance: 0, archived: true },
+        { id: 'tr', name: 'Trade Republic', openingBalance: 0 },
+      ]
+    })
+    useUiStore().ui.activeSection = 'investment'
+  })
+
+  const picker = (wrapper: Awaited<ReturnType<typeof openSheet>>) =>
+    wrapper
+      .findAllComponents({ name: 'NeonEntryPicker' })
+      .find((item) => (item.props() as { label: string }).label === 'Cuenta de inversión')!
+
+  it('no ofrece la cuenta archivada y arranca en la primera activa aunque el símbolo no tenga instrumento', async () => {
+    const wrapper = await openSheet()
+
+    expect((picker(wrapper).props() as { options: { value: string }[] }).options).toEqual([
+      expect.objectContaining({ value: 'tr' }),
+    ])
+    expect(picker(wrapper).props('modelValue')).toBe('tr')
+
+    await wrapper.get('[name="symbol"]').setValue('XYZ')
+    await wrapper.get('[name="units"]').setValue('2')
+    await wrapper.get('[name="unitPrice"]').setValue('100')
+    await wrapper.get('form').trigger('submit')
+
+    expect(transactions()[0]).toMatchObject({ symbol: 'XYZ', destinationAccountId: 'tr' })
+  })
+})

@@ -24,6 +24,13 @@ export interface Entity {
   id: string
   name: string
   openingBalance: number
+  /** Retired: kept so its history resolves, never offered for new movements. */
+  archived?: boolean
+}
+
+/** The accounts still offered for new movements: the archived ones stay out. */
+export function activeEntities<T extends Pick<Entity, 'archived'>>(entities: readonly T[]): T[] {
+  return entities.filter((entity) => !entity.archived)
 }
 
 export interface Snapshot {

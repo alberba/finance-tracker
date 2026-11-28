@@ -3,6 +3,7 @@ import { ruleMonthlyEquivalent } from '../../../domain/investment/view-model'
 import { frequencyText } from '../../../domain/recurring/occurrences'
 import type { AssetRowViewModel, StockEventsSyncSummary } from '../../../domain/settings/view-model'
 import type { NeonTheme } from '../../../lib/client/neon-theme'
+import { activeEntities } from '../../../lib/finance-core'
 import { formatMoney, formatShortDate, formatSignedMoney } from '../../../lib/format'
 import { parseDecimal } from '../../../lib/number'
 import type { Entity, RecurringRule, State } from '../../../scripts/types'
@@ -271,7 +272,7 @@ export function partCounts(
 ): Record<SettingsPartId, number | null> {
   return {
     cuentas: state.accounts.length,
-    activos: state.investmentAssets.length,
+    activos: activeEntities(state.investmentAssets).length,
     pasivos: state.liabilities.length,
     categorias:
       state.incomeCategories.length +

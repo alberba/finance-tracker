@@ -4,6 +4,7 @@ import {
   normalizeSymbol,
   symbolsMatchInstrument,
 } from '../investment/symbol-matching'
+import { activeEntities } from '../../lib/finance-core'
 import { categoryEmojiKey, getCategoryEmoji } from '../../scripts/category-emoji'
 import type { BudgetType, CategoryKey, Entity, Instrument, State } from '../../scripts/types'
 
@@ -184,7 +185,7 @@ export function buildAssetsViewModel(state: State): AssetsViewModel {
   })
   symbolsByAsset.forEach((symbols) => symbols.forEach((symbol) => orphans.delete(symbol)))
 
-  const assets = state.investmentAssets.map((asset) => {
+  const assets = activeEntities(state.investmentAssets).map((asset) => {
     const instruments = state.instruments
       .filter((instrument) => instrument.investmentAssetId === asset.id)
       .map((instrument) => ({

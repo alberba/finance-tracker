@@ -10,6 +10,7 @@ import {
   type InstrumentQuoteConfig,
   type State,
 } from '../../scripts/types'
+import { DEFAULT_INVESTMENT_GROUPING } from '../investment-grouping'
 import { asMonth, monthIndex } from '../month'
 import { monthFromISO, todayISO } from '../../scripts/utils'
 import type { CachedEntity } from './idb-cache'
@@ -121,7 +122,7 @@ export function projectSyncV2State(
     tourMobileSeen: bootstrap.settings?.tourMobileSeen === 1,
     theme: bootstrap.settings?.theme ?? null,
     dashboardLayout: bootstrap.settings?.dashboardLayout ?? null,
-    investmentGrouping: bootstrap.settings?.investmentGrouping ?? 'account',
+    investmentGrouping: bootstrap.settings?.investmentGrouping ?? DEFAULT_INVESTMENT_GROUPING,
     twrLiquidityAccountIds: [],
     accounts: [],
     investmentAssets: [],
@@ -152,6 +153,7 @@ export function projectSyncV2State(
     id: legacyId(account),
     name: String(account.name || ''),
     openingBalance: Number(account.openingBalance || 0),
+    ...(account.isArchived ? { archived: true } : {}),
   })
   projected.accounts = bootstrap.accounts
     .filter((account) => account.kind === 'cash')

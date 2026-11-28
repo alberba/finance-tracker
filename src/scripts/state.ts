@@ -276,6 +276,7 @@ function normalizeEntities(list: unknown): Entity[] {
         id: slug(rawItem.id || rawItem.name || uid('item')),
         name: String(rawItem.name || rawItem.id || 'Item'),
         openingBalance: round2(parseFloatSafe(rawItem.openingBalance, 0)),
+        ...(rawItem.archived === true ? { archived: true } : {}),
       }
     })
     .filter((item) => item.name)

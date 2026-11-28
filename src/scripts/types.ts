@@ -54,6 +54,11 @@ export interface Entity {
   id: string
   name: string
   openingBalance: number
+  /**
+   * Retired (e.g. a legacy ETF account merged into an instrument). It stays in
+   * the state so its history still resolves, but is not offered for new movements.
+   */
+  archived?: boolean
 }
 
 export interface Transaction {

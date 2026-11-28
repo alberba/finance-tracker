@@ -102,7 +102,7 @@ export const useInvestmentStore = defineStore('investment', () => {
   /** The chosen investment account when it exists, otherwise the one of the symbol's instrument. */
   function resolveDestination(chosen: string | undefined, symbol: string): string | undefined {
     const known = (id: string | undefined) =>
-      financialStateStore.investmentAssets.some((asset) => asset.id === id) ? id : undefined
+      financialStateStore.activeInvestmentAssets.some((asset) => asset.id === id) ? id : undefined
     return known(chosen?.trim()) ?? known(defaultInvestmentAccountId(symbol))
   }
 
