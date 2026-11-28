@@ -17,10 +17,8 @@ import { resultFigures, UNPRICED_NOTE, type Tone } from './view-model'
 // by id; everything here is words and figures already formatted. The route is
 // `/inversion?instrumento=<id>` (`instrumentHref`).
 
-/** What is held of the instrument in one account. */
-export interface InstrumentPositionLine {
-  accountId: string
-  accountName: string
+/** The figures of a holding of an instrument: one account's, or all of them summed. */
+export interface InstrumentTotal {
   /** «4», units held. */
   units: string
   value: string
@@ -30,18 +28,14 @@ export interface InstrumentPositionLine {
   /** «+25,0 %». */
   ret: string
   tone: Tone
-  /** The value is an estimate: the instrument has no quote. */
-  estimated: boolean
 }
 
-/** The same figures summed over every account. */
-export interface InstrumentTotal {
-  units: string
-  value: string
-  invested: string
-  gain: string
-  ret: string
-  tone: Tone
+/** What one account holds of the instrument. */
+export interface InstrumentPositionLine extends InstrumentTotal {
+  accountId: string
+  accountName: string
+  /** The value is an estimate: the instrument has no quote. */
+  estimated: boolean
 }
 
 export interface InstrumentDetail {
