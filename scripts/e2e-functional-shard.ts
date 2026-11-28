@@ -19,8 +19,8 @@ const historical = Object.values(history)
 const defaultDuration =
   historical.reduce((sum, item) => sum + item.durationMs, 0) /
   historical.reduce((sum, item) => sum + item.tests, 0)
-const command = ['exec', 'playwright', 'test']
-const listing = spawnSync('pnpm', [...command, '--list', '--reporter=json'], { encoding: 'utf8' })
+const command = ['playwright', 'test']
+const listing = spawnSync('bunx', [...command, '--list', '--reporter=json'], { encoding: 'utf8' })
 if (listing.status !== 0) {
   process.stderr.write(listing.stderr || listing.stdout)
   process.exit(listing.status ?? 1)
@@ -50,5 +50,5 @@ console.log(
   `Functional shard ${shard}: ${selected.length} files, estimated ${Math.round(selected.reduce((sum, file) => sum + file.durationMs, 0) / 1000)}s`,
 )
 const patterns = selected.map(({ file }) => `${file.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`)
-const result = spawnSync('pnpm', [...command, ...patterns, ...extraArgs], { stdio: 'inherit' })
+const result = spawnSync('bunx', [...command, ...patterns, ...extraArgs], { stdio: 'inherit' })
 process.exit(result.status ?? 1)

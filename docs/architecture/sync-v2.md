@@ -133,7 +133,7 @@ y conserva los precios transitorios solo si no cambia su fuente.
 ## Tocar el tipo de movimiento
 
 Añadir o cambiar un tipo (`income`, `expense`, `investment`, `saving`…) afecta además a sitios que
-el compilador no siempre marca. Tras `pnpm check`, busca el tipo con `grep -rn` en:
+el compilador no siempre marca. Tras `bun run check`, busca el tipo con `grep -rn` en:
 
 - `src/lib/finance-core.ts` y `src/neon/dashboard/view-model.ts`: totales y patrimonio.
 - `src/domain/transactions/registry.ts`, `src/neon/entry/` (tipos de la hoja de alta,

@@ -2,7 +2,7 @@
 # Prepara un worktree recién creado (o el checkout principal) para dev y E2E.
 # `.dev.vars` está en .gitignore, así que un worktree nuevo no lo tiene: sin él
 # el fixture E2E no puede inyectar una identidad local. Sin las
-# migraciones locales, `pnpm dev` arranca contra una D1 vacía.
+# migraciones locales, `bun run dev` arranca contra una D1 vacía.
 set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"
@@ -33,7 +33,7 @@ ensure_var DATA_ENCRYPTION_KEY "$(openssl rand -base64 32)"
 # Better Auth valida el origen contra esta URL: la del puerto propio de este worktree.
 node scripts/dev-worktree.mjs --sync-url
 
-pnpm install --frozen-lockfile
+bun install --frozen-lockfile
 
-pnpm d1:migrate:local:v2 >/dev/null
+bun run d1:migrate:local:v2 >/dev/null
 echo "setup-worktree: migraciones D1 locales (v2) aplicadas"

@@ -106,9 +106,9 @@ Es una muestra local, no una predicción del arranque en producción ni evidenci
 de velocidad; no mostró regresión de arranque. Para reproducir con el build Astro:
 
 ```sh
-pnpm build
-pnpm exec wrangler deploy --dry-run --config dist/server/wrangler.json --outfile /tmp/bitvavo-worker.bundle
-pnpm exec wrangler check startup --worker /tmp/bitvavo-worker.bundle --outfile /tmp/bitvavo-startup.cpuprofile
+bun run build
+bunx wrangler deploy --dry-run --config dist/server/wrangler.json --outfile /tmp/bitvavo-worker.bundle
+bunx wrangler check startup --worker /tmp/bitvavo-worker.bundle --outfile /tmp/bitvavo-startup.cpuprofile
 ```
 
 ## Pruebas
@@ -121,7 +121,7 @@ a Bitvavo real; `X-Test-Bitvavo-Status` simula una clave revocada o una caída. 
 alteran el proveedor de una identidad de producción.
 
 ```sh
-pnpm exec vitest run tests/unit/bitvavo.test.ts tests/integration/d1-v2/bitvavo.test.ts \
+bunx vitest run tests/unit/bitvavo.test.ts tests/integration/d1-v2/bitvavo.test.ts \
   tests/integration/d1-v2/bitvavo-sync.test.ts tests/component/NeonBitvavoPanel.test.ts
-pnpm exec playwright test --config playwright.bitvavo.config.ts
+bunx playwright test --config playwright.bitvavo.config.ts
 ```

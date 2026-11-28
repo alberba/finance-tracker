@@ -88,5 +88,5 @@ archivo o cambiar el nombre de sus métodos no crea por sí solo esa responsabil
 ## Verificacion
 
 - Cambios funcionales de frontend deben tener cobertura E2E nueva o actualizada.
-- Refactors sin cambio visible deben mantener al menos `pnpm check` y lint acotado sobre archivos tocados.
+- Refactors sin cambio visible deben mantener al menos `bun run check` y lint acotado sobre archivos tocados.
 - Si se toca una interaccion existente, ejecutar la spec E2E que la cubre.

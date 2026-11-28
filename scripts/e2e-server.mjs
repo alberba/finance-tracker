@@ -44,9 +44,8 @@ if (nodeRuntime) {
   }
 } else {
   const migration = spawnSync(
-    'pnpm',
+    'bunx',
     [
-      'exec',
       'wrangler',
       'd1',
       'migrations',
@@ -62,7 +61,7 @@ if (nodeRuntime) {
   )
   if (migration.status !== 0) process.exit(migration.status ?? 1)
 }
-const build = spawnSync('pnpm', ['build'], { stdio: 'inherit', env })
+const build = spawnSync('bun', ['run', 'build'], { stdio: 'inherit', env })
 if (build.status !== 0) process.exit(build.status ?? 1)
 if (!nodeRuntime) {
   copyFileSync(resolve(dirname(configPath), '.dev.vars'), resolve(output, 'server/.dev.vars'))
@@ -70,9 +69,8 @@ if (!nodeRuntime) {
 const server = nodeRuntime
   ? spawn(process.execPath, [resolve(output, 'server/entry.mjs')], { stdio: 'inherit', env })
   : spawn(
-      'pnpm',
+      'bunx',
       [
-        'exec',
         'wrangler',
         'dev',
         '--config',

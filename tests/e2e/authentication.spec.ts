@@ -25,9 +25,8 @@ UPDATE auth_policy SET public_registration = 0;`
 }
 function executeSql(sql: string) {
   const result = spawnSync(
-    'pnpm',
+    'bunx',
     [
-      'exec',
       'wrangler',
       'd1',
       'execute',

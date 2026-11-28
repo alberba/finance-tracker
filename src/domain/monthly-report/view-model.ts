@@ -170,7 +170,7 @@ export function buildMonthlyReportViewModel(input: {
 
   const income = total(inPeriod, 'income')
   const expense = total(inPeriod, 'expense')
-  const sorted = [...inPeriod].sort(
+  const sorted = inPeriod.toSorted(
     (a, b) => datePart(b).localeCompare(datePart(a)) || b.id.localeCompare(a.id),
   )
   const movements = sorted.slice(0, REPORT_MOVEMENT_LIMIT).map<MonthlyReportMovementRow>((tx) => ({

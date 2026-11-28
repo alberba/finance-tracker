@@ -86,7 +86,7 @@ Identificadores clave en UI:
   `(user_id, issue_number)`. Migraciones `0016_issue_reports.sql` y `0017_issue_reports_original_body.sql`.
 - Repositorio `src/db/repositories/issue-reports.ts`; todas las funciones reciben `userId`.
 - `submittedAt` se toma del servidor al crear; en el backfill, de `created_at` de GitHub.
-- `pnpm reports:backfill` recupera los reportes anteriores leyendo el bloque `### Reportero`. Simula
+- `bun run reports:backfill` recupera los reportes anteriores leyendo el bloque `### Reportero`. Simula
   por defecto, escribe con `--execute`, es idempotente y lista las issues que no puede asociar. Se
   documenta en `docs/operations/self-hosting.md`.
 

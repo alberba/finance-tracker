@@ -24,6 +24,7 @@ const props = Astro.props
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
     <script is:inline>
       // Theme before the first paint, the rule of the shell
       // (src/neon/app/AppShell.astro): a stored theme name wins, otherwise
@@ -53,6 +54,8 @@ const props = Astro.props
         } catch {
           root.dataset.theme = 'oscuro-suave'
         }
+        const meta = document.querySelector('meta[name="color-scheme"]')
+        if (meta) meta.content = root.dataset.theme.startsWith('oscuro') ? 'dark' : 'light'
       })()
     </script>
     <meta name="theme-color" content="#1B1A18" media="(prefers-color-scheme: dark)" />

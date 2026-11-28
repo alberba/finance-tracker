@@ -96,9 +96,8 @@ TEST_RESEND_URL = "http://127.0.0.1:${mailPort}"
 `,
 )
 const migration = spawnSync(
-  'pnpm',
+  'bunx',
   [
-    'exec',
     'wrangler',
     'd1',
     'migrations',
@@ -123,12 +122,11 @@ const appEnv = {
   PLAYWRIGHT_VITE_CACHE_DIR: resolve('.scratch/auth/vite'),
   PLAYWRIGHT_BUILD_DIR: buildDirectory,
 }
-const build = spawnSync('pnpm', ['build'], { stdio: 'inherit', env: appEnv })
+const build = spawnSync('bun', ['run', 'build'], { stdio: 'inherit', env: appEnv })
 if (build.status !== 0) process.exit(build.status ?? 1)
 const app = spawn(
-  'pnpm',
+  'bunx',
   [
-    'exec',
     'wrangler',
     'dev',
     '--config',

@@ -1,15 +1,15 @@
 #!/usr/bin/env -S node
 /**
- * `pnpm reports:backfill` (#340) — recupera la propiedad de los reportes que se
+ * `bun run reports:backfill` (#340) — recupera la propiedad de los reportes que se
  * enviaron antes de que existiera `issue_reports`.
  *
  * Por defecto solo simula e imprime el plan; con `--execute` escribe. Es
  * idempotente: lo que ya está no se toca y puede ejecutarse varias veces.
  *
  * Uso:
- *   pnpm reports:backfill
- *   pnpm reports:backfill --execute --v2-sqlite=.data/finance-tracker-v2.sqlite
- *   pnpm reports:backfill --execute --remote-sql-out=.data/reports-backfill.sql
+ *   bun run reports:backfill
+ *   bun run reports:backfill --execute --v2-sqlite=.data/finance-tracker-v2.sqlite
+ *   bun run reports:backfill --execute --remote-sql-out=.data/reports-backfill.sql
  */
 
 import { writeFileSync } from 'node:fs'
@@ -219,7 +219,7 @@ export function writeRemoteSql(plan: BackfillPlan, outPath: string): number {
 }
 
 const HELP = `
-Uso: pnpm reports:backfill [opciones]
+Uso: bun run reports:backfill [opciones]
 
 Recupera la propiedad de los reportes web anteriores a issue_reports leyendo el
 bloque «### Reportero» de cada issue con label ${LABEL}.
