@@ -137,11 +137,7 @@ async function updateSql(
             ? 1
             : 0,
       tourMobileSeen:
-        input.tourMobileSeen === undefined
-          ? existing.tourMobileSeen
-          : input.tourMobileSeen
-            ? 1
-            : 0,
+        input.tourMobileSeen === undefined ? existing.tourMobileSeen : input.tourMobileSeen ? 1 : 0,
       updatedAt: nowIso(),
       version: existing.version + 1,
     })

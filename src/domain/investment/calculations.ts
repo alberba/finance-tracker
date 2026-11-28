@@ -43,8 +43,18 @@ export function computeInvestmentValue(state: State, assetId: string, month: Mon
   )
 }
 
-export function computeAccountBalance(state: State, accountId: string, month: MonthOrStart): number {
-  return coreAccountBalance(accountId, month, accounts(state), transactions(state), snapshots(state))
+export function computeAccountBalance(
+  state: State,
+  accountId: string,
+  month: MonthOrStart,
+): number {
+  return coreAccountBalance(
+    accountId,
+    month,
+    accounts(state),
+    transactions(state),
+    snapshots(state),
+  )
 }
 
 export function wealthByMonth(state: State, month: MonthOrStart): WealthSnapshot {
@@ -95,7 +105,11 @@ export function computeInvestedCapital(state: State, month: Month): number {
   return round2(openingCapital + contributions)
 }
 
-export function computeInvestedCapitalByAsset(state: State, assetId: string, month: MonthOrStart): number {
+export function computeInvestedCapitalByAsset(
+  state: State,
+  assetId: string,
+  month: MonthOrStart,
+): number {
   const asset = state.investmentAssets.find((item) => item.id === assetId)
   if (!asset) {
     return 0

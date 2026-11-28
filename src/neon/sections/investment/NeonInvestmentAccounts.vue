@@ -1,20 +1,16 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+
 import type { InvestmentGrouping } from '../../../lib/investment-grouping'
 import NeonInvestmentInstrumentCells from './NeonInvestmentInstrumentCells.vue'
 import NeonChoiceMenu, { type ChoiceGroup } from '../../ui/NeonChoiceMenu.vue'
-import {
-  groupingOptions,
-  groupingTitle,
-  type InstrumentRow,
-  type TypeSection,
-} from './cover-groups'
+import { groupingMenu, groupingTitle, type CoverList } from './cover-groups'
 import {
   DIRECTION_OPTIONS,
-  SORT_OPTIONS,
   SPARK_HEIGHT,
   SPARK_WIDTH,
   sortLabel,
-  type AccountRow,
+  sortOptionsFor,
   type SortDirection,
   type SortKey,
   type Tone,
@@ -30,10 +26,7 @@ import {
 // of its own. The whole row opens its detail (the account's or the
 // instrument's); the name is the button keyboards and screen readers use.
 const props = defineProps<{
-  grouping: InvestmentGrouping
-  rows: readonly AccountRow[]
-  instruments: readonly InstrumentRow[]
-  sections: readonly TypeSection[]
+  list: CoverList
   sortKey: SortKey
   sortDirection: SortDirection
   /** The cover is coming in: the rows follow its blocks (see the section). */
@@ -66,30 +59,17 @@ const COLUMNS_POSITIONS =
 const SORT_ICON = 'M4 7h16M7 12h10M10 17h4'
 const GROUP_ICON = 'M4 5h7v7H4zM13 5h7v4h-7zM13 11h7v8h-7zM4 14h7v5H4z'
 
-// The period's change belongs to accounts: by instrument or type there are two ways to sort.
-const sortOptions = () =>
-  props.grouping === 'account'
-    ? SORT_OPTIONS
-    : SORT_OPTIONS.filter((option) => option.value !== 'change')
-
-function groupingGroups(): ChoiceGroup<InvestmentGrouping>[] {
-  return [{ key: 'grouping', options: groupingOptions(), value: props.grouping }]
-}
+const menu = computed(() => groupingMenu(props.list.grouping))
 
 function sortGroups(): ChoiceGroup<SortKey | SortDirection>[] {
   return [
-    { key: 'by', options: sortOptions(), value: props.sortKey },
+    { key: 'by', options: sortOptionsFor(props.list.grouping), value: props.sortKey },
     { key: 'direction', options: DIRECTION_OPTIONS, value: props.sortDirection },
   ]
 }
 
 const isDirection = (value: SortKey | SortDirection): value is SortDirection =>
   value === 'asc' || value === 'desc'
-
-const groupingLabel = () =>
-  `Por ${groupingOptions()
-    .find((option) => option.value === props.grouping)
-    ?.label.toLowerCase()}`
 
 function onSort(_group: string, value: SortKey | SortDirection): void {
   if (isDirection(value)) emit('sort', props.sortKey, value)
@@ -102,20 +82,20 @@ function onSort(_group: string, value: SortKey | SortDirection): void {
     class="flex min-w-0 flex-col"
     aria-labelledby="investment-accounts-title"
     data-investment-accounts
-    :data-investment-grouping="grouping"
+    :data-investment-grouping="list.grouping"
   >
     <div
       class="motion-safe:animate-rise relative z-10 mbe-3 flex flex-wrap items-center justify-between gap-3 motion-safe:[animation-delay:200ms]"
     >
       <h2 id="investment-accounts-title" class="font-display text-figure-block font-bold">
-        {{ groupingTitle(grouping) }}
+        {{ groupingTitle(list.grouping) }}
       </h2>
       <div class="flex flex-wrap items-center gap-2">
         <NeonChoiceMenu
-          :text="groupingLabel()"
+          :text="menu.text"
           label="Agrupar por"
           :icon="GROUP_ICON"
-          :groups="groupingGroups()"
+          :groups="menu.groups"
           data-investment-grouping-menu
           @select="(_, value) => emit('group', value)"
         />
@@ -128,7 +108,7 @@ function onSort(_group: string, value: SortKey | SortDirection): void {
         />
       </div>
     </div>
-    <template v-if="grouping === 'account'">
+    <template v-if="list.grouping === 'account'">
       <div
         class="text-muted text-label tracking-label motion-safe:animate-rise grid pbe-2.5 font-extrabold uppercase motion-safe:[animation-delay:200ms]"
         :class="COLUMNS"
@@ -143,7 +123,7 @@ function onSort(_group: string, value: SortKey | SortDirection): void {
       </div>
       <ul class="m-0 list-none p-0">
         <li
-          v-for="(row, index) in rows"
+          v-for="(row, index) in list.rows"
           :key="row.id"
           class="border-line pointer-fine:hover:bg-panel grid cursor-pointer items-center border-t py-4 motion-safe:transition-colors motion-safe:duration-160"
           :class="[COLUMNS, entering && 'motion-safe:animate-row']"
@@ -236,9 +216,9 @@ function onSort(_group: string, value: SortKey | SortDirection): void {
         <span class="text-end">Valor</span>
         <span class="text-end">Resultado</span>
       </div>
-      <ul v-if="grouping === 'instrument'" class="m-0 list-none p-0">
+      <ul v-if="list.grouping === 'instrument'" class="m-0 list-none p-0">
         <li
-          v-for="(row, index) in instruments"
+          v-for="(row, index) in list.rows"
           :key="row.id"
           class="border-line pointer-fine:hover:bg-panel grid cursor-pointer items-center border-t py-4 motion-safe:transition-colors motion-safe:duration-160"
           :class="[COLUMNS_POSITIONS, entering && 'motion-safe:animate-row']"
@@ -251,7 +231,7 @@ function onSort(_group: string, value: SortKey | SortDirection): void {
       </ul>
       <ul v-else class="m-0 list-none p-0">
         <li
-          v-for="section in sections"
+          v-for="section in list.sections"
           :key="section.id"
           :data-investment-type="section.id"
           class="border-line border-t"

@@ -158,7 +158,10 @@ const accountOptions = computed(() =>
   movementsStore.accounts.map((account) => ({ value: account.id, label: account.name })),
 )
 const assetOptions = computed(() =>
-  financialStateStore.activeInvestmentAssets.map((asset) => ({ value: asset.id, label: asset.name })),
+  financialStateStore.activeInvestmentAssets.map((asset) => ({
+    value: asset.id,
+    label: asset.name,
+  })),
 )
 // The amount an investment operation records: gross for a purchase, net of
 // fees for a sale. The store recomputes it with the same function.

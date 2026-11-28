@@ -11,7 +11,9 @@ function unlinkedMovements(dbPath: string): number {
   const sqlite = new Database(dbPath, { readonly: true })
   try {
     const row = sqlite
-      .prepare(`SELECT COUNT(*) AS n FROM investment_trade_details WHERE instrument_id IS NULL AND symbol IN ('BTC', 'ETH')`)
+      .prepare(
+        `SELECT COUNT(*) AS n FROM investment_trade_details WHERE instrument_id IS NULL AND symbol IN ('BTC', 'ETH')`,
+      )
       .get() as { n: number }
     return row.n
   } finally {
@@ -46,13 +48,21 @@ describe('db:repair-links', () => {
   })
 
   it('con --execute deja una copia de la base y repara; repetirlo no cambia nada', async () => {
-    const first = await runRepairLinksCli([`--v2-sqlite=${dbPath}`, `--user-id=${USER}`, '--execute'])
+    const first = await runRepairLinksCli([
+      `--v2-sqlite=${dbPath}`,
+      `--user-id=${USER}`,
+      '--execute',
+    ])
 
     expect(first.report).toEqual({ instrumentsLinked: 5, accountsMoved: 3 })
     expect(unlinkedMovements(dbPath)).toBe(0)
     expect(unlinkedMovements(first.backupPath!)).toBe(2)
 
-    const second = await runRepairLinksCli([`--v2-sqlite=${dbPath}`, `--user-id=${USER}`, '--execute'])
+    const second = await runRepairLinksCli([
+      `--v2-sqlite=${dbPath}`,
+      `--user-id=${USER}`,
+      '--execute',
+    ])
     expect(second.plan.movements).toEqual([])
     expect(second.report).toEqual({ instrumentsLinked: 0, accountsMoved: 0 })
   })
@@ -60,9 +70,9 @@ describe('db:repair-links', () => {
   it('no crea una base vacía si la ruta no existe', async () => {
     const missing = join(dir, 'no-existe.sqlite')
 
-    await expect(runRepairLinksCli([`--v2-sqlite=${missing}`, `--user-id=${USER}`])).rejects.toThrow(
-      /no existe/,
-    )
+    await expect(
+      runRepairLinksCli([`--v2-sqlite=${missing}`, `--user-id=${USER}`]),
+    ).rejects.toThrow(/no existe/)
     expect(existsSync(missing)).toBe(false)
   })
 })

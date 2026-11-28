@@ -40,9 +40,13 @@ import {
   type AccountMergeReport,
 } from './lib/account-instrument-merge'
 
-const DEFAULT_MERGES: AccountMerge[] = ['ETF XDWH', 'ETF IQQI', 'ETF AGED', 'ETF SXRS', 'ETF Plata'].map(
-  (accountName) => ({ accountName, brokerName: 'Trade Republic' }),
-)
+const DEFAULT_MERGES: AccountMerge[] = [
+  'ETF XDWH',
+  'ETF IQQI',
+  'ETF AGED',
+  'ETF SXRS',
+  'ETF Plata',
+].map((accountName) => ({ accountName, brokerName: 'Trade Republic' }))
 
 const EMPTY_PLAN: AccountMergePlan = {
   brokers: [],
@@ -108,7 +112,9 @@ export async function runMergeAccountsCli(argv: string[]): Promise<{
     formatPlan: formatAccountMergePlan,
     assertExecutable: (plan) => {
       if (plan.blockers.length > 0) {
-        throw new Error(`El plan no se puede ejecutar:\n${plan.blockers.map((item) => `  - ${item}`).join('\n')}`)
+        throw new Error(
+          `El plan no se puede ejecutar:\n${plan.blockers.map((item) => `  - ${item}`).join('\n')}`,
+        )
       }
     },
     apply: (db, userId, plan) => applyAccountMergePlan(db, userId, plan, options),

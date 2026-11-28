@@ -63,7 +63,9 @@ describe('fusión de las cuentas-ETF en instrumentos de Trade Republic', () => {
         openingBalanceMinor: { from: 0, to: 50000 },
       },
     ])
-    expect(plan.accounts.map((account) => [account.name, account.instruments.map((i) => i.symbol)])).toEqual([
+    expect(
+      plan.accounts.map((account) => [account.name, account.instruments.map((i) => i.symbol)]),
+    ).toEqual([
       ['ETF XDWH', ['XDWH']],
       ['ETF IQQI', ['IQQI']],
       ['ETF AGED', ['AGED']],
@@ -109,7 +111,9 @@ describe('fusión de las cuentas-ETF en instrumentos de Trade Republic', () => {
       brokerName: 'Trade Republic',
       instrument: { from: null, to: { id: 'inst-xdwh', symbol: 'XDWH' } },
     })
-    expect(plan.movements.find((movement) => movement.transactionId === 'xdwh-1')?.instrument).toBeUndefined()
+    expect(
+      plan.movements.find((movement) => movement.transactionId === 'xdwh-1')?.instrument,
+    ).toBeUndefined()
     expect(formatAccountMergePlan(plan)).toContain('ETF XDWH')
   })
 
@@ -145,7 +149,9 @@ describe('fusión de las cuentas-ETF en instrumentos de Trade Republic', () => {
     expect(report).toMatchObject({ accountsArchived: 5, closesMerged: 3, movementsReassigned: 7 })
     const state = await loadState(testDb)
     const broker = state.investmentAssets.find((asset) => asset.name === 'Trade Republic')!
-    const positions = buildAccountPositions(state, 3).filter((position) => position.accountId === broker.id)
+    const positions = buildAccountPositions(state, 3).filter(
+      (position) => position.accountId === broker.id,
+    )
     expect(positions.map((position) => position.symbol).sort()).toEqual([
       'AGED',
       'IQQI',
@@ -156,7 +162,9 @@ describe('fusión de las cuentas-ETF en instrumentos de Trade Republic', () => {
     expect(positions.find((position) => position.symbol === 'XDWH')?.units).toBe(15)
     // Las cuentas originales siguen ahí, archivadas, y no valen nada.
     const archived = testDb.sqlite
-      .prepare(`SELECT name, is_archived AS archived, opening_balance_minor AS opening FROM accounts WHERE name LIKE 'ETF %' ORDER BY name`)
+      .prepare(
+        `SELECT name, is_archived AS archived, opening_balance_minor AS opening FROM accounts WHERE name LIKE 'ETF %' ORDER BY name`,
+      )
       .all()
     expect(archived).toHaveLength(5)
     expect(archived.every((row) => (row as { archived: number }).archived === 1)).toBe(true)
@@ -226,14 +234,20 @@ describe('fusión de las cuentas-ETF en instrumentos de Trade Republic', () => {
         .get(),
     ).toEqual(before)
     expect(
-      testDb.sqlite.prepare(`SELECT alias FROM user_instruments WHERE id = 'user-inst-acciones'`).get(),
+      testDb.sqlite
+        .prepare(`SELECT alias FROM user_instruments WHERE id = 'user-inst-acciones'`)
+        .get(),
     ).toEqual({ alias: 'acc-acciones' })
     expect(
-      testDb.sqlite.prepare(`SELECT is_archived AS archived FROM accounts WHERE id = 'acc-acciones'`).get(),
+      testDb.sqlite
+        .prepare(`SELECT is_archived AS archived FROM accounts WHERE id = 'acc-acciones'`)
+        .get(),
     ).toEqual({ archived: 0 })
     expect(
       testDb.sqlite
-        .prepare(`SELECT b.balance_minor AS balance FROM snapshot_balances b JOIN wealth_snapshots s ON s.id = b.snapshot_id WHERE b.account_id = 'acc-acciones' ORDER BY s.month`)
+        .prepare(
+          `SELECT b.balance_minor AS balance FROM snapshot_balances b JOIN wealth_snapshots s ON s.id = b.snapshot_id WHERE b.account_id = 'acc-acciones' ORDER BY s.month`,
+        )
         .all(),
     ).toEqual([{ balance: 70000 }, { balance: 72000 }, { balance: 73000 }])
   })
@@ -243,25 +257,47 @@ describe('fusión de las cuentas-ETF en instrumentos de Trade Republic', () => {
     await applyAccountMergePlan(testDb.db, USER, plan, options)
 
     const changes = testDb.sqlite
-      .prepare(`SELECT entity_type AS entityType, entity_id AS entityId, payload FROM sync_changes WHERE user_id = ? ORDER BY revision`)
+      .prepare(
+        `SELECT entity_type AS entityType, entity_id AS entityId, payload FROM sync_changes WHERE user_id = ? ORDER BY revision`,
+      )
       .all(USER) as { entityType: string; entityId: string; payload: string }[]
-    const ids = (type: string) => changes.filter((change) => change.entityType === type).map((change) => change.entityId).sort()
+    const ids = (type: string) =>
+      changes
+        .filter((change) => change.entityType === type)
+        .map((change) => change.entityId)
+        .sort()
 
-    expect(ids('transaction')).toEqual(plan.movements.map((movement) => movement.transactionId).sort())
-    expect(ids('userInstrument')).toEqual(
-      ['user-inst-aged', 'user-inst-iqqi', 'user-inst-plata', 'user-inst-sxrs', 'user-inst-xdwh'],
+    expect(ids('transaction')).toEqual(
+      plan.movements.map((movement) => movement.transactionId).sort(),
     )
+    expect(ids('userInstrument')).toEqual([
+      'user-inst-aged',
+      'user-inst-iqqi',
+      'user-inst-plata',
+      'user-inst-sxrs',
+      'user-inst-xdwh',
+    ])
     expect(ids('wealthSnapshot')).toEqual(['snap-feb', 'snap-jan', 'snap-mar'])
     expect(ids('contribution')).toEqual(['contrib-1'])
     // Las cinco archivadas y Trade Republic, creada.
     expect(ids('account')).toHaveLength(6)
-    const broker = testDb.sqlite.prepare(`SELECT id FROM accounts WHERE name = 'Trade Republic'`).get() as { id: string }
+    const broker = testDb.sqlite
+      .prepare(`SELECT id FROM accounts WHERE name = 'Trade Republic'`)
+      .get() as { id: string }
     const march = JSON.parse(changes.find((change) => change.entityId === 'snap-mar')!.payload)
-    expect(march.balances).toContainEqual(expect.objectContaining({ accountId: broker.id, balance: 3150 }))
-    expect(march.balances.some((balance: { accountId: string }) => balance.accountId === 'acc-xdwh')).toBe(false)
-    const instrument = JSON.parse(changes.find((change) => change.entityId === 'user-inst-xdwh')!.payload)
+    expect(march.balances).toContainEqual(
+      expect.objectContaining({ accountId: broker.id, balance: 3150 }),
+    )
+    expect(
+      march.balances.some((balance: { accountId: string }) => balance.accountId === 'acc-xdwh'),
+    ).toBe(false)
+    const instrument = JSON.parse(
+      changes.find((change) => change.entityId === 'user-inst-xdwh')!.payload,
+    )
     expect(instrument.alias).toBe(broker.id)
-    const revision = testDb.sqlite.prepare(`SELECT revision FROM user_revisions WHERE user_id = ?`).get(USER) as { revision: number }
+    const revision = testDb.sqlite
+      .prepare(`SELECT revision FROM user_revisions WHERE user_id = ?`)
+      .get(USER) as { revision: number }
     expect(revision.revision).toBe(changes.length)
   })
 
@@ -275,14 +311,20 @@ describe('fusión de las cuentas-ETF en instrumentos de Trade Republic', () => {
 
     expect(
       testDb.sqlite
-        .prepare(`SELECT s.month AS month, b.balance_minor AS balance FROM snapshot_balances b JOIN wealth_snapshots s ON s.id = b.snapshot_id WHERE b.account_id = 'acc-trade-republic' ORDER BY s.month`)
+        .prepare(
+          `SELECT s.month AS month, b.balance_minor AS balance FROM snapshot_balances b JOIN wealth_snapshots s ON s.id = b.snapshot_id WHERE b.account_id = 'acc-trade-republic' ORDER BY s.month`,
+        )
         .all(),
     ).toEqual([
       { month: 1, balance: 230000 },
       { month: 2, balance: 261000 },
       { month: 3, balance: 330000 },
     ])
-    expect(testDb.sqlite.prepare(`SELECT COUNT(*) AS n FROM accounts WHERE name = 'Trade Republic'`).get()).toEqual({ n: 1 })
+    expect(
+      testDb.sqlite
+        .prepare(`SELECT COUNT(*) AS n FROM accounts WHERE name = 'Trade Republic'`)
+        .get(),
+    ).toEqual({ n: 1 })
   })
 
   it('aborta y no escribe nada si la fusión cambiara el patrimonio o el capital aportado', async () => {
@@ -293,17 +335,23 @@ describe('fusión de las cuentas-ETF en instrumentos de Trade Republic', () => {
     )
     const before = tablesSnapshot(testDb)
 
-    await expect(applyAccountMergePlan(testDb.db, USER, plan, options)).rejects.toThrow(/no se ha escrito nada/)
+    await expect(applyAccountMergePlan(testDb.db, USER, plan, options)).rejects.toThrow(
+      /no se ha escrito nada/,
+    )
 
     expect(tablesSnapshot(testDb)).toEqual(before)
   })
 
   it('rechaza un plan cuyos datos cambiaron desde que se calculó, sin escribir nada', async () => {
     const plan = await buildAccountMergePlan(testDb.db, USER, options)
-    testDb.sqlite.prepare(`UPDATE snapshot_balances SET balance_minor = 99999 WHERE id = 'snap-jan-acc-xdwh'`).run()
+    testDb.sqlite
+      .prepare(`UPDATE snapshot_balances SET balance_minor = 99999 WHERE id = 'snap-jan-acc-xdwh'`)
+      .run()
     const before = tablesSnapshot(testDb)
 
-    await expect(applyAccountMergePlan(testDb.db, USER, plan, options)).rejects.toThrow(/vuelve a simularlo/)
+    await expect(applyAccountMergePlan(testDb.db, USER, plan, options)).rejects.toThrow(
+      /vuelve a simularlo/,
+    )
 
     expect(tablesSnapshot(testDb)).toEqual(before)
   })
@@ -321,7 +369,9 @@ describe('fusión de las cuentas-ETF en instrumentos de Trade Republic', () => {
 
   it('falla en el plan si la cuenta heredada no existe en vez de saltársela', async () => {
     await expect(
-      buildAccountMergePlan(testDb.db, USER, { merges: [{ accountName: 'ETF Inexistente', brokerName: 'Trade Republic' }] }),
+      buildAccountMergePlan(testDb.db, USER, {
+        merges: [{ accountName: 'ETF Inexistente', brokerName: 'Trade Republic' }],
+      }),
     ).rejects.toThrow(/ETF Inexistente/)
   })
 })

@@ -63,7 +63,9 @@ export async function runRepairCli<Plan, Report>(
   const requestedUserId = values['user-id']?.trim()
   const requestedEmail = values.email?.trim()
   if (!requestedUserId && !requestedEmail) {
-    throw new Error('Pasa --email=<email> o --user-id=<id> explícitamente para seleccionar el usuario.')
+    throw new Error(
+      'Pasa --email=<email> o --user-id=<id> explícitamente para seleccionar el usuario.',
+    )
   }
 
   // `openLocalV2Db` crea una base vacía si la ruta no existe: aquí sería un error de ruta.

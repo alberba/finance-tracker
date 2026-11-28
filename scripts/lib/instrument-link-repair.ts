@@ -94,7 +94,10 @@ async function investmentMovements(db: Db, userId: string) {
     .orderBy(asc(transactions.date), asc(transactions.id))
 }
 
-async function instrumentsById(db: Db, ids: readonly string[]): Promise<Map<string, InstrumentRef>> {
+async function instrumentsById(
+  db: Db,
+  ids: readonly string[],
+): Promise<Map<string, InstrumentRef>> {
   const found = new Map<string, InstrumentRef>()
   for (const chunk of chunkIds([...new Set(ids)])) {
     const rows = await db
@@ -161,7 +164,10 @@ export async function buildInstrumentLinkRepairPlan(
     investmentMovements(db, userId),
     userInstrumentsBySymbol(db, userId),
     resolveMoveTargets(db, userId, options.accountMoves),
-    db.select({ id: accounts.id, name: accounts.name }).from(accounts).where(eq(accounts.userId, userId)),
+    db
+      .select({ id: accounts.id, name: accounts.name })
+      .from(accounts)
+      .where(eq(accounts.userId, userId)),
   ])
   const linked = await instrumentsById(
     db,
@@ -186,7 +192,8 @@ export async function buildInstrumentLinkRepairPlan(
       const matches = candidates.get(symbol) ?? []
       if (matches.length === 1) {
         repair.instrument = {
-          from: current ?? (movement.instrumentId ? { id: movement.instrumentId, symbol: '' } : null),
+          from:
+            current ?? (movement.instrumentId ? { id: movement.instrumentId, symbol: '' } : null),
           to: { id: matches[0].id, symbol: matches[0].symbol },
         }
       } else {
@@ -219,12 +226,15 @@ const SKIP_LABEL: Record<SkipReason, string> = {
 
 /** El plan como texto para revisarlo antes de ejecutar. */
 export function formatInstrumentLinkRepairPlan(plan: InstrumentLinkRepairPlan): string {
-  const label = (ref: InstrumentRef | null) => (ref ? `${ref.symbol || '?'} (${ref.id})` : 'sin instrumento')
+  const label = (ref: InstrumentRef | null) =>
+    ref ? `${ref.symbol || '?'} (${ref.id})` : 'sin instrumento'
   const lines = [`Movimientos a reparar: ${plan.movements.length}`]
   for (const movement of plan.movements) {
     lines.push(`  ${movement.transactionId} · ${movement.date} · ${movement.symbol}`)
     if (movement.instrument) {
-      lines.push(`    instrumento: ${label(movement.instrument.from)} → ${label(movement.instrument.to)}`)
+      lines.push(
+        `    instrumento: ${label(movement.instrument.from)} → ${label(movement.instrument.to)}`,
+      )
     }
     if (movement.account) {
       lines.push(
@@ -265,7 +275,10 @@ export async function applyInstrumentLinkRepairPlan(
           instrumentId: investmentTradeDetails.instrumentId,
         })
         .from(transactions)
-        .innerJoin(investmentTradeDetails, eq(investmentTradeDetails.transactionId, transactions.id))
+        .innerJoin(
+          investmentTradeDetails,
+          eq(investmentTradeDetails.transactionId, transactions.id),
+        )
         .where(and(eq(transactions.userId, userId), eq(transactions.id, movement.transactionId)))
       const stale =
         !row ||
@@ -300,7 +313,10 @@ export async function applyInstrumentLinkRepairPlan(
         .where(and(eq(transactions.userId, userId), eq(transactions.id, movement.transactionId)))
       if (movement.account) accountsMoved++
 
-      const updated = await runWithDb(db, transactionsRepository.get(userId, movement.transactionId))
+      const updated = await runWithDb(
+        db,
+        transactionsRepository.get(userId, movement.transactionId),
+      )
       const tradeDetail = await runWithDb(
         db,
         transactionsRepository.getTradeDetailByTransaction(userId, movement.transactionId),
