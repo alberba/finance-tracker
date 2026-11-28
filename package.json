@@ -9,6 +9,7 @@
     "d1:migrate:local:v2": "wrangler d1 migrations apply finance-tracker-db-v2 --local --persist-to .wrangler/state",
     "db:repair": "tsx scripts/repair-corrupted-data.ts",
     "db:repair-links": "tsx scripts/repair-instrument-links.ts",
+    "db:merge-accounts": "tsx scripts/merge-accounts-into-instruments.ts",
     "reports:backfill": "tsx scripts/reports-backfill.ts",
     "setup:worktree": "bash scripts/setup-worktree.sh",
     "dev": "astro dev",
