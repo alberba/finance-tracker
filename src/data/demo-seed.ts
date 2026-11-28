@@ -169,6 +169,7 @@ export function buildDemoSeed(now: Date = new Date()): State {
     })
 
     if (slot % 2 === 0) {
+      const btcPrice = round2(56000 + slot * 450)
       pushTx({
         date: iso(year, month, 15),
         month,
@@ -180,6 +181,28 @@ export function buildDemoSeed(now: Date = new Date()): State {
         symbol: 'BTC',
         instrumentId: 'btc',
         side: 'buy',
+        unitPrice: btcPrice,
+        units: Math.round((50 / btcPrice) * 1e8) / 1e8,
+        declared: true,
+      })
+    }
+
+    // Criptomonedas holds two instruments: ETH is bought on the other months.
+    if (slot % 2 === 1) {
+      const ethPrice = round2(2700 + slot * 40)
+      pushTx({
+        date: iso(year, month, 16),
+        month,
+        type: 'investment',
+        accountId: 'cuenta-corriente',
+        category: 'Criptomonedas',
+        description: 'Compra periódica ETH',
+        amount: 30,
+        symbol: 'ETH',
+        instrumentId: 'eth',
+        side: 'buy',
+        unitPrice: ethPrice,
+        units: Math.round((30 / ethPrice) * 1e8) / 1e8,
         declared: true,
       })
     }
@@ -373,6 +396,16 @@ export function buildDemoSeed(now: Date = new Date()): State {
         active: true,
         openingUnits: 0.026,
       },
+      {
+        id: 'eth',
+        investmentAssetId: 'criptomonedas',
+        type: 'crypto',
+        symbol: 'ETH',
+        market: '',
+        currency: 'EUR',
+        provider: 'coingecko',
+        active: true,
+      },
     ],
     quotes: {
       'fondo-msci-world': {
@@ -400,6 +433,19 @@ export function buildDemoSeed(now: Date = new Date()): State {
         isStale: true,
         previousClose: 60480,
         changePercent: 1.27,
+      },
+      eth: {
+        instrumentId: 'eth',
+        price: 3180,
+        currency: 'EUR',
+        timestamp: generatedAt,
+        fetchedAt: generatedAt,
+        dataType: 'unknown',
+        source: 'demo',
+        status: 'stale',
+        isStale: true,
+        previousClose: 3141,
+        changePercent: 1.24,
       },
     },
     recurringRules: [

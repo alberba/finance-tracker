@@ -1,7 +1,8 @@
 import type { InvestmentEntryPreset } from '../../../composables/useEntrySheet'
+import type { AccountPosition } from '../../../domain/investment/positions'
 import type {
+  InvestmentAccount,
   InvestmentDashboardViewModel,
-  InvestmentPosition,
 } from '../../../domain/investment/view-model'
 import { matchesInvestmentAsset } from '../../../lib/finance-core'
 import {
@@ -112,11 +113,35 @@ export interface AssetYear {
   rows: AssetMovementRow[]
 }
 
+/** One position of the account: an instrument and what is held of it. */
+export interface PositionLine {
+  instrumentId: string
+  symbol: string
+  /** «2», units held. */
+  units: string
+  /** The average buy price, or «—» without buys. */
+  averagePrice: string
+  value: string
+  invested: string
+  /** «+160,00 €». */
+  gain: string
+  /** «+4,0 %». */
+  ret: string
+  tone: Tone
+  weight: string
+  /** Share of the account's positions, 0–100, for the weight bar. */
+  weightPct: number
+  /** The value is an estimate: the instrument has no quote. */
+  estimated: boolean
+}
+
 export interface AssetDetail {
   id: string
-  /** The ticker, or the name when the asset has none. */
-  symbol: string
   name: string
+  /** What the account holds, by value. */
+  positions: PositionLine[]
+  /** Some position has no quote: its value is its share of the account's. */
+  unpricedNote: string | null
   figures: AssetFigure[]
   chart: AssetChart | null
   facts: AssetFact[]
@@ -149,10 +174,6 @@ const COMPACT: ChartFrame = {
 }
 const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
 
-/** Units held, or null when the asset has no units. */
-const heldUnits = (position: InvestmentPosition): number | null =>
-  position.units !== null && position.units > 0 ? position.units : null
-
 const round1 = (value: number) => Math.round(value * 10) / 10
 const round2 = (value: number) => Math.round(value * 100) / 100
 const share = (value: number, total: number) => Math.round((value / total) * 10000) / 100
@@ -162,7 +183,7 @@ function isOperation(tx: Transaction): boolean {
 }
 
 /** The asset's movements, newest first. */
-function assetMovements(state: State, position: InvestmentPosition): Transaction[] {
+function assetMovements(state: State, position: InvestmentAccount): Transaction[] {
   const asset = state.investmentAssets.find((candidate) => candidate.id === position.id)
   if (!asset) return []
   return state.transactions
@@ -262,7 +283,8 @@ function tickLabels(first: number, last: number): Array<{ time: number; text: st
  * shown yet (#524). Null without two operations on different days.
  */
 export function assetChart(
-  position: InvestmentPosition,
+  account: Pick<InvestmentAccount, 'name'>,
+  average: number | null,
   movements: readonly Transaction[],
   frame: ChartFrame = WIDE,
 ): AssetChart | null {
@@ -275,7 +297,6 @@ export function assetChart(
   const last = operations.at(-1)!
   const end = last.time
   if (end <= operations[0].time) return null
-  const average = position.averagePrice
 
   const sequence = operations
   const prices = sequence.map((point) => point.price)
@@ -338,14 +359,13 @@ export function assetChart(
       text,
     })),
     points,
-    label: `Precio de ${position.name} (${history}): ${formatMoney(round2(operations[0].price))} en la primera operación y ${formatMoney(round2(last.price))} en la última, con ${operations.length} ${operations.length === 1 ? 'operación marcada' : 'operaciones marcadas'}.`,
+    label: `Precio de ${account.name} (${history}): ${formatMoney(round2(operations[0].price))} en la primera operación y ${formatMoney(round2(last.price))} en la última, con ${operations.length} ${operations.length === 1 ? 'operación marcada' : 'operaciones marcadas'}.`,
   }
 }
 
-function assetFacts(position: InvestmentPosition, movements: readonly Transaction[]): AssetFact[] {
+function assetFacts(average: number | null, movements: readonly Transaction[]): AssetFact[] {
   const operations = movements.filter(isOperation)
   const buys = operations.filter((tx) => tx.side !== 'sell')
-  const average = position.averagePrice
   const fees = movements.reduce((sum, tx) => sum + (Number(tx.fee) || 0), 0)
   const facts: AssetFact[] = []
   const fact = (label: string, value: string, note = '', tone: Tone = 'neutral') =>
@@ -358,20 +378,37 @@ function assetFacts(position: InvestmentPosition, movements: readonly Transactio
   return facts
 }
 
-function unitsHeld(position: InvestmentPosition): AssetDetail['units'] {
-  const units = heldUnits(position)
-  return units === null
-    ? null
-    : { count: formatDecimal(units), word: units === 1 ? 'título' : 'títulos' }
+/** The units of an account that holds one instrument; with several there is no single count. */
+function unitsHeld(single: AccountPosition | null): AssetDetail['units'] {
+  return single
+    ? { count: formatDecimal(single.units), word: single.units === 1 ? 'título' : 'títulos' }
+    : null
 }
 
-function assetPosition(position: InvestmentPosition): AssetPosition {
+function positionLine(position: AccountPosition): PositionLine {
+  return {
+    instrumentId: position.instrumentId,
+    symbol: position.symbol,
+    units: formatDecimal(position.units),
+    averagePrice: position.averagePrice === null ? '—' : formatMoney(position.averagePrice),
+    value: formatMoney(position.value),
+    invested: formatMoney(position.invested),
+    gain: formatSignedMoney(position.gain),
+    ret: position.invested > 0 ? signedPct(position.returnPct) : '',
+    tone: toneOf(position.gain),
+    weight: formatPercent(position.weight, { digits: 1 }),
+    weightPct: position.weight,
+    estimated: !position.priced,
+  }
+}
+
+function assetPosition(position: InvestmentAccount, average: number | null): AssetPosition {
   const weight = formatPercent(position.weight, { digits: 1 })
   const rows: AssetFact[] = []
-  if (position.averagePrice !== null) {
+  if (average !== null) {
     rows.push({
       label: 'Precio medio',
-      value: formatMoney(position.averagePrice),
+      value: formatMoney(average),
       note: '',
       tone: 'neutral',
     })
@@ -406,16 +443,22 @@ export function assetDetail(
   positionId: string,
   { compact = false }: { compact?: boolean } = {},
 ): AssetDetail | null {
-  const position = vm.positions.find((candidate) => candidate.id === positionId)
+  const position = vm.accounts.find((candidate) => candidate.id === positionId)
   if (!position) return null
+  const positions = vm.positions.filter((held) => held.accountId === position.id)
+  const single = positions.length === 1 ? positions[0] : null
+  const average = single?.averagePrice ?? null
   const movements = assetMovements(state, position)
   const operationCount = movements.length
   const last = movements.find(isOperation) ?? movements[0]
 
   return {
     id: position.id,
-    symbol: position.symbol ?? position.name,
     name: position.name,
+    positions: positions.map(positionLine),
+    unpricedNote: positions.some((held) => !held.priced)
+      ? 'Sin cotización: el valor es la parte que le toca del valor de la cuenta.'
+      : null,
     figures: [
       { key: 'value', label: 'Vale hoy', value: formatMoney(position.value), tone: 'neutral' },
       {
@@ -438,13 +481,13 @@ export function assetDetail(
         tone: 'neutral',
       },
     ],
-    chart: assetChart(position, movements, compact ? COMPACT : WIDE),
-    facts: assetFacts(position, movements),
-    units: unitsHeld(position),
-    position: assetPosition(position),
+    chart: assetChart(position, average, movements, compact ? COMPACT : WIDE),
+    facts: assetFacts(average, movements),
+    units: unitsHeld(single),
+    position: assetPosition(position, average),
     count: `${operationCount} ${operationCount === 1 ? 'operación' : 'operaciones'}`,
     entry: {
-      symbol: last?.symbol ?? position.symbol ?? '',
+      symbol: last?.symbol ?? single?.symbol ?? '',
       category: last?.category ?? position.name,
       accountId: last?.accountId,
       currency: last?.movementCurrency,

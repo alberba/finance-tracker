@@ -119,9 +119,8 @@ function buildInstrumentValuation(
 ): InstrumentValuation {
   const quote = state.quotes[instrument.id] || null
   const units = calculateInstrumentUnits(instrument, state.transactions)
-  const quoteCurrency = quote?.currency || instrument.currency || baseCurrency
-  const exchangeRate = getExchangeRate(quoteCurrency, baseCurrency, fxRates)
-  const value = quote && quote.status !== 'unavailable' ? round2(units * quote.price * exchangeRate) : 0
+  const unitPrice = quoteUnitPrice(quote, instrument, baseCurrency, fxRates)
+  const value = unitPrice === null ? 0 : round2(units * unitPrice)
   const staleByAge = quote ? isQuoteStale(quote, now, maxAgeMinutes) : true
   const status = !quote || quote.status === 'unavailable'
     ? 'unavailable'
@@ -138,6 +137,18 @@ function buildInstrumentValuation(
     isStale: status !== 'fresh',
     status,
   }
+}
+
+/** What one unit of an instrument is worth in the base currency; null without a usable quote. */
+export function quoteUnitPrice(
+  quote: Quote | null | undefined,
+  instrument: Pick<Instrument, 'currency'>,
+  baseCurrency: string,
+  fxRates: Record<string, number> = {},
+): number | null {
+  if (!quote || quote.status === 'unavailable') return null
+  const quoteCurrency = quote.currency || instrument.currency || baseCurrency
+  return quote.price * getExchangeRate(quoteCurrency, baseCurrency, fxRates)
 }
 
 export function isQuoteStale(quote: Quote, now = new Date(), maxAgeMinutes = 15): boolean {

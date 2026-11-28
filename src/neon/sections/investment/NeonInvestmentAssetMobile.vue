@@ -5,6 +5,7 @@ import NeonBarDetail from '../../ui/NeonBarDetail.vue'
 import { OPERATION_ICONS } from './asset-icons'
 import { assetHref } from './asset-route'
 import { type AssetDetail } from './asset-view-model'
+import NeonInvestmentAssetPositions from './NeonInvestmentAssetPositions.vue'
 import NeonInvestmentAssetChart from './NeonInvestmentAssetChart.vue'
 import NeonInvestmentAssetYears from './NeonInvestmentAssetYears.vue'
 import NeonInvestmentQuote from './NeonInvestmentQuote.vue'
@@ -34,12 +35,15 @@ const emit = defineEmits<{
 
 const RING = 2 * Math.PI * 45
 
-// With a linked symbol the chart on top is its quote; without one, the price
-// of each operation against the average buy price.
+// An account that holds one instrument charts its quote; with several or none,
+// the price of each operation against the average buy price.
 const marketStore = useMarketStore()
-const instrument = computed(() =>
-  marketStore.instruments.find((item) => item.investmentAssetId === props.detail.id && item.active),
-)
+const instrument = computed(() => {
+  const [only, ...others] = props.detail.positions
+  return only && !others.length
+    ? marketStore.instruments.find((item) => item.id === only.instrumentId)
+    : undefined
+})
 
 // The chart rests on today's point; a finger on it (or the arrow keys) reads another.
 const hot = ref<number | null>(null)
@@ -71,9 +75,9 @@ const PRESS =
 
 <template>
   <NeonBarDetail
-    :label="detail.symbol"
+    :label="detail.name"
     :back-href="movements ? assetHref(detail.id) : '/inversion'"
-    :back-label="movements ? detail.symbol : 'Inversión'"
+    :back-label="movements ? detail.name : 'Inversión'"
     title-id="investment-title"
     @back="onBack"
   />
@@ -145,6 +149,13 @@ const PRESS =
         </svg>
       </button>
     </div>
+
+    <NeonInvestmentAssetPositions
+      v-if="detail.positions.length"
+      :positions="detail.positions"
+      :note="detail.unpricedNote"
+      stacked
+    />
 
     <section class="grid min-w-0 gap-3" aria-labelledby="asset-position-title">
       <h2 id="asset-position-title" class="text-block-title m-0 font-extrabold">Tu posición</h2>

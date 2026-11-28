@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-
 import NeonChoiceMenu, { type ChoiceGroup } from '../../ui/NeonChoiceMenu.vue'
 import {
   DIRECTION_OPTIONS,
@@ -8,18 +6,19 @@ import {
   SPARK_HEIGHT,
   SPARK_WIDTH,
   sortLabel,
-  type PositionRow,
+  type AccountRow,
   type SortDirection,
   type SortKey,
   type Tone,
   TONE_TEXT,
 } from './view-model'
 
-// The positions of the cover, one ledger row each: ticker and name, units and
-// price, weight, value, result, and how it did in the period. The whole row
-// opens the position; the name is the button keyboards and screen readers use.
+// The investment accounts of the cover, one ledger row each: name, how many
+// positions it holds, weight, value, result, and how it did in the period. An
+// account carries no symbol (ADR 0011). The whole row opens the account; the
+// name is the button keyboards and screen readers use.
 const props = defineProps<{
-  rows: readonly PositionRow[]
+  rows: readonly AccountRow[]
   sortKey: SortKey
   sortDirection: SortDirection
   /** The cover is coming in: the rows follow its blocks (see the section). */
@@ -60,10 +59,6 @@ function sortGroups(): ChoiceGroup<SortKey | SortDirection>[] {
   ]
 }
 
-// The ticker column only exists when some asset has a ticker; a row without
-// one keeps its place so the names stay aligned.
-const hasTickers = computed(() => props.rows.some((row) => row.symbol))
-
 const isDirection = (value: SortKey | SortDirection): value is SortDirection =>
   value === 'asc' || value === 'desc'
 
@@ -76,14 +71,14 @@ function onSort(_group: string, value: SortKey | SortDirection): void {
 <template>
   <section
     class="flex min-w-0 flex-col"
-    aria-labelledby="investment-positions-title"
-    data-investment-positions
+    aria-labelledby="investment-accounts-title"
+    data-investment-accounts
   >
     <div
       class="motion-safe:animate-rise relative z-10 mbe-3 flex flex-wrap items-center justify-between gap-3 motion-safe:[animation-delay:200ms]"
     >
-      <h2 id="investment-positions-title" class="font-display text-figure-block font-bold">
-        Posiciones
+      <h2 id="investment-accounts-title" class="font-display text-figure-block font-bold">
+        Cuentas
       </h2>
       <NeonChoiceMenu
         :text="sortLabel(sortKey, sortDirection)"
@@ -98,8 +93,8 @@ function onSort(_group: string, value: SortKey | SortDirection): void {
       :class="COLUMNS"
       aria-hidden="true"
     >
-      <span>Activo</span>
-      <span class="text-end">Títulos</span>
+      <span>Cuenta</span>
+      <span class="text-end">Posiciones</span>
       <span>Peso</span>
       <span class="text-end">Valor</span>
       <span class="text-end">Resultado</span>
@@ -112,7 +107,7 @@ function onSort(_group: string, value: SortKey | SortDirection): void {
         class="border-line pointer-fine:hover:bg-panel grid cursor-pointer items-center border-t py-4 motion-safe:transition-colors motion-safe:duration-160"
         :class="[COLUMNS, entering && 'motion-safe:animate-row']"
         :style="rowIn(index)"
-        :data-investment-position="row.id"
+        :data-investment-account="row.id"
         @click="emit('open', row.id)"
       >
         <button
@@ -121,22 +116,12 @@ function onSort(_group: string, value: SortKey | SortDirection): void {
           :aria-label="row.openLabel"
           @click.stop="emit('open', row.id)"
         >
-          <span
-            v-if="hasTickers"
-            class="bg-panel2 text-meta w-16 max-w-[40%] flex-none truncate rounded-[8px] px-2 py-0.5 text-center font-mono font-bold tracking-[0.04em]"
-            :class="row.symbol ? '' : 'invisible'"
-          >
-            {{ row.symbol ?? '·' }}
-          </span>
           <span class="text-row line-clamp-2 font-bold wrap-anywhere">{{ row.name }}</span>
         </button>
         <span class="min-w-0 text-end wrap-anywhere">
-          <template v-if="row.units">
-            <span class="font-display text-figure-row block font-semibold tabular-nums">
-              {{ row.units }}
-            </span>
-            <span class="text-muted text-meta block tabular-nums">{{ row.price }}</span>
-          </template>
+          <span v-if="row.holdings" class="text-soft text-note font-bold tabular-nums">
+            {{ row.holdings }}
+          </span>
           <span v-else class="text-muted">—</span>
         </span>
         <span class="flex min-w-0 items-center gap-2">

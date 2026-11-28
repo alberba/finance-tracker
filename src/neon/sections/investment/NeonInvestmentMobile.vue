@@ -13,7 +13,7 @@ import {
   type Card,
   type CompactChart,
   type LeadFigure,
-  type PositionRow,
+  type AccountRow,
   type QuoteNotice,
   TONE_TEXT,
   type Tone,
@@ -40,7 +40,7 @@ const props = defineProps<{
   method: ReturnMode
   /** Today's return under each method, for the method menu. */
   returns: Record<ReturnMode, { text: string; tone: Tone }>
-  rows: readonly PositionRow[]
+  rows: readonly AccountRow[]
   cards: readonly Card[]
   /** The cover is coming in: the rows follow the sheet (see the section). */
   entering: boolean
@@ -285,8 +285,8 @@ const BLEED = '-mx-[clamp(16px,2.6vw,40px)]'
     <section
       class="bg-panel rounded-t-sheet motion-safe:animate-rise flex min-h-0 flex-1 flex-col px-4 pbe-3.5 motion-safe:[animation-delay:100ms]"
       :class="BLEED"
-      aria-labelledby="investment-positions-title"
-      data-investment-positions
+      aria-labelledby="investment-accounts-title"
+      data-investment-accounts
     >
       <!-- The whole head drags the sheet; the grip is its button. -->
       <div
@@ -301,17 +301,13 @@ const BLEED = '-mx-[clamp(16px,2.6vw,40px)]'
           type="button"
           class="outline-accent grid min-h-11 w-full place-items-center rounded-full focus-visible:outline-2 focus-visible:-outline-offset-2"
           :aria-expanded="expanded"
-          :aria-label="
-            expanded ? 'Reducir la lista de posiciones' : 'Ampliar la lista de posiciones'
-          "
+          :aria-label="expanded ? 'Reducir la lista de cuentas' : 'Ampliar la lista de cuentas'"
           data-sheet-grip
           @click="onGripClick"
         >
           <span class="bg-ctrl-line rounded-pill block h-1 w-9" aria-hidden="true"></span>
         </button>
-        <h2 id="investment-positions-title" class="text-block-title m-0 font-extrabold">
-          Posiciones
-        </h2>
+        <h2 id="investment-accounts-title" class="text-block-title m-0 font-extrabold">Cuentas</h2>
       </div>
       <ul
         class="m-0 min-h-0 flex-1 [scrollbar-width:none] list-none overflow-y-auto overscroll-contain p-0"
@@ -327,7 +323,7 @@ const BLEED = '-mx-[clamp(16px,2.6vw,40px)]'
             type="button"
             class="outline-accent grid min-h-16 w-full grid-cols-[minmax(0,1fr)_auto_3.6rem] items-baseline gap-x-2.5 gap-y-1 py-2.5 text-start focus-visible:outline-2 focus-visible:-outline-offset-2 motion-safe:transition-transform motion-safe:duration-160 motion-safe:ease-out motion-safe:active:scale-[0.99]"
             :aria-label="row.openLabel"
-            :data-investment-position="row.id"
+            :data-investment-account="row.id"
             @click="emit('open', row.id)"
           >
             <span class="text-row min-w-0 truncate font-bold">{{ row.name }}</span>
@@ -337,12 +333,7 @@ const BLEED = '-mx-[clamp(16px,2.6vw,40px)]'
               {{ row.value }}
             </span>
             <span class="text-meta flex min-w-0 items-center gap-2">
-              <span
-                v-if="row.symbol"
-                class="text-muted font-mono text-[12px] font-bold tracking-[0.04em]"
-              >
-                {{ row.symbol }}
-              </span>
+              <span v-if="row.holdings" class="text-muted font-bold">{{ row.holdings }}</span>
               <span class="bg-line rounded-pill h-[3px] w-11 flex-none" aria-hidden="true">
                 <span
                   class="bg-neutral-bar rounded-pill block h-full"
