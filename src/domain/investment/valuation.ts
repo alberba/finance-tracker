@@ -37,7 +37,7 @@ export function calculateInstrumentUnits(
   return round8(
     startingUnits + transactions.reduce((total, transaction) => {
       if (
-        !isTransactionForInstrument(transaction, instrument, transactions) ||
+        !isTransactionForInstrument(transaction, instrument) ||
         !isTransactionAfterHoldingsCutoff(transaction, instrument, hasCurrentSnapshot)
       ) return total
       const units = Number(transaction.units || 0)
@@ -78,14 +78,12 @@ function isTransactionAfterHoldingsCutoff(
 function isTransactionForInstrument(
   transaction: Transaction,
   instrument: Instrument,
-  transactions: Transaction[],
 ): boolean {
   if (transaction.type !== 'investment') return false
-  const hasExplicitLinks = transactions.some(
-    (candidate) => candidate.type === 'investment' && candidate.instrumentId === instrument.id,
-  )
-  if (hasExplicitLinks) return transaction.instrumentId === instrument.id
-  return symbolsMatchInstrument(transaction.symbol, instrument) && !transaction.instrumentId
+  if (transaction.instrumentId) return transaction.instrumentId === instrument.id
+  // A movement without a link still counts when its symbol is the instrument's,
+  // even if other movements of the instrument are linked explicitly.
+  return symbolsMatchInstrument(transaction.symbol, instrument)
 }
 
 export function buildPortfolioValuation(

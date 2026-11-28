@@ -411,6 +411,55 @@ describe('valoración de cartera', () => {
     expect(marketStore.valuation.instruments[0].units).toBe(5)
   })
 
+  it('cuenta los movimientos que solo casan por símbolo aunque el instrumento tenga otros enlazados', () => {
+    const buy = (id: string, units: number, instrumentId?: string) => ({
+      id,
+      date: '2026-01-01',
+      month: 1 as const,
+      type: 'investment' as const,
+      accountId: 'bitvavo',
+      category: 'Crypto',
+      description: 'Compra ETH',
+      amount: units * 2000,
+      symbol: 'ETH',
+      side: 'buy' as const,
+      units,
+      ...(instrumentId ? { instrumentId } : {}),
+    })
+    const valuation = buildPortfolioValuation(
+      {
+        currency: 'EUR',
+        instruments: [
+          {
+            id: 'eth',
+            investmentAssetId: 'crypto',
+            type: 'crypto',
+            symbol: 'ETH',
+            market: '',
+            currency: 'EUR',
+            provider: 'coingecko',
+            active: true,
+          },
+          {
+            id: 'btc',
+            investmentAssetId: 'crypto',
+            type: 'crypto',
+            symbol: 'BTC',
+            market: '',
+            currency: 'EUR',
+            provider: 'coingecko',
+            active: true,
+          },
+        ],
+        quotes: {},
+        transactions: [buy('enlazada', 1, 'eth'), buy('solo-simbolo', 2), buy('de-btc', 4, 'btc')],
+      },
+      { now: new Date('2026-01-02T00:00:00Z') },
+    )
+
+    expect(valuation.instruments.find((item) => item.instrument.id === 'eth')?.units).toBe(3)
+  })
+
   it('suma títulos, convierte moneda y marca cotizaciones antiguas', () => {
     const valuation = buildPortfolioValuation(
       {
