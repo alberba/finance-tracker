@@ -221,7 +221,7 @@ export function confirmBitvavo(
       return yield* Effect.fail(new RejectedCommandError('Resolución fuera de la vista previa.'))
     }
     const serialized = JSON.stringify(
-      [...resolutions].sort((a, b) => a.externalId.localeCompare(b.externalId)),
+      resolutions.toSorted((a, b) => a.externalId.localeCompare(b.externalId)),
     )
     if (stored.resolutions && stored.resolutions !== serialized) {
       return yield* Effect.fail(new RejectedCommandError('Reanuda con las mismas resoluciones.'))
