@@ -15,7 +15,7 @@ The improvement comes from two measured changes:
 
 ## Benchmark method
 
-The benchmark is implemented in `scripts/benchmark-performance.mjs` and exposed as `pnpm benchmark:performance`.
+The benchmark is implemented in `scripts/benchmark-performance.mjs` and exposed as `bun run benchmark:performance`.
 
 Each result is the median of seven cold Chromium contexts against the production Cloudflare worker build with:
 
@@ -31,15 +31,15 @@ The benchmark captures navigation and paint timing, the first visible dashboard 
 Reproduce it with:
 
 ```sh
-SENTRY_AUTH_TOKEN='' pnpm build
-pnpm exec wrangler dev dist/_worker.js/index.js \
+SENTRY_AUTH_TOKEN='' bun run build
+bunx wrangler dev dist/_worker.js/index.js \
   --assets dist \
   --local \
   --ip 127.0.0.1 \
   --port 4322 \
   --compatibility-flags nodejs_compat
-pnpm benchmark:performance
-pnpm benchmark:pages
+bun run benchmark:performance
+bun run benchmark:pages
 ```
 
 ## Before and after
@@ -82,10 +82,10 @@ The seven deferred section chunks range from 4.70 kB to 49.24 kB raw. The 130.28
 
 ## Verification
 
-- `pnpm check`: 0 errors, warnings, or hints
-- `pnpm lint`: passed
-- `pnpm test:unit`: 95 tests passed, 98.29% statement coverage in the covered finance core
-- `pnpm build`: passed
+- `bun run check`: 0 errors, warnings, or hints
+- `bun run lint`: passed
+- `bun run test:unit`: 95 tests passed, 98.29% statement coverage in the covered finance core
+- `bun run build`: passed
 - Targeted Playwright navigation/dashboard checks: 4 passed
 - Wider section regression sample: 27 passed; 12 failed on existing date-sensitive fixtures, stale totals/DOM contracts, or brittle interaction helpers rather than the new loading boundary
 - Delayed Replay chunk: confirmed to load after startup idle
@@ -98,7 +98,7 @@ The next largest startup cost is the eager dashboard itself, especially charts a
 
 ## Per-page pass (2026-11-17)
 
-This pass targeted every page, not only the dashboard. `pnpm benchmark:pages` was added to
+This pass targeted every page, not only the dashboard. `bun run benchmark:pages` was added to
 measure direct loads (`/movimientos`, `/presupuesto`, `/patrimonio`, `/inversion`,
 `/objetivos`, `/configuracion`, `/datos`, `/login`, `/reportes`) and first navigation to each
 section with the same throttling profile as the dashboard benchmark.

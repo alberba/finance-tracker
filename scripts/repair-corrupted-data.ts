@@ -8,13 +8,13 @@
  *
  * Uso:
  *   # Modo simulación (por defecto, no escribe en la base de datos):
- *   pnpm db:repair --backup=ruta/al/export-2026-08-12.json --email=usuario@example.com
+ *   bun run db:repair --backup=ruta/al/export-2026-08-12.json --email=usuario@example.com
  *
  *   # Modo ejecución (aplica los cambios en la base de datos tras imprimir el plan):
- *   pnpm db:repair --backup=ruta/al/export-2026-08-12.json --email=usuario@example.com --execute
+ *   bun run db:repair --backup=ruta/al/export-2026-08-12.json --email=usuario@example.com --execute
  *
  *   # ...y además deja el SQL para llevarlo a D1 con wrangler:
- *   pnpm db:repair --backup=ruta/al/export-2026-08-12.json --email=usuario@example.com --execute \
+ *   bun run db:repair --backup=ruta/al/export-2026-08-12.json --email=usuario@example.com --execute \
  *     --v2-sqlite=.data/v2-prod.sqlite --remote-sql-out=.data/reparacion-remote.sql
  *
  * Opciones:
@@ -66,7 +66,7 @@ function parseCliArgs(argv: string[]) {
 
 function printHelp(): void {
   console.log(`
-Uso: pnpm db:repair --backup=<ruta> [opciones]
+Uso: bun run db:repair --backup=<ruta> [opciones]
 
 Repara los datos corrompidos en producción (categorías duplicadas, cuentas con
 tipo erróneo, celdas de presupuesto y snapshots sobrescritos).

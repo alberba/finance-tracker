@@ -15,13 +15,13 @@ async function run(extraArgs) {
   const checkout = realpathSync(process.cwd())
   const port = await availablePort(preferredPort(checkout, primaryCheckout(checkout)))
   const devVars = resolve('.dev.vars')
-  if (!existsSync(devVars)) throw new Error('Falta .dev.vars: ejecuta pnpm setup:worktree.')
+  if (!existsSync(devVars)) throw new Error('Falta .dev.vars: ejecuta bun run setup:worktree.')
   // Better Auth valida origen, cookies y passkeys contra esta URL: debe coincidir con el puerto.
   const current = readFileSync(devVars, 'utf8')
   const next = upsertEnvVar(current, 'BETTER_AUTH_URL', `http://localhost:${port}`)
   if (next !== current) writeFileSync(devVars, next)
   console.log(`Servidor de desarrollo en http://localhost:${port}`)
-  const child = spawn('pnpm', ['dev', '--port', String(port), '--strictPort', ...extraArgs], {
+  const child = spawn('bun', ['run', 'dev', '--port', String(port), '--strictPort', ...extraArgs], {
     stdio: 'inherit',
   })
   child.on('exit', (code, signal) => {

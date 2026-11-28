@@ -11,10 +11,10 @@
   store-to-D1 field paths, the shared movement command conversion and the type checklist.
 - UI or `/design`: [DESIGN.md](DESIGN.md) is authoritative (tokens, themes, fonts, responsive,
   mobile). The UI lives in `src/neon/`; shared code (`domain`, `lib`, `stores`…) never imports it
-  (`pnpm lint` enforces it).
+  (`bun run lint` enforces it).
 - Frontend behavior: read [frontend](docs/architecture/frontend.md) for startup, navigation and section entry points.
 - Run, log in locally or deploy: read [self-hosting](docs/operations/self-hosting.md) for
-  `pnpm dev:worktree`/`dev:account` (daily work, own data), Docker, SQLite and production on Oracle; [authentication](docs/operations/authentication.md) for Better Auth.
+  `bun run dev:worktree`/`dev:account` (daily work, own data), Docker, SQLite and production on Oracle; [authentication](docs/operations/authentication.md) for Better Auth.
 - Coding and review: [CODING_STANDARDS.md](CODING_STANDARDS.md) is authoritative, including the
   Standards axis of `/code-review`. Report conflicting narrative docs as drift.
 - Tests (Vitest, Vue, Astro or Playwright): before writing, modifying or deleting one, read
@@ -26,5 +26,5 @@
 
 ## Execution
 
-Use `pnpm`; discover commands in `package.json`.
+Use `bun` (`bun install`, `bun run <script>`, `bunx`); discover commands in `package.json`. Never `bun test`: it is Bun's own runner, not the `test` script.
 During `/implement`, run typecheck and targeted tests often; run the full suite once at the end.

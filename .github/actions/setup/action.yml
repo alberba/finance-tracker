@@ -1,5 +1,5 @@
 name: Setup
-description: pnpm, Node and frozen-lockfile install, with Chromium for Playwright on request
+description: bun, Node and frozen-lockfile install, with Chromium for Playwright on request
 
 inputs:
   playwright:
@@ -11,16 +11,22 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Install pnpm
-      shell: bash
-      run: npm install --global pnpm@10.26.0
+    # bun installs and runs the scripts; Node runs the code.
+    - uses: oven-sh/setup-bun@v2
+      with:
+        bun-version-file: package.json
     - uses: actions/setup-node@v7
       with:
         node-version: 24
-        cache: pnpm
+    - name: Cache bun packages
+      uses: actions/cache@v6
+      with:
+        path: ~/.bun/install/cache
+        key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+        restore-keys: bun-${{ runner.os }}-
     - name: Install dependencies
       shell: bash
-      run: pnpm install --frozen-lockfile
+      run: bun install --frozen-lockfile
     - name: Resolve the Playwright version
       if: ${{ inputs.playwright == 'true' }}
       id: playwright-version
@@ -38,8 +44,8 @@ runs:
     - name: Install Chromium
       if: ${{ inputs.playwright == 'true' && steps.chromium-cache.outputs.cache-hit != 'true' }}
       shell: bash
-      run: pnpm exec playwright install --with-deps chromium
+      run: bunx playwright install --with-deps chromium
     - name: Install Chromium system dependencies
       if: ${{ inputs.playwright == 'true' && steps.chromium-cache.outputs.cache-hit == 'true' }}
       shell: bash
-      run: pnpm exec playwright install-deps chromium
+      run: bunx playwright install-deps chromium

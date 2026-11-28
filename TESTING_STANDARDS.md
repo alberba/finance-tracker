@@ -46,7 +46,7 @@ narrativa.
 9. **Unit:** Node puro, dominio, servicios, stores y utilidades. Sin DOM ni IndexedDB si la regla se
    puede representar sin ellos. Si el caso necesita DOM, va a component. En Astro, las rutas,
    endpoints y middleware se prueban en integration; las islas Vue en component; el shell y el
-   markup estático se cubren por E2E, no por unit. Los tipos se comprueban con `pnpm check`, no con
+   markup estático se cubren por E2E, no por unit. Los tipos se comprueban con `bun run check`, no con
    tests de runtime.
 10. **Component:** monta el componente real, pásale props y comprueba lo que el usuario ve o emite.
     Localiza por rol, etiqueta, texto o `data-*`, nunca por clases. No uses `wrapper.vm`, métodos
@@ -82,14 +82,14 @@ narrativa.
     `html[data-finance-ready="true"]`. Para recargar, `tracker.reload()`; el lint rechaza
     `page.reload()` en los specs.
 17. **`@smoke` es autosuficiente** y cubre recorridos críticos. Los escenarios que necesitan volumen
-    no son smoke: corren en Browser regression o en `pnpm test:all`, no en el gate de PR.
+    no son smoke: corren en Browser regression o en `bun run test:all`, no en el gate de PR.
 18. **Un contrato no se repite por viewport o tema.** Añade una combinación solo si hay una
     diferencia de comportamiento concreta. Conserva escenarios separados para estados o recorridos
     independientes y no compartas usuarios mutables para ahorrar preparación.
 19. **Sin carreras tapadas.** No subas timeouts o workers ni añadas reintentos para estabilizar;
     corrige el aislamiento. En CI, un caso que solo pasa al reintentarlo falla el gate
     (`failOnFlakyTests`). La cuarentena es solo el procedimiento de #233, con sus diez ejecuciones.
-    El presupuesto de la suite completa es de seis minutos de reloj (`pnpm test:all`); los cambios de
+    El presupuesto de la suite completa es de seis minutos de reloj (`bun run test:all`); los cambios de
     infraestructura registran tres ejecuciones consecutivas locales y de Browser regression con
     duración y resultado. No se reduce cobertura ni se relajan aserciones para conseguirlo;
     toda fusión o eliminación identifica la cobertura que queda.
@@ -113,15 +113,15 @@ narrativa.
 
 ## Ejecución
 
-- `pnpm test` es el comando por defecto (las tres capas). Durante el trabajo, acota por fichero o
-  proyecto (`pnpm exec vitest run --project unit <ruta>`); no esperes al final para el bucle rojo.
-- Antes de la PR: `pnpm gate` (dependencias, lint, tipos y suite) y `pnpm test:e2e:smoke` en
+- `bun run test` es el comando por defecto (las tres capas). Durante el trabajo, acota por fichero o
+  proyecto (`bunx vitest run --project unit <ruta>`); no esperes al final para el bucle rojo.
+- Antes de la PR: `bun run gate` (dependencias, lint, tipos y suite) y `bun run test:e2e:smoke` en
   secuencia para cambios de código, configuración o contenido ejecutable.
-- E2E: `pnpm test:e2e:install` una vez; `pnpm test:e2e --project=chromium` para funcional;
-  `pnpm test:e2e:sync-v2` para offline y sincronización.
-- Worktrees: `pnpm setup:worktree` antes de probar. `pnpm test:e2e` arranca su propio servidor en un
+- E2E: `bun run test:e2e:install` una vez; `bun run test:e2e --project=chromium` para funcional;
+  `bun run test:e2e:sync-v2` para offline y sincronización.
+- Worktrees: `bun run setup:worktree` antes de probar. `bun run test:e2e` arranca su propio servidor en un
   puerto derivado de la ruta del worktree; no lances suites pesadas contra el mismo servidor.
-- Coverage: `pnpm test:coverage` (manual; no está en `pnpm gate` ni en CI). Los umbrales de
+- Coverage: `bun run test:coverage` (manual; no está en `bun run gate` ni en CI). Los umbrales de
   `vitest.config.ts` se suben, nunca se bajan; no se excluyen módulos para mejorar el porcentaje.
 
 ## Cómo lo aplican los agentes
@@ -143,7 +143,7 @@ narrativa.
 - [ ] Los tests nuevos de IA están clasificados (esencial/prescindible/borrar) y se han podado los
       dos últimos grupos.
 - [ ] Si hubo código nuevo, los umbrales de coverage han subido.
-- [ ] `pnpm gate` y, si toca navegador, las specs E2E afectadas están en verde.
+- [ ] `bun run gate` y, si toca navegador, las specs E2E afectadas están en verde.
 
 ## Fuentes
 

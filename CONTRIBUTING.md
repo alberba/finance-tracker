@@ -6,27 +6,43 @@ mezclar. Las reglas sobre **cómo se escribe el código** están aparte, en
 
 ## Entorno
 
-Node según `.node-version`, pnpm como gestor.
+Node según `.node-version`, bun como gestor de paquetes (el runtime sigue siendo Node).
 
 ```bash
-pnpm install
-pnpm setup:worktree
-pnpm dev
+bun install
+bun run setup:worktree
+bun run dev
 ```
 
-`pnpm setup:worktree` crea `.dev.vars` y aplica las migraciones D1 locales; cómo entrar en local
+`bun run setup:worktree` crea `.dev.vars` y aplica las migraciones D1 locales; cómo entrar en local
 con identidad local de pruebas está en el [README](./README.md#ejecutar-en-local-astro). Para Playwright,
-una sola vez: `pnpm test:e2e:install`.
+una sola vez: `bun run test:e2e:install`.
 
-Con varios worktrees a la vez, usa `pnpm dev:worktree` en lugar de `pnpm dev`: elige un puerto propio
+Con varios worktrees a la vez, usa `bun run dev:worktree` en lugar de `bun run dev`: elige un puerto propio
 del worktree (4321 en el checkout principal) y ajusta `BETTER_AUTH_URL` en `.dev.vars` para que el
-login de Better Auth coincida con él. Se para con `pnpm exec astro dev stop`.
-Para entrar con tu cuenta y tus datos (export JSON): `pnpm dev:account <correo> [export.json]`,
-detallado en [self-hosting](docs/operations/self-hosting.md#desarrollo-diario-pnpm-devworktree).
+login de Better Auth coincida con él. Se para con `bunx astro dev stop`.
+Para entrar con tu cuenta y tus datos (export JSON): `bun run dev:account <correo> [export.json]`,
+detallado en [self-hosting](docs/operations/self-hosting.md#desarrollo-diario-bun-run-devworktree).
 
 Sesiones y proveedores de login: [autenticación](docs/operations/authentication.md).
 Node/SQLite, Docker y arranque o archivado de worktrees en Orca:
 [self-hosting](docs/operations/self-hosting.md).
+
+## Dependencias
+
+Los scripts se lanzan con `bun run <script>`, nunca `bun test` (es el runner de Bun, no el script
+`test`), y los binarios con `bunx`. `bunfig.toml` usa el linker aislado: un paquete solo importa lo
+que declara.
+
+- `overrides` en `package.json` fija dependencias transitivas que los grupos de Dependabot no
+  revisan. Quita una entrada solo cuando el rango del padre ya resuelva una versión corregida
+  (compruébalo con `bun pm why <paquete>` y `bun run audit:prod` sin el pin).
+- `patchedDependencies` parchea `@cloudflare/vite-plugin` (el dev server reintenta peticiones
+  idempotentes cuando workerd cierra una conexión loopback; sin él, `bun run dev` devuelve 500
+  intermitentes en E2E) y `http-cache-semantics`. `audit:prod` ignora el aviso que corrige este
+  último (GHSA-ch52-4w7c-c8xp); retira la excepción y el parche cuando haya versión corregida.
+- `trustedDependencies` es la lista cerrada de paquetes que pueden ejecutar scripts de
+  instalación; un paquete nuevo que los necesite se añade a mano.
 
 ## Dónde viven las issues
 
@@ -51,12 +67,12 @@ siguientes, aunque estén dentro de `docs/`.
 Para esos cambios, ejecuta el gate de calidad y smoke en secuencia:
 
 ```bash
-pnpm gate                   # dependencias + lint + tipos + unit/component/integration
-pnpm test:e2e:smoke          # recorridos críticos
+bun run gate                   # dependencias + lint + tipos + unit/component/integration
+bun run test:e2e:smoke          # recorridos críticos
 ```
 
-El CI de cada PR ejecuta lint, tipos (`astro check` + `vue-tsc`), `pnpm test`, comprueba que las
-migraciones D1 locales v2 aplican limpias y ejecuta `pnpm build`. Un único job de navegador comprueba los recorridos
+El CI de cada PR ejecuta lint, tipos (`astro check` + `vue-tsc`), `bun run test`, comprueba que las
+migraciones D1 locales v2 aplican limpias y ejecuta `bun run build`. Un único job de navegador comprueba los recorridos
 `@smoke` de la app, de autenticación y de sync, automáticamente y sin labels.
 Al empujar a `main`, un job breve busca el CI verde de la PR que produjo el merge y compara
 el árbol Git del push con el árbol que realmente se probó. Si coinciden, reutiliza la validación
@@ -64,7 +80,7 @@ sin repetir checks. Si difieren, es un push directo o no se puede verificar la e
 lint/tipos, Vitest y migraciones D1. El build de CI solo corre en PR y ejecuciones manuales:
 el despliegue construye la imagen Docker del commit mezclado. La evidencia caduca a los siete días;
 su ausencia siempre activa los checks de respaldo.
-La suite completa (Vitest, auth, funcional y sync-v2) se ejecuta con `pnpm test:all`.
+La suite completa (Vitest, auth, funcional y sync-v2) se ejecuta con `bun run test:all`.
 **Browser regression** comprueba las mismas capas en CI:
 se ejecuta los lunes a las 05:00 UTC o a mano sobre la rama elegida. No bloquea entregas ni dispara
 despliegues. Para una PR de riesgo, ejecútala manualmente antes de mezclar.

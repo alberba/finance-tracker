@@ -4,7 +4,7 @@ Better Auth 1.7.18, su plugin passkey 1.7.18 y Resend 6.37.0 están fijados en e
 lockfile. `@better-auth/utils` 0.5.1 fija el peer requerido por core/passkey; Better
 Auth resuelve su dependencia propia. Producción corre Node + SQLite en Docker (ver
 [self-hosting](self-hosting.md#producción-en-oracle)); Workers/D1 solo quedan para
-desarrollo, `pnpm preview` y tests. Drizzle 0.45.4. Las migraciones 0007–0009 son aditivas y
+desarrollo, `bun run preview` y tests. Drizzle 0.45.4. Las migraciones 0007–0009 son aditivas y
 conservan las claves financieras.
 
 ## Contratos
@@ -108,10 +108,10 @@ escrituras financieras nuevas ni volver al protocolo de blob retirado.
 
 ## Verificación
 
-- Gates: `pnpm check`, `pnpm lint`, `pnpm test`, `pnpm build`.
-- HTTP/SQLite: `pnpm test:integration tests/integration/auth`.
+- Gates: `bun run check`, `bun run lint`, `bun run test`, `bun run build`.
+- HTTP/SQLite: `bun run test:integration tests/integration/auth`.
 - Worker/D1 y WebAuthn real con autenticador virtual:
-  `pnpm test:e2e:auth` (desktop y móvil; correo y red de proveedores externos simulados).
+  `bun run test:e2e:auth` (desktop y móvil; correo y red de proveedores externos simulados).
   `AUTH_TEST_PORT` permite otro puerto. El runner usa una D1 de pruebas distinta,
   migraciones reales y el mismo estado local que Astro. Los servidores de prueba
   solo funcionan con flag de pruebas y origen loopback. El alias de red OAuth

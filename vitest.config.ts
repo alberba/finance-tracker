@@ -26,7 +26,7 @@ export default defineConfig({
       ],
       reporter: process.env.CI ? ['text', 'json-summary'] : ['text', 'html', 'json-summary'],
       // Measured on the merge of the redesign into main (#454), with the neon
-      // UI in place of src/components (pnpm test:coverage): lines 59.91,
+      // UI in place of src/components (bun run test:coverage): lines 59.91,
       // statements 58.06, functions 52.73, branches 48.83. The neon screens are
       // mostly covered by E2E, so this is a new baseline, not a drop of the old
       // one. Keep the minimum just below the measurement; raise it with new code.
