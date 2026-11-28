@@ -187,8 +187,8 @@ const categoryOptions = computed(() => {
 })
 
 const categoryChoices = computed(() =>
-  [...categoryOptions.value]
-    .sort((a, b) => a.localeCompare(b, 'es'))
+  categoryOptions.value
+    .toSorted((a, b) => a.localeCompare(b, 'es'))
     .map((label) => ({
       label,
       value: label,
@@ -431,10 +431,10 @@ function morphOut(element: HTMLElement, done: () => void): boolean {
     easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
     fill: 'forwards',
   } as const
-  const shape = element.animate([...frames.shape].reverse(), options)
+  const shape = element.animate(frames.shape.toReversed(), options)
   morphing = [
     shape,
-    element.animate([...frames.colour].reverse(), { ...options, easing: 'linear' }),
+    element.animate(frames.colour.toReversed(), { ...options, easing: 'linear' }),
     ...[...element.children].map((child) =>
       child.animate([{ opacity: 1 }, { opacity: 0, offset: 0.45 }, { opacity: 0 }], {
         ...options,

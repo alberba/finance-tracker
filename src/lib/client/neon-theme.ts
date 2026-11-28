@@ -31,6 +31,8 @@ export interface NeonThemeEnvironment {
     addEventListener(type: 'change', listener: (event: { matches: boolean }) => void): void
   }
   root: { dataset: DOMStringMap }
+  /** `<meta name="color-scheme">`, so native UI matches the theme before the CSS loads. */
+  colorSchemeMeta?: { content: string } | null
 }
 
 export interface NeonThemeController {
@@ -61,6 +63,10 @@ function writeStored(storage: NeonThemeEnvironment['storage'], preference: NeonT
   }
 }
 
+function colorSchemeOf(theme: NeonTheme): 'dark' | 'light' {
+  return theme.startsWith('oscuro') ? 'dark' : 'light'
+}
+
 export function createNeonThemeController(env: NeonThemeEnvironment): NeonThemeController {
   let preference = parsePreference(readStored(env.storage))
   const listeners = new Set<(state: NeonThemeState) => void>()
@@ -70,16 +76,21 @@ export function createNeonThemeController(env: NeonThemeEnvironment): NeonThemeC
     theme: preference ?? (env.media.matches ? 'oscuro-suave' : 'claro-melocoton'),
   })
 
+  const paint = (theme: NeonTheme) => {
+    env.root.dataset.theme = theme
+    if (env.colorSchemeMeta) env.colorSchemeMeta.content = colorSchemeOf(theme)
+  }
+
   const apply = () => {
     const state = getState()
-    env.root.dataset.theme = state.theme
+    paint(state.theme)
     listeners.forEach((listener) => listener(state))
   }
 
   env.media.addEventListener('change', () => {
     if (preference === null) apply()
   })
-  env.root.dataset.theme = getState().theme
+  paint(getState().theme)
 
   return {
     getState,
@@ -111,6 +122,7 @@ export function getNeonThemeController(): NeonThemeController {
     storage: browserStorage(),
     media: window.matchMedia('(prefers-color-scheme: dark)'),
     root: document.documentElement,
+    colorSchemeMeta: document.querySelector<HTMLMetaElement>('meta[name="color-scheme"]'),
   })
   return browserController
 }

@@ -652,7 +652,7 @@ export function sortPositions(
   const pick = (row: PositionRow) =>
     key === 'weight' ? row.weightPct : key === 'gain' ? row.gainValue : row.changeValue
   const sign = direction === 'asc' ? 1 : -1
-  return [...rows].sort((a, b) => sign * (pick(a) - pick(b)))
+  return rows.toSorted((a, b) => sign * (pick(a) - pick(b)))
 }
 
 /**

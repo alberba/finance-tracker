@@ -432,7 +432,7 @@ function correlationIdFixes(
     for (const legacyId of Array.from(groups.keys()).sort()) {
       // UUIDv7 ids sort by creation time, so the earliest row keeps the id the
       // migration derived and the later ones move aside.
-      const ids = (groups.get(legacyId) ?? []).slice().sort()
+      const ids = (groups.get(legacyId) ?? []).toSorted()
       for (const rowId of ids.slice(1)) {
         let candidate = `${legacyId}@2`
         for (let suffix = 2; taken.has(candidate); suffix += 1) {
@@ -481,8 +481,7 @@ function budgetRestorations(
   backup: readonly RepairBackupBudgetCell[],
 ): BudgetCellRepair[] {
   return backup
-    .slice()
-    .sort(
+    .toSorted(
       (left, right) =>
         left.year - right.year ||
         left.month - right.month ||
@@ -554,8 +553,7 @@ function snapshotRestorations(
   )
 
   return backup
-    .slice()
-    .sort((left, right) => left.year - right.year || left.month - right.month)
+    .toSorted((left, right) => left.year - right.year || left.month - right.month)
     .flatMap((snapshot) => {
       const expectedBalances = snapshot.balances.map((balance) => ({
         accountId: balance.accountLegacyId

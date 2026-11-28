@@ -398,8 +398,8 @@ export function projectSyncV2State(
     (bootstrap.instruments || []).flatMap((instrument) => {
       const tracking = trackingRows.get(instrument.userInstrument.id)
       if (!tracking || tracking.quoteConfig) return []
-      const latest = [...instrument.quotes]
-        .sort((left, right) => String(left.quotedAt).localeCompare(String(right.quotedAt)))
+      const latest = instrument.quotes
+        .toSorted((left, right) => String(left.quotedAt).localeCompare(String(right.quotedAt)))
         .at(-1)
       if (!latest) return []
       const instrumentId = legacyId(instrument)

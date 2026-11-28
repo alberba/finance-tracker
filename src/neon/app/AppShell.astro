@@ -20,6 +20,7 @@ const activeSection = page === 'reports' ? null : getSectionFromPath(Astro.url.p
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
     <script is:inline>
       // Theme before the first paint (src/lib/client/neon-theme.ts): a stored
       // theme name wins, otherwise «oscuro suave», or «claro melocotón» if the
@@ -48,6 +49,8 @@ const activeSection = page === 'reports' ? null : getSectionFromPath(Astro.url.p
         } catch {
           root.dataset.theme = 'oscuro-suave'
         }
+        const meta = document.querySelector('meta[name="color-scheme"]')
+        if (meta) meta.content = root.dataset.theme.startsWith('oscuro') ? 'dark' : 'light'
       })()
     </script>
     <script is:inline>
